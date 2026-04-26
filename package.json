@@ -1,0 +1,13 @@
+{
+  "name": "syncup",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "api",
+    "mobile"
+  ],
+  "scripts": {
+    "api": "npm run dev --workspace=api",
+    "mobile": "npm run start --workspace=mobile"
+  }
+}
