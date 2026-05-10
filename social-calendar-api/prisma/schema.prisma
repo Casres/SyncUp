@@ -1,0 +1,385 @@
+generator client {
+  provider      = "prisma-client-js"
+  // `native` covers macOS dev. The explicit Linux/glibc targets cover the
+  // API container (node:20-bookworm-slim) on both Apple-Silicon and x86_64
+  // hosts. Bookworm ships libssl3, so the OpenSSL 3 query-engine variant
+  // loads cleanly — see Dockerfile rationale.
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum SocialGroupRole {
+  ADMIN
+  MEMBER
+}
+
+enum EventOrganiserRole {
+  CREATOR
+  CO_HOST
+}
+
+enum EventExceptionType {
+  CANCELLED
+  RESCHEDULED
+  MODIFIED
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  MAYBE
+}
+
+enum NotifChannel {
+  PUSH
+  EMAIL
+  NONE
+}
+
+enum Recurrence {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum AvailabilityGranularity {
+  DAY
+  WEEK
+  MONTH
+}
+
+enum SuggestionVoteValue {
+  UP
+  DOWN
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id          String  @id @default(cuid())
+  clerkId     String  @unique
+  username    String  @unique
+  displayName String
+  avatarUrl   String?
+  bio         String?
+
+  // Global notification defaults — overridden per-invite or per-availability-window
+  notifEventInvite  Boolean @default(true)
+  notifAvailability Boolean @default(true)
+  notifGroupUpdates Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  friendshipsInitiated Friendship[]        @relation("FriendshipInitiator")
+  friendshipsReceived  Friendship[]        @relation("FriendshipReceiver")
+  friendshipLabels     FriendshipLabel[]
+  availabilityBlocks   AvailabilityBlock[] @relation("AvailabilityBlocker")
+  blockedByUsers       AvailabilityBlock[] @relation("AvailabilityBlocked")
+  friendGroupsOwned    FriendGroup[]
+  socialGroups         SocialGroupMember[]
+  eventsCreated        Event[]
+  eventOrganiserRoles  EventOrganiser[]
+  eventInvites         EventInvite[]
+  userAvailability     UserAvailability[]
+  pollsCreated         GroupPoll[]
+  pollVotes            PollVote[]
+  eventSuggestions     EventSuggestion[]
+  suggestionVotes      SuggestionVote[]
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  initiatorId String
+  receiverId  String
+  status      FriendshipStatus @default(PENDING)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  initiator User              @relation("FriendshipInitiator", fields: [initiatorId], references: [id])
+  receiver  User              @relation("FriendshipReceiver", fields: [receiverId], references: [id])
+  labels    FriendshipLabel[]
+
+  @@unique([initiatorId, receiverId])
+}
+
+// Each user labels the other independently.
+// A can call B a "coworker" while B calls A a "friend". Labels are not shared.
+model FriendshipLabel {
+  id           String @id @default(cuid())
+  friendshipId String
+  ownerId      String
+  label        String
+
+  friendship Friendship @relation(fields: [friendshipId], references: [id])
+  owner      User       @relation(fields: [ownerId], references: [id])
+
+  @@unique([friendshipId, ownerId])
+}
+
+// One-directional. Hiding availability from someone is not the same as blocking or unfriending.
+// Every service method that fetches availability for a viewer must check this table first.
+model AvailabilityBlock {
+  id        String @id @default(cuid())
+  blockerId String
+  blockedId String
+
+  createdAt DateTime @default(now())
+
+  blocker User @relation("AvailabilityBlocker", fields: [blockerId], references: [id])
+  blocked User @relation("AvailabilityBlocked", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+}
+
+// Private to owner. Members cannot see they are in it.
+// Used only for bulk-inviting convenience — service layer expands to individual EventInvite rows.
+model FriendGroup {
+  id      String @id @default(cuid())
+  ownerId String
+  name    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner        User                @relation(fields: [ownerId], references: [id])
+  members      FriendGroupMember[]
+  eventInvites EventInvite[]
+}
+
+model FriendGroupMember {
+  id            String @id @default(cuid())
+  friendGroupId String
+  userId        String
+
+  friendGroup FriendGroup @relation(fields: [friendGroupId], references: [id])
+
+  @@unique([friendGroupId, userId])
+}
+
+// Shared group with roles. Drives polls and suggestions.
+model SocialGroup {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  avatarUrl   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  members     SocialGroupMember[]
+  polls       GroupPoll[]
+  suggestions EventSuggestion[]
+}
+
+model SocialGroupMember {
+  id            String          @id @default(cuid())
+  socialGroupId String
+  userId        String
+  role          SocialGroupRole @default(MEMBER)
+
+  joinedAt DateTime @default(now())
+
+  socialGroup SocialGroup @relation(fields: [socialGroupId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@unique([socialGroupId, userId])
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  // creatorId is denormalised for fast list queries without an extra join.
+  // The creator always gets a CREATOR row in EventOrganiser, written atomically at creation time.
+  creatorId   String
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime
+
+  // recurrence covers common cases. recurrenceRuleRaw stores a full RRULE string for complex patterns.
+  // This means complex recurrence can be supported later via rrule.js without a migration.
+  recurrence        Recurrence @default(NONE)
+  recurrenceRuleRaw String?
+
+  // Checked at the service layer before persisting a SuggestionVote. No DB constraint across tables.
+  allowSuggestionVoting Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  creator     User              @relation(fields: [creatorId], references: [id])
+  organisers  EventOrganiser[]
+  exceptions  EventException[]
+  invites     EventInvite[]
+  suggestions EventSuggestion[]
+}
+
+model EventOrganiser {
+  id      String             @id @default(cuid())
+  eventId String
+  userId  String
+  role    EventOrganiserRole
+
+  event Event @relation(fields: [eventId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+// One Event row is the recurrence template. Exceptions are tracked here.
+// originalDate is always the date the instance WOULD have occurred per the recurrence rule — not the rescheduled date.
+// Override fields are nullable — null means inherit from the parent Event.
+// Calendar rendering: expand RRULE into instances, left-join EventException on originalDate to apply overrides.
+model EventException {
+  id           String             @id @default(cuid())
+  eventId      String
+  originalDate DateTime
+  type         EventExceptionType
+
+  // Nullable overrides — null means inherit from parent
+  title       String?
+  description String?
+  location    String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@unique([eventId, originalDate])
+}
+
+model EventInvite {
+  id          String       @id @default(cuid())
+  eventId     String
+  recipientId String
+  status      InviteStatus @default(PENDING)
+
+  // Audit trail: which FriendGroup blast spawned this invite.
+  // @@unique([eventId, recipientId]) makes FriendGroup expansion idempotent (safe to upsert).
+  friendGroupId String?
+
+  // Per-invite notification channel override. Falls back to UserAvailability.notifOnChange, then User global defaults.
+  notifChannel NotifChannel?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  event       Event        @relation(fields: [eventId], references: [id])
+  recipient   User         @relation(fields: [recipientId], references: [id])
+  friendGroup FriendGroup? @relation(fields: [friendGroupId], references: [id])
+
+  @@unique([eventId, recipientId])
+}
+
+// Source of truth for availability. Redis caches current + upcoming windows per userId for the real-time invite screen.
+// Overlapping windows are allowed — service layer resolves conflicts by preferring the most specific granularity: DAY > WEEK > MONTH.
+// No DB constraint prevents overlaps — enforced in code.
+model UserAvailability {
+  id          String                  @id @default(cuid())
+  userId      String
+  windowStart DateTime
+  windowEnd   DateTime
+  granularity AvailabilityGranularity
+
+  // Per-window notification override. Falls back to User global defaults.
+  notifOnChange Boolean       @default(false)
+  notifChannel  NotifChannel?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, windowStart])
+  @@index([windowStart, windowEnd])
+}
+
+// Any group member can create a poll. createdById is for attribution and so poll creators can close/delete their own polls.
+model GroupPoll {
+  id            String    @id @default(cuid())
+  socialGroupId String
+  eventId       String?
+  createdById   String
+  question      String
+  closedAt      DateTime?
+
+  createdAt DateTime @default(now())
+
+  socialGroup SocialGroup  @relation(fields: [socialGroupId], references: [id])
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  options     PollOption[]
+}
+
+model PollOption {
+  id     String @id @default(cuid())
+  pollId String
+  text   String
+  order  Int
+
+  poll  GroupPoll  @relation(fields: [pollId], references: [id])
+  votes PollVote[]
+}
+
+model PollVote {
+  id           String @id @default(cuid())
+  pollOptionId String
+  userId       String
+
+  pollOption PollOption @relation(fields: [pollOptionId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([pollOptionId, userId])
+}
+
+model EventSuggestion {
+  id            String    @id @default(cuid())
+  socialGroupId String
+  eventId       String?
+  suggestedById String
+  title         String
+  description   String?
+  proposedDate  DateTime?
+
+  createdAt DateTime @default(now())
+
+  socialGroup SocialGroup      @relation(fields: [socialGroupId], references: [id])
+  event       Event?           @relation(fields: [eventId], references: [id])
+  suggestedBy User             @relation(fields: [suggestedById], references: [id])
+  votes       SuggestionVote[]
+}
+
+// allowSuggestionVoting on Event is checked at the service layer before writing a vote.
+model SuggestionVote {
+  id           String              @id @default(cuid())
+  suggestionId String
+  userId       String
+  value        SuggestionVoteValue
+
+  suggestion EventSuggestion @relation(fields: [suggestionId], references: [id])
+  user       User            @relation(fields: [userId], references: [id])
+
+  @@unique([suggestionId, userId])
+}
