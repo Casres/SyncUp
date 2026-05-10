@@ -1,0 +1,106 @@
+/**
+ * FriendRequestCard — pending inbound friend request.
+ *
+ * In-place actions only. The sheet does NOT dismiss on Accept or Decline.
+ * No SwipeableRow wrapper — the row exposes Accept and Decline tap targets,
+ * a swipe layer would conflict.
+ *
+ * Decline uses TwoTapDestructive. When offline=true, both pills render
+ * disabled (opacity 0.4, pointerEvents='none').
+ */
+
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { RingAvatar } from '../foundation/RingAvatar';
+import { PillBtn } from '../foundation/PillBtn';
+import { TwoTapDestructive } from '../social/TwoTapDestructive';
+import { colors, spacing, typography } from '../../theme';
+import type { FriendRequestNotif } from '../../../../TYPES';
+
+import { formatRelative } from './relativeTime';
+
+type Theme = typeof colors.light;
+
+export interface FriendRequestCardProps {
+  T?: Theme;
+  notif: FriendRequestNotif;
+  offline: boolean;
+  onAccept: () => void;
+  onDecline: () => void;
+}
+
+export function FriendRequestCard({
+  T = colors.light,
+  notif,
+  offline,
+  onAccept,
+  onDecline,
+}: FriendRequestCardProps): React.JSX.Element {
+  return (
+    <View
+      pointerEvents={offline ? 'none' : 'auto'}
+      style={[
+        styles.row,
+        { backgroundColor: T.bgElevated, opacity: offline ? 0.4 : 1 },
+      ]}
+    >
+      <View style={styles.head}>
+        <RingAvatar T={T} letter={notif.actorInitial} size={40} />
+        <View style={styles.body}>
+          <Text style={[typography.body, { color: T.ink }]} numberOfLines={2}>
+            <Text style={{ fontWeight: '700' }}>{notif.actorName}</Text> wants to be friends
+          </Text>
+          <Text style={[typography.caption, { color: T.ink3 }]}>
+            {notif.actorHandle} · {formatRelative(notif.createdAt)}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.actions}>
+        <View style={styles.action}>
+          <PillBtn
+            T={T}
+            label="Accept"
+            variant="primary"
+            size="sm"
+            onPress={onAccept}
+          />
+        </View>
+        <View style={styles.action}>
+          <TwoTapDestructive
+            T={T}
+            label="Decline"
+            confirmLabel="Tap again to decline"
+            onConfirm={onDecline}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  row: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
+    minHeight: 64,
+  },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  body: {
+    flex: 1,
+    gap: 4,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingLeft: 52, // align under text body, not avatar
+  },
+  action: {
+    flex: 1,
+  },
+});
