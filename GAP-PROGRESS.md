@@ -39,7 +39,7 @@ without losing context. Always update this file after each GAP completes.
 | 5 | GAP 9 | BroadcastToast `queued` prop (R13-3) | ✅ Complete — see commit log |
 | 6 | GAP 10 | AudiencePickerSheet zero-friend state (R13-4) | ✅ Complete — see commit log |
 | 7 | GAP 2 | Search overlay (R8-1 through R8-7) | ✅ Complete — see commit log |
-| 8 | GAP 1 | Onboarding stack (R9-1 through R9-10) | ⏳ Prompt ready — gaps/GAP-01-onboarding.md (lowest priority) |
+| 8 | GAP 1 | Onboarding stack (R9-1 through R9-10) | ✅ Complete — see commit log |
 
 ---
 

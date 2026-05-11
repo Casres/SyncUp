@@ -1,62 +1,76 @@
 /**
- * SignInScreen — minimum sign-in shell for Clerk integration.
+ * SignInScreen — credential-based sign-in (R9-1, R9-9, R9-10 entry).
  *
- * SPEC STATUS:
- *   This screen is the smallest viable surface that lets a real Clerk
- *   session be established so the rest of the app can be exercised against
- *   live tokens. The full Round 9 sign-in design — branded Welcome screen,
- *   format-agnostic identifier (R9-9), forgot-password sub-flow ending at a
- *   confirmation screen (R9-10), invite-context banner (R9-8) — is GAP 1 and
- *   tracked separately. See ANCHOR-DESIGN.txt R9-1 through R9-10.
- *
- * IMPLEMENTED RULES:
- *   - R9-1: no tab bar / FlowHeader; this screen renders inside AuthNavigator,
- *     which mounts before the main app shell.
- *   - R9-4: primary CTA disabled until both fields non-empty. No error shown
- *     before the first submit attempt.
- *   - Tokens only: never hardcodes hex; uses src/theme/colors.ts.
- *
- * DEFERRED (TODO):
- *   - R9-9: format-agnostic identifier with adaptive keyboardType.
- *   - R9-10: forgot-password sub-flow + confirmation screen.
- *   - InviteContextBanner on Welcome (R9-8).
- *   - Welcome screen with branded illustration.
- *   - Animated entry / haptics on submit success (use useHaptic, never raw Haptics.*).
+ * Updated for the GAP 1 onboarding surface — still backed by Clerk
+ * (`useSignIn`) when a real attempt completes, with a simulated wrong-
+ * credentials path for visual QA (password === 'wrong'). Forgot-password
+ * link routes to the dedicated sub-flow, and the footer routes to the
+ * 6-step sign-up rather than the legacy single-screen surface.
  */
 
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSignIn } from '@clerk/clerk-expo';
 
-import { FormField, PillBtn } from '../../components';
-import { colors, spacing, typography } from '../../theme';
+import { AuthInputField } from '../../components/foundation/AuthInputField';
+import { PillBtn } from '../../components/foundation/PillBtn';
+import { colors, spacing, typography, useHaptic } from '../../theme';
 import type { SignInScreenProps } from '../../navigation/types';
 
-export default function SignInScreen({ navigation }: SignInScreenProps): React.JSX.Element {
+export default function SignInScreen({
+  navigation,
+}: SignInScreenProps): React.JSX.Element {
   const T = colors.light;
+  const fire = useHaptic();
   const { signIn, setActive, isLoaded } = useSignIn();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | undefined>();
+  const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const canSubmit = identifier.trim().length > 0 && password.length > 0 && !submitting;
+  const canSubmit =
+    identifier.trim().length > 0 && password.length > 0 && !submitting;
 
   async function onSubmit() {
-    if (!isLoaded || !canSubmit) return;
+    if (!canSubmit) return;
+    fire('light');
+
+    // QA hook: password === 'wrong' surfaces the inline error path without
+    // requiring a network round-trip. Real Clerk auth handles every other
+    // case (incl. genuine bad credentials with its own message).
+    if (password === 'wrong') {
+      fire('error');
+      setError('Incorrect credentials');
+      return;
+    }
+
+    if (!isLoaded) return;
     setSubmitting(true);
-    setError(undefined);
+    setError(null);
     try {
-      const attempt = await signIn.create({ identifier: identifier.trim(), password });
+      const attempt = await signIn.create({
+        identifier: identifier.trim(),
+        password,
+      });
       if (attempt.status === 'complete') {
+        fire('success');
         await setActive({ session: attempt.createdSessionId });
-        // RootNavigator unmounts AuthNavigator on isSignedIn flip.
+        // RootNavigator unmounts AuthNavigator when isSignedIn flips.
       } else {
-        setError('Additional verification required. Full multi-factor flow is GAP 1.');
+        setError('Additional verification required.');
       }
     } catch (e) {
+      fire('error');
       const msg = e instanceof Error ? e.message : 'Sign-in failed';
       setError(msg);
     } finally {
@@ -64,8 +78,21 @@ export default function SignInScreen({ navigation }: SignInScreenProps): React.J
     }
   }
 
+  function onForgotPassword() {
+    fire('light');
+    navigation.navigate('ForgotPassword');
+  }
+
+  function onCreateAccount() {
+    fire('light');
+    navigation.navigate('SignUpStep1');
+  }
+
   return (
-    <SafeAreaView style={[styles.root, { backgroundColor: T.bg }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.root, { backgroundColor: T.bg }]}
+      edges={['top', 'bottom']}
+    >
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -74,55 +101,73 @@ export default function SignInScreen({ navigation }: SignInScreenProps): React.J
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={[typography.h1, { color: T.ink, marginBottom: spacing.sm }]}>
-            Sign in
-          </Text>
-          <Text style={[typography.body, { color: T.ink2, marginBottom: spacing['3xl'] }]}>
-            Welcome back to SyncUp.
+          <Text style={[typography.h1, styles.title, { color: T.ink }]}>
+            Welcome back
           </Text>
 
-          <FormField
-            T={T}
-            label="Phone, email, or @handle"
-            value={identifier}
-            onChange={setIdentifier}
-            placeholder="you@example.com"
-            autoCapitalize="none"
-          />
-          <View style={{ height: spacing.lg }} />
-          <FormField
-            T={T}
-            label="Password"
-            value={password}
-            onChange={setPassword}
-            placeholder="••••••••"
-            autoCapitalize="none"
-            secureTextEntry
-          />
+          <View style={styles.fields}>
+            <AuthInputField
+              T={T}
+              label="Phone, email, or @handle"
+              value={identifier}
+              onChange={(v) => {
+                setIdentifier(v);
+                if (error) setError(null);
+              }}
+              placeholder="you@example.com"
+              autoFocus
+            />
+            <View>
+              <AuthInputField
+                T={T}
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(v) => {
+                  setPassword(v);
+                  if (error) setError(null);
+                }}
+                error={error ?? undefined}
+                placeholder="••••••••"
+              />
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Forgot password"
+                hitSlop={8}
+                onPress={onForgotPassword}
+                style={styles.forgotBtn}
+              >
+                <Text style={[styles.forgotLabel, { color: T.ink3 }]}>
+                  Forgot password?
+                </Text>
+              </Pressable>
+            </View>
+          </View>
 
-          {error ? (
-            <Text style={[typography.caption, styles.error, { color: T.popInk }]}>{error}</Text>
-          ) : null}
+          <View style={styles.cta}>
+            <PillBtn
+              T={T}
+              label="Sign in"
+              variant="primary"
+              size="lg"
+              disabled={!canSubmit}
+              loading={submitting}
+              onPress={onSubmit}
+            />
+          </View>
 
-          <View style={{ height: spacing['3xl'] }} />
-
-          <PillBtn
-            T={T}
-            label="Sign in"
-            variant="primary"
-            size="lg"
-            onPress={onSubmit}
-            disabled={!canSubmit}
-            loading={submitting}
-          />
-          <View style={{ height: spacing.md }} />
-          <PillBtn
-            T={T}
-            label="Create account"
-            variant="ghost"
-            size="lg"
-            onPress={() => navigation.navigate('SignUp')}
-          />
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Create account"
+            hitSlop={8}
+            onPress={onCreateAccount}
+            style={styles.footerLink}
+          >
+            <Text style={[styles.footerLabel, { color: T.ink3 }]}>
+              New to SyncUp?{' '}
+              <Text style={{ color: T.accent }}>Create account</Text>
+            </Text>
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -134,10 +179,37 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
     flexGrow: 1,
-    padding: spacing.lg,
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing['4xl'],
+    paddingBottom: spacing.lg,
   },
-  error: {
-    marginTop: spacing.md,
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  fields: {
+    marginTop: spacing['3xl'],
+    gap: spacing.lg,
+  },
+  forgotBtn: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-end',
+    paddingVertical: spacing.xs,
+  },
+  forgotLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  cta: {
+    marginTop: spacing.xxl,
+  },
+  footerLink: {
+    marginTop: spacing.xxl,
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+  },
+  footerLabel: {
+    fontSize: 13,
+    fontWeight: '500',
   },
 });

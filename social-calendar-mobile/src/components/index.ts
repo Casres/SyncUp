@@ -41,6 +41,31 @@ export type { SectionHeaderProps } from './foundation/SectionHeader';
 export { Toggle } from './foundation/Toggle';
 export type { ToggleProps } from './foundation/Toggle';
 
+// ── GAP 1 — onboarding foundation pieces ────────────────────────────────────
+export { ProgressDots } from './foundation/ProgressDots';
+export type { ProgressDotsProps } from './foundation/ProgressDots';
+
+export { AuthInputField } from './foundation/AuthInputField';
+export type {
+  AuthInputFieldProps,
+  AuthInputType,
+} from './foundation/AuthInputField';
+
+export { OTPInput } from './foundation/OTPInput';
+export type { OTPInputProps } from './foundation/OTPInput';
+
+export { HandleInput } from './foundation/HandleInput';
+export type {
+  HandleInputProps,
+  HandleAvailabilityState,
+} from './foundation/HandleInput';
+
+export { InviteContextBanner } from './foundation/InviteContextBanner';
+export type {
+  InviteContextBannerProps,
+  InviteContext,
+} from './foundation/InviteContextBanner';
+
 // ────────────────────────────────────────────────────────────────────────────
 // Polish (8)
 // ────────────────────────────────────────────────────────────────────────────

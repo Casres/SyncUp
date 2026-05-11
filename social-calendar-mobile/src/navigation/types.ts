@@ -34,9 +34,28 @@ import type {
  * (Welcome, 6-step sign-up, forgot password) is GAP 1 and is tracked
  * separately; see ANCHOR-DESIGN.txt R9-1 through R9-10.
  */
+/** Invite-first deep-link context (R9-8). */
+export interface AuthInviteContext {
+  inviterName: string;
+  eventName?: string;
+}
+
 export type AuthStackParamList = {
+  Welcome: { inviteContext?: AuthInviteContext } | undefined;
   SignIn: undefined;
-  SignUp: undefined;
+  SignUpStep1: undefined;
+  SignUpStep2: { credential: string };
+  SignUpStep3: { credential: string };
+  SignUpStep4: { credential: string; name: string; handle: string };
+  SignUpStep5: {
+    credential: string;
+    name: string;
+    handle: string;
+    password: string;
+  };
+  SignUpStep6: { inviteContext?: AuthInviteContext };
+  ForgotPassword: undefined;
+  ForgotPasswordConfirm: { credential: string };
 };
 
 export type HomeStackParamList = {
@@ -149,8 +168,16 @@ export type RootStackParamList = {
 // ============================================================================
 
 // --- Auth ---
+export type WelcomeScreenProps = NativeStackScreenProps<AuthStackParamList, 'Welcome'>;
 export type SignInScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignIn'>;
-export type SignUpScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUp'>;
+export type SignUpStep1ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep1'>;
+export type SignUpStep2ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep2'>;
+export type SignUpStep3ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep3'>;
+export type SignUpStep4ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep4'>;
+export type SignUpStep5ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep5'>;
+export type SignUpStep6ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep6'>;
+export type ForgotPasswordScreenProps = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
+export type ForgotPasswordConfirmScreenProps = NativeStackScreenProps<AuthStackParamList, 'ForgotPasswordConfirm'>;
 
 // --- Explore ---
 export type ExploreScreenProps = CompositeScreenProps<
