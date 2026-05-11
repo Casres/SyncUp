@@ -1,0 +1,78 @@
+# SyncUp — File Map
+# Extracted from ANCHOR.txt v2.7
+# Developer reference only — not needed by Claude Design.
+================================================================
+## FILE MAP
+================================================================
+Root HTML
+  Polish & States.html          Round 5 polish catalog
+  Profile & Availability.html   Round 4 prototype shell
+  Friends & Groups.html         Round 3 prototype shell
+  Create Event Flow.html        Round 2 prototype shell
+  Home v2 - Merged.html         Round 1 home
+  Design System.html            Round 1 DS gallery
+  Notifications & Activity.html Round 6 deliverable
+  ANCHOR.txt                    Full source-of-truth anchor doc
+  ANCHOR-DESIGN.txt             Trimmed Claude Design working copy
+  ANCHOR-HISTORY.txt            Changelog + build notes archive
+  ANCHOR-FILEMAP.txt            This file
+Round 6 modules
+  flow/n6-data.jsx              N6_NOTIFS (mock feed), n6UnreadCount,
+                                stackInboundBroadcasts (60-min sender merge),
+                                groupNotifsByDay
+  flow/n6-primitives.jsx        N6TabBar (5-tab IA), PullDownAffordance,
+                                NotifGroupHeader, InboundBroadcastCard,
+                                RsvpCard, FriendRequestCard, GroupInviteCard,
+                                EventReminderCard, GroupActivityCard,
+                                SwipeRow, EmptyNotifications
+  flow/n6-sheet.jsx             NotifSheet (2-detent · drag mechanics ·
+                                focus trap · reduced-motion variant)
+Round 5 modules
+  flow/polish-primitives.jsx    Spinner, LoadingOverlay, ButtonLoading,
+                                ErrorState, ErrorToast, OfflineBar, A11yLive,
+                                StaggerList, PolishKeyframes, useHaptic,
+                                HAPTIC_TYPES
+  flow/polish-screens.jsx       In-place state demos (Empty*, Loading*,
+                                Error*, Edge*) for every shipped screen
+  flow/polish-catalog.jsx       DesignCanvas layout: spinner spec, haptics
+                                sheet, motion sheet, audit table, dark check
+Round 4 modules
+  flow/pa-data.jsx              PA_PROFILE, PA_NOTIF_DEFAULTS,
+                                PA_PRIVACY_DEFAULTS, PA_TODAY,
+                                PA_AVAIL_DEFAULT, PA_BROADCAST_DEFAULT,
+                                PA_QUICKSETS, paToIso, paAddDays
+  flow/pa-primitives.jsx        SettingsRow, SettingsGroup, ThemePicker,
+                                AvailDot, StatTile, BroadcastToast,
+                                AudienceSwitcher
+  flow/pa-profile.jsx           ProfileSettings
+  flow/pa-availability.jsx      AvailabilityEditor, MonthGrid, WeekView,
+                                DayView (+ inline BrushPicker, QuicksetGrid)
+  flow/pa-broadcast.jsx         BroadcastSettings, AudiencePickerSheet
+  flow/pa-step3-wired.jsx       Step3InviteWired (consumes avail map)
+Round 3 modules
+  flow/fg-data.jsx              ME, FRIEND_CATEGORIES, FG_FRIENDS,
+                                FG_PRIVATE_GROUPS (friend types),
+                                FG_SOCIAL_GROUPS, FG_SHARED_HISTORY
+  flow/fg-primitives.jsx        SegmentedSwitcher, QRArt, CoverArt,
+                                CategoryBadge, PrivateBadge, PollRow,
+                                SuggestionRow, AdminBar, TwoTapDestructive,
+                                PlanningModeToggle, FilterChipRowMulti,
+                                FGTabBar, TabPills, EmptyStateBlock
+  flow/fg-screens.jsx           FriendsList, AddFriend, FriendProfile,
+                                FriendTypesManage, GroupsList, CreateGroup,
+                                GroupDetail, CoverPickerSheet, AdminInviteRow
+Round 2 modules
+  flow/flow-data.jsx            FLOW_TOKENS, FLOW_FONTS, FLOW_MOTION,
+                                FRIENDS (legacy), EventGlyph, DEFAULT_DRAFT
+  flow/flow-primitives.jsx      base primitives (status area, header, footer,
+                                progress, PillBtn, FormField, Field,
+                                RingAvatar, Overline, SectionHeader,
+                                FlowKeyframes, useLongPress, useSheetDrag,
+                                MiniMap, PriceSelector, Toggle)
+  flow/flow-step1/2/3.jsx       Create flow screens
+  flow/flow-confirm.jsx         Confirm screen
+  flow/flow-detail.jsx          Event detail + RSVP sheet
+  flow/flow-home.jsx            Home with feed
+Shared
+  ios-frame.jsx                 IOSDevice
+  design-canvas.jsx             DesignCanvas / DCSection / DCArtboard

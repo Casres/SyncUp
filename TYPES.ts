@@ -371,6 +371,8 @@ export interface Event {
   title: string;
   /** Host user id. */
   hostId: string;
+  /** Co-host user ids (R11-6). Empty array when no co-hosts. */
+  coHostIds: string[];
   /** ISO date 'YYYY-MM-DD'. */
   iso: string;
   /** ISO start datetime. */

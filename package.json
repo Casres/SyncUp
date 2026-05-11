@@ -3,11 +3,15 @@
   "version": "0.0.1",
   "private": true,
   "workspaces": [
-    "api",
-    "mobile"
+    "social-calendar-api",
+    "social-calendar-mobile"
   ],
   "scripts": {
-    "api": "npm run dev --workspace=api",
-    "mobile": "npm run start --workspace=mobile"
+    "api": "npm run dev --workspace=social-calendar-api",
+    "mobile": "npm run start --workspace=social-calendar-mobile"
+  },
+  "dependencies": {
+    "@clerk/expo": "^3.2.10",
+    "expo-secure-store": "^55.0.13"
   }
 }

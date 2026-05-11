@@ -1,0 +1,34 @@
+# Railway deployment config for the SyncUp API.
+#
+# Service root: monorepo root (NOT social-calendar-api/).
+# Reason: SyncUp is an npm workspace. The authoritative package-lock.json
+# lives at the monorepo root and includes every workspace's transitive
+# dependencies (socket.io, ioredis, jest, etc. — all the deps the API needs).
+# `npm ci` from a workspace child cannot resolve these because npm's
+# workspace resolver requires the parent's package.json + lockfile context.
+#
+# Prerequisites (one-time, see social-calendar-api/DEPLOY_CHECKLIST.md):
+#   • Provision a Postgres add-on and a Redis add-on.
+#   • Run the two-role SQL against the Postgres instance to create
+#     `syncup_app`. (Railway-provisioned Postgres gives you only one role
+#     by default — that becomes `syncup_migrate` here.)
+#   • Set all environment variables listed in DEPLOY_CHECKLIST.md.
+#   • DELETE the dev seed file (Decision #4 — see DEPLOY_CHECKLIST.md step 3).
+
+[build]
+builder = "NIXPACKS"
+# 1. Install all workspace deps from the root lockfile (npm ci hoists everything).
+# 2. Generate the Prisma client inside the API workspace.
+# 3. Compile TypeScript (tsc reads social-calendar-api/tsconfig.json,
+#    outputs to social-calendar-api/dist/server.js).
+buildCommand = "npm ci && npm --workspace=social-calendar-api run prisma:generate && npm --workspace=social-calendar-api run build"
+
+[deploy]
+# Migrations run on every deploy via `prisma migrate deploy` (not `dev`),
+# per Lead Manager Decision #5. This is idempotent and only applies new
+# migrations. Then start the compiled server.
+startCommand = "npm --workspace=social-calendar-api exec -- prisma migrate deploy && node social-calendar-api/dist/server.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

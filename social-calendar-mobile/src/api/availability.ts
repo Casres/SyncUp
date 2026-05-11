@@ -1,0 +1,262 @@
+/**
+ * Availability API — React Query hooks.
+ *
+ * DATA FLOW
+ *   When `isApiConfigured()` is true, hooks call the real backend.
+ *   Otherwise they fall back to MOCK_AVAILABILITY / MOCK_AVAILABILITY_BLOCKS
+ *   / MOCK_BROADCAST_SETTINGS / MOCK_MY_AVAILABILITY / MOCK_SASHA_AVAILABILITY.
+ *
+ * REAL BACKEND ENDPOINTS
+ *   GET  /me/availability                → AvailabilityEntry
+ *   PUT  /me/availability                → 204                (body: AvailabilityEntry)
+ *   GET  /users/:id/availability         → AvailabilityEntry  (403 if blocked)
+ *   GET  /me/broadcasts                  → BroadcastSettings
+ *   PUT  /me/broadcasts                  → 204                (body: BroadcastSettings)
+ *
+ * CRITICAL behaviour (per MOCKS_HANDOFF inferred-shape #3 — mock path only):
+ *
+ *   `getFriendAvailability('user-3')` MUST throw `ApiError('FORBIDDEN', ...)`
+ *   because MOCK_AVAILABILITY_BLOCKS contains
+ *   `{ blockerId: 'user-3', blockedId: 'me' }` — Marcus has blocked his
+ *   availability from 'me'.
+ *
+ *   `getFriendAvailability('user-2')` returns the empty Sasha map (unknown
+ *   state) — Sasha has no row in MOCK_AVAILABILITY but is NOT blocked.
+ *
+ * On the live API the same FORBIDDEN semantics happen via HTTP 403 → ApiError.
+ *
+ * Optimistic mutations: updateAvailability + updateBroadcastSettings use the
+ * cancel → snapshot → patch → onError rollback → onSettled invalidate pattern.
+ *
+ * CLERK INTEGRATION via `useApiFetch()` / `useApiMutate()` only.
+ */
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+
+import type { AvailabilityEntry, BroadcastSettings } from '../../../TYPES';
+import {
+  MOCK_AVAILABILITY,
+  MOCK_AVAILABILITY_BLOCKS,
+  MOCK_BROADCAST_SETTINGS,
+  MOCK_MY_AVAILABILITY,
+  MOCK_SASHA_AVAILABILITY,
+} from '../mocks';
+
+import { ApiError, simulateLatency } from './_utils';
+import {
+  isApiConfigured,
+  useApiFetch,
+  useApiMutate,
+  type AuthedFetch,
+  type AuthedMutate,
+} from './_client';
+import { queryKeys } from './queryKeys';
+
+// ---------------------------------------------------------------------------
+// Internal: mock-only block-table check
+// ---------------------------------------------------------------------------
+
+const ME_ID = 'me' as const;
+
+/**
+ * True iff `viewerId` is blocked from seeing `targetId`'s availability.
+ * Mock path only — the live API enforces blocks server-side via HTTP 403.
+ */
+function isAvailabilityBlocked(viewerId: string, targetId: string): boolean {
+  return MOCK_AVAILABILITY_BLOCKS.some(
+    (b) => b.blockerId === targetId && b.blockedId === viewerId,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Fetch / mutate functions
+// ---------------------------------------------------------------------------
+
+export async function getMyAvailability(
+  authedFetch: AuthedFetch,
+): Promise<AvailabilityEntry> {
+  if (!isApiConfigured()) {
+    await simulateLatency();
+    return { ...MOCK_MY_AVAILABILITY };
+  }
+  return authedFetch<AvailabilityEntry>('/me/availability');
+}
+
+export async function getFriendAvailability(
+  authedFetch: AuthedFetch,
+  userId: string,
+): Promise<AvailabilityEntry> {
+  if (!isApiConfigured()) {
+    await simulateLatency();
+    if (isAvailabilityBlocked(ME_ID, userId)) {
+      throw new ApiError(
+        'FORBIDDEN',
+        `User "${userId}" has blocked their availability from you.`,
+      );
+    }
+    if (userId === 'user-2') {
+      return { ...MOCK_SASHA_AVAILABILITY };
+    }
+    const entry = MOCK_AVAILABILITY[userId];
+    return entry ? { ...entry } : {};
+  }
+  return authedFetch<AvailabilityEntry>(
+    `/users/${encodeURIComponent(userId)}/availability`,
+  );
+}
+
+export async function updateAvailability(
+  authedMutate: AuthedMutate,
+  entry: AvailabilityEntry,
+): Promise<void> {
+  if (!isApiConfigured()) {
+    await simulateLatency();
+    void entry;
+    return;
+  }
+  await authedMutate<void>('PUT', '/me/availability', entry);
+}
+
+export async function getBroadcastSettings(
+  authedFetch: AuthedFetch,
+): Promise<BroadcastSettings> {
+  if (!isApiConfigured()) {
+    await simulateLatency();
+    return {
+      free: { ...MOCK_BROADCAST_SETTINGS.free, targets: [...MOCK_BROADCAST_SETTINGS.free.targets] },
+      maybe: { ...MOCK_BROADCAST_SETTINGS.maybe, targets: [...MOCK_BROADCAST_SETTINGS.maybe.targets] },
+      busy: { ...MOCK_BROADCAST_SETTINGS.busy, targets: [...MOCK_BROADCAST_SETTINGS.busy.targets] },
+    };
+  }
+  return authedFetch<BroadcastSettings>('/me/broadcasts');
+}
+
+export async function updateBroadcastSettings(
+  authedMutate: AuthedMutate,
+  settings: BroadcastSettings,
+): Promise<void> {
+  if (!isApiConfigured()) {
+    await simulateLatency();
+    void settings;
+    return;
+  }
+  await authedMutate<void>('PUT', '/me/broadcasts', settings);
+}
+
+// ---------------------------------------------------------------------------
+// React Query hooks
+// ---------------------------------------------------------------------------
+
+export function useMyAvailability(): UseQueryResult<AvailabilityEntry, ApiError> {
+  const authedFetch = useApiFetch();
+  return useQuery<AvailabilityEntry, ApiError>({
+    queryKey: queryKeys.availability.mine(),
+    queryFn: () => getMyAvailability(authedFetch),
+  });
+}
+
+export function useFriendAvailability(
+  userId: string,
+): UseQueryResult<AvailabilityEntry, ApiError> {
+  const authedFetch = useApiFetch();
+  return useQuery<AvailabilityEntry, ApiError>({
+    queryKey: queryKeys.availability.friend(userId),
+    queryFn: () => getFriendAvailability(authedFetch, userId),
+    enabled: !!userId,
+  });
+}
+
+export function useBroadcastSettings(): UseQueryResult<BroadcastSettings, ApiError> {
+  const authedFetch = useApiFetch();
+  return useQuery<BroadcastSettings, ApiError>({
+    queryKey: queryKeys.availability.broadcasts(),
+    queryFn: () => getBroadcastSettings(authedFetch),
+  });
+}
+
+interface UpdateAvailabilityContext {
+  previous: AvailabilityEntry | undefined;
+}
+
+/**
+ * Optimistic availability update. Patches the user's full map immediately,
+ * rolls back on error, invalidates on settle.
+ */
+export function useUpdateAvailability(): UseMutationResult<
+  void,
+  ApiError,
+  AvailabilityEntry,
+  UpdateAvailabilityContext
+> {
+  const queryClient = useQueryClient();
+  const authedMutate = useApiMutate();
+  return useMutation<
+    void,
+    ApiError,
+    AvailabilityEntry,
+    UpdateAvailabilityContext
+  >({
+    mutationFn: (entry) => updateAvailability(authedMutate, entry),
+    onMutate: async (entry) => {
+      const key = queryKeys.availability.mine();
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<AvailabilityEntry>(key);
+      queryClient.setQueryData<AvailabilityEntry>(key, entry);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.availability.mine(), context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.availability.mine() });
+    },
+  });
+}
+
+interface UpdateBroadcastContext {
+  previous: BroadcastSettings | undefined;
+}
+
+/**
+ * Optimistic broadcast-settings update. Same cancel/snapshot/patch/rollback/
+ * invalidate pattern as the availability mutation.
+ */
+export function useUpdateBroadcastSettings(): UseMutationResult<
+  void,
+  ApiError,
+  BroadcastSettings,
+  UpdateBroadcastContext
+> {
+  const queryClient = useQueryClient();
+  const authedMutate = useApiMutate();
+  return useMutation<void, ApiError, BroadcastSettings, UpdateBroadcastContext>({
+    mutationFn: (settings) => updateBroadcastSettings(authedMutate, settings),
+    onMutate: async (settings) => {
+      const key = queryKeys.availability.broadcasts();
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<BroadcastSettings>(key);
+      queryClient.setQueryData<BroadcastSettings>(key, settings);
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          queryKeys.availability.broadcasts(),
+          context.previous,
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.availability.broadcasts(),
+      });
+    },
+  });
+}

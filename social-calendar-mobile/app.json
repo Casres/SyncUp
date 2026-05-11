@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "SyncUp",
+    "slug": "syncup",
+    "scheme": "syncup",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "tech.casillas.syncup"
+    },
+    "android": {
+      "package": "tech.casillas.syncup"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-font"
+    ]
+  }
+}

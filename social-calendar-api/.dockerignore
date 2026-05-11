@@ -1,0 +1,32 @@
+# Build output
+dist/
+*.tsbuildinfo
+
+# Dependencies (npm ci will reinstall inside the image)
+node_modules/
+
+# Local environment & secrets
+.env
+.env.*
+!.env.example
+
+# Tests (not bundled into the production image)
+src/__tests__/
+**/*.test.ts
+**/*.spec.ts
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Docs
+*.md
+!prisma/HANDOFF.md
+
+# Agent handoffs / project docs (keep image lean)
+src/middleware/AUTH_HANDOFF.md

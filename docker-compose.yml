@@ -1,0 +1,92 @@
+# SyncUp — local dev stack.
+#
+# Brings up Postgres 16 (with the two-role RLS setup), Redis 7, and the
+# Fastify API in hot-reload mode. The api service uses the `builder`
+# stage of the Dockerfile so dev dependencies (including tsx) are present.
+#
+# Usage:
+#   cp .env.example .env       # edit values as needed
+#   docker compose up
+#
+# First-run notes:
+#   • Postgres init.sql runs once when the postgres_data volume is empty.
+#     If you need to recreate roles, drop the volume: `docker compose down -v`.
+#   • After the stack is up, apply migrations from the host:
+#       docker compose exec api npx prisma migrate deploy
+#     (or `prisma migrate dev` if you're iterating on the schema).
+#   • The api waits for postgres + redis healthchecks before starting.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: syncup
+      POSTGRES_USER: syncup_migrate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-syncup_migrate_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U syncup_migrate -d syncup"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./social-calendar-api
+      target: builder
+    restart: unless-stopped
+    command: ["npx", "tsx", "watch", "src/server.ts"]
+    environment:
+      # Migration owner role (used by Prisma CLI).
+      DATABASE_URL: postgresql://syncup_migrate:${POSTGRES_PASSWORD:-syncup_migrate_dev}@postgres:5432/syncup
+      # Runtime app role (RLS applies). The Fastify server should read this
+      # one — see social-calendar-api/prisma/HANDOFF.md.
+      DATABASE_URL_APP: postgresql://syncup_app:syncup_app_dev@postgres:5432/syncup
+      REDIS_URL: redis://redis:6379
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:-sk_test_placeholder}
+      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-whsec_placeholder}
+      PORT: 3000
+      NODE_ENV: development
+      # Explore tab — third-party API keys.
+      # Leave blank in dev; Explore returns empty results gracefully.
+      # Set real keys via .env before running in production.
+      EVENTBRITE_API_KEY: ${EVENTBRITE_API_KEY:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      EXPLORE_RATE_LIMIT: ${EXPLORE_RATE_LIMIT:-30}
+      EXPLORE_RADIUS_METRES: ${EXPLORE_RADIUS_METRES:-5000}
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hot reload: mount source over the image's copy. node_modules and
+      # the generated Prisma client stay inside the container.
+      - ./social-calendar-api/src:/app/src
+      - ./social-calendar-api/prisma:/app/prisma
+      - ./social-calendar-api/tsconfig.json:/app/tsconfig.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

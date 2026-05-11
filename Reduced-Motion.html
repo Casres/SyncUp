@@ -1,0 +1,1860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncUp · Reduced Motion — Round 14</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   TWEAKS CONFIG (per-deliverable extras above standard controls)
+   Standard controls appended automatically: Reduced motion, Dark mode.
+   Extra controls for this deliverable:
+     { label: 'Demo', type: 'select', options: ['Toast','Sheet','Stagger','Card','NotifSnap'] }
+   ============================================================ */
+
+/* ---- TOKENS ---- */
+:root {
+  --bg:         #F2EFEA;
+  --bgEl:       #FFFFFF;
+  --bgSun:      #EEEAE2;
+  --ink:        #15141A;
+  --ink2:       #45424F;
+  --ink3:       #8B8799;
+  --hair:       #E4DFD4;
+  --hairStr:    #CDC7B8;
+  --accent:     #4F3BFF;
+  --accentInk:  #2A1F9E;
+  --accentSoft: #E9E5FF;
+  --pop:        #FF7A59;
+  --popInk:     #9A3E22;
+  --popSoft:    #FFE4D9;
+  --lime:       #A8E063;
+  --limeInk:    #3F6014;
+  --limeSoft:   #ECF8DA;
+  --danger:     #D14545;
+  --dangerSoft: #FFE4D9;
+  --warn:       #E8A93A;
+  --warnSoft:   #FEF3DC;
+  --free:       #2BB673;
+  --maybe:      #E8A93A;
+  --busy:       #D14545;
+  --shadow-acc: rgba(79,59,255,0.28);
+
+  --sans: 'Manrope', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* motion — standard */
+  --spring:      cubic-bezier(0.34,1.56,0.64,1);
+  --springSnap:  cubic-bezier(0.2,0.9,0.3,1.2);
+  --easeOut:     cubic-bezier(0.2,0,0,1);
+  --easeStd:     cubic-bezier(0.4,0,0.2,1);
+
+  --dur-sheet:   280ms;
+  --dur-toast:   320ms;
+  --dur-stagger-base: 60ms;
+  --dur-stagger-per:  30ms;
+  --dur-card:    320ms;
+  --dur-snap:    320ms;
+  --dur-menu:    150ms;
+  --dur-rm:      200ms; /* reduced-motion fallback duration */
+
+  /* stagger count */
+  --stagger-count: 6;
+}
+
+/* ---- DARK MODE TOKENS ---- */
+[data-theme="dark"] {
+  --bg:         #0D0C12;
+  --bgEl:       #17161F;
+  --bgSun:      #0A0910;
+  --ink:        #F2EFEA;
+  --ink2:       #B8B5C2;
+  --ink3:       #6F6C7C;
+  --hair:       rgba(255,255,255,0.06);
+  --hairStr:    rgba(255,255,255,0.12);
+  --accentSoft: rgba(79,59,255,0.18);
+  --accent:     #8575FF;
+}
+
+/* ---- REDUCED MOTION OVERRIDES ---- */
+[data-reduced-motion="true"] {
+  --spring:    cubic-bezier(0.2,0,0,1);  /* easeOut — no overshoot */
+  --springSnap: cubic-bezier(0.2,0,0,1);
+  --dur-sheet:  var(--dur-rm);
+  --dur-toast:  var(--dur-rm);
+  --dur-card:   var(--dur-rm);
+  --dur-snap:   var(--dur-rm);
+  --dur-stagger-base: 60ms;
+  --dur-stagger-per:  0ms;  /* all-at-once */
+}
+
+/* ---- RESET & BASE ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  background: #1A1830;
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 16px 64px;
+}
+
+/* ---- PAGE HEADER ---- */
+.page-header {
+  width: 100%;
+  max-width: 960px;
+  margin-bottom: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.page-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.5);
+}
+.page-title strong {
+  color: rgba(255,255,255,0.9);
+  font-weight: 700;
+}
+.round-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  background: rgba(255,255,255,0.07);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+/* ---- MAIN LAYOUT ---- */
+.main-layout {
+  width: 100%;
+  max-width: 960px;
+  display: grid;
+  grid-template-columns: 390px 1fr;
+  gap: 40px;
+  align-items: start;
+}
+
+/* ---- PHONE FRAME ---- */
+.phone-wrap {
+  position: sticky;
+  top: 32px;
+}
+.phone {
+  width: 390px;
+  height: 844px;
+  background: var(--bg);
+  border-radius: 44px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.08);
+  transition: background 240ms var(--easeStd);
+}
+.phone-notch {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 126px; height: 34px;
+  background: #000;
+  border-radius: 0 0 18px 18px;
+  z-index: 100;
+}
+.phone-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ---- STATUS BAR ---- */
+.status-bar {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  flex-shrink: 0;
+  z-index: 10;
+  position: relative;
+}
+.status-time {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.status-icons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.status-icons svg { fill: var(--ink); }
+
+/* ---- FLOW HEADER ---- */
+.flow-header {
+  height: 52px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hair);
+  flex-shrink: 0;
+  background: var(--bg);
+  position: relative;
+  z-index: 10;
+}
+.flow-header-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--ink);
+}
+.icon-btn {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; cursor: pointer;
+  border-radius: 12px;
+  color: var(--accent);
+  transition: background 120ms;
+}
+.icon-btn:hover { background: var(--accentSoft); }
+.icon-btn svg { fill: var(--accent); }
+
+/* ---- DEMO STAGE ---- */
+.demo-stage {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+}
+
+/* ---- TAB BAR ---- */
+.tab-bar {
+  height: 64px;
+  background: var(--bgEl);
+  border-top: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 12px;
+}
+.tab-item svg { fill: var(--ink3); width: 24px; height: 24px; }
+.tab-item.active svg { fill: var(--accent); }
+.tab-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--ink3);
+  text-transform: uppercase;
+}
+.tab-item.active .tab-label { color: var(--accent); }
+
+/* ============================================================
+   DEMO 1 — BROADCAST TOAST
+   ============================================================ */
+.demo-home {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.home-body {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+.calendar-placeholder {
+  background: var(--bgEl);
+  border-radius: 18px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--hair);
+}
+.calendar-placeholder svg { fill: var(--ink3); }
+.placeholder-label {
+  font-size: 12px; font-weight: 500; color: var(--ink3);
+  font-family: var(--mono);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* BroadcastToast */
+.broadcast-toast {
+  position: absolute;
+  left: 14px; right: 14px;
+  bottom: 88px;
+  background: var(--ink);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  z-index: 50;
+  pointer-events: none;
+
+  /* hidden state */
+  opacity: 0;
+  transform: translateY(8px);
+}
+.broadcast-toast.visible {
+  animation: toast-enter var(--dur-toast) var(--spring) forwards;
+}
+.broadcast-toast.dismissing {
+  animation: toast-exit 200ms var(--easeStd) forwards;
+}
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(6px); }
+}
+/* reduced-motion: opacity only, no translate */
+[data-reduced-motion="true"] .broadcast-toast.visible {
+  animation: toast-enter-rm var(--dur-toast) var(--easeOut) forwards;
+}
+@keyframes toast-enter-rm {
+  from { opacity: 0; transform: none; }
+  to   { opacity: 1; transform: none; }
+}
+
+.toast-dot {
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.toast-dot.free  { background: var(--free); }
+.toast-dot.maybe { background: var(--maybe); }
+.toast-content { flex: 1; min-width: 0; }
+.toast-title {
+  font-size: 13px; font-weight: 700;
+  color: var(--bg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.toast-sub {
+  font-size: 11px; font-weight: 500;
+  color: rgba(242,239,234,0.6);
+  margin-top: 1px;
+}
+.toast-undo {
+  font-size: 11px; font-weight: 700;
+  color: var(--accent);
+  background: var(--accentSoft);
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--accent);
+}
+[data-theme="dark"] .toast-undo { color: var(--accent); }
+.toast-close {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.toast-close svg { fill: rgba(242,239,234,0.5); }
+
+/* ============================================================
+   DEMO 2 — BOTTOM SHEET
+   ============================================================ */
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.42);
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 280ms var(--easeStd);
+}
+.sheet-backdrop.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+[data-reduced-motion="true"] .sheet-backdrop.visible {
+  transition: none;
+  opacity: 1;
+}
+[data-reduced-motion="true"] .sheet-backdrop:not(.visible) {
+  transition: none;
+  opacity: 0;
+}
+
+.bottom-sheet {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bgEl);
+  border-radius: 22px 22px 0 0;
+  z-index: 40;
+  min-height: 280px;
+  transform: translateY(100%);
+  transition: transform var(--dur-sheet) var(--spring);
+}
+.bottom-sheet.open {
+  transform: translateY(0);
+}
+.sheet-handle {
+  width: 38px; height: 4px;
+  background: var(--hairStr);
+  border-radius: 999px;
+  margin: 12px auto 0;
+}
+.sheet-header {
+  padding: 16px 20px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hair);
+}
+.sheet-title {
+  font-size: 17px; font-weight: 800; letter-spacing: -0.2px;
+  color: var(--ink);
+}
+.sheet-close {
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  border-radius: 12px;
+}
+.sheet-close svg { fill: var(--ink3); }
+.sheet-body {
+  padding: 16px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sheet-row {
+  height: 52px;
+  background: var(--bgSun);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+}
+.sheet-row-dot {
+  width: 10px; height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.sheet-row-label {
+  font-size: 14px; font-weight: 600; color: var(--ink2);
+}
+
+/* ============================================================
+   DEMO 3 — STAGGER LIST
+   ============================================================ */
+.stagger-list {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stagger-item {
+  height: 64px;
+  background: var(--bgEl);
+  border-radius: 14px;
+  border: 1px solid var(--hair);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  opacity: 0;
+  transform: translateY(8px);
+}
+.stagger-item.entered {
+  opacity: 1;
+  transform: translateY(0);
+}
+/* standard: each item with delay */
+.stagger-item.entering {
+  animation: stagger-in 320ms var(--spring) forwards;
+}
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* reduced-motion: all at once, no translate */
+[data-reduced-motion="true"] .stagger-item.entering {
+  animation: stagger-in-rm 60ms var(--easeOut) forwards;
+  animation-delay: 0ms !important;
+}
+@keyframes stagger-in-rm {
+  from { opacity: 0; transform: none; }
+  to   { opacity: 1; transform: none; }
+}
+
+.stagger-avatar {
+  width: 40px; height: 40px;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700;
+  flex-shrink: 0;
+  color: #fff;
+}
+.stagger-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+.stagger-handle { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink3); }
+
+/* ============================================================
+   DEMO 4 — BROADCAST CARD EXPAND
+   ============================================================ */
+.notif-card {
+  margin: 16px 20px;
+  background: var(--bgEl);
+  border-radius: 14px;
+  border: 1px solid var(--hair);
+  overflow: hidden;
+}
+.notif-card-row {
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.avail-dot {
+  width: 8px; height: 8px;
+  border-radius: 999px;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.notif-card-body { flex: 1; min-width: 0; }
+.notif-card-name { font-size: 15px; font-weight: 600; color: var(--ink); }
+.notif-card-meta { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--ink3); margin-top: 2px; letter-spacing: 0.8px; text-transform: uppercase; }
+.notif-card-actions {
+  padding: 0 16px 14px;
+  display: flex;
+  gap: 8px;
+}
+.notif-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+.notif-pill.accent { background: var(--accent); color: #fff; }
+.notif-pill.ghost { background: var(--accentSoft); color: var(--accent); }
+
+/* stack expand */
+.stack-expand {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height var(--dur-card) var(--spring);
+}
+.stack-expand.open { max-height: 200px; }
+[data-reduced-motion="true"] .stack-expand {
+  transition: max-height 0ms !important;
+}
+.stack-sub {
+  padding: 8px 16px 14px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--hair);
+}
+.stack-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stack-sub-dot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+.stack-sub-text { font-size: 13px; font-weight: 500; color: var(--ink2); }
+.stack-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--hair);
+  cursor: pointer;
+  background: none; border-left: none; border-right: none; border-bottom: none;
+  width: 100%;
+  text-align: left;
+}
+.stack-toggle-label {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.stack-toggle svg { fill: var(--accent); transition: transform 200ms var(--easeStd); }
+.stack-toggle.expanded svg { transform: rotate(180deg); }
+[data-reduced-motion="true"] .stack-toggle svg { transition: none; }
+
+/* ============================================================
+   DEMO 5 — NOTIFSHEET SNAP
+   ============================================================ */
+.pull-affordance {
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  cursor: pointer;
+  user-select: none;
+}
+.pull-pill {
+  margin: 8px auto 0;
+  background: var(--accentSoft);
+  border-radius: 999px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+}
+.pull-pill-text {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* NotifSheet for demo 5 */
+.notif-sheet {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  background: var(--bgEl);
+  border-radius: 0 0 22px 22px;
+  z-index: 35;
+  transform: translateY(-100%);
+  transition: transform var(--dur-snap) var(--spring);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+.notif-sheet.peek {
+  transform: translateY(-44%);   /* shows 56% = peek */
+  /* the sheet top is off-screen by 44%, meaning 56% is visible */
+}
+.notif-sheet.peek {
+  /* peek: top of sheet at 44% from screen top — translateY so top of
+     sheet sits at 44%×screen. We position the sheet from top:0 with
+     height ~88% and slide it so the bottom 44% is visible. */
+  transform: translateY(calc(-100% + 56%));
+}
+.notif-sheet.full {
+  transform: translateY(calc(-100% + 88%));
+}
+.notif-sheet.closed {
+  transform: translateY(-100%);
+}
+
+/* Simpler: position from TOP, height = 88% of phone */
+/* Detents: closed = top: -88%, peek = top: 44%, full = top: 12% */
+.notif-sheet {
+  position: absolute;
+  left: 0; right: 0;
+  top: -100%;
+  height: 88%;
+  background: var(--bgEl);
+  border-radius: 0 0 22px 22px;
+  z-index: 35;
+  transition: top var(--dur-snap) var(--spring);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+}
+.notif-sheet.peek { top: calc(44% - 88%); }  /* bottom of sheet at 44% */
+.notif-sheet.full { top: 12%; }
+.notif-sheet.closed { top: -100%; }
+
+/* backdrop for notif sheet */
+.notif-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(0,0,0,0);
+  transition: background 280ms var(--easeStd), opacity 280ms var(--easeStd);
+}
+.notif-backdrop.peek {
+  background: rgba(0,0,0,0.18);
+  opacity: 1;
+  pointer-events: auto;
+}
+.notif-backdrop.full {
+  background: rgba(0,0,0,0.42);
+  opacity: 1;
+  pointer-events: auto;
+}
+[data-reduced-motion="true"] .notif-sheet {
+  transition: top var(--dur-snap) var(--easeOut);
+}
+[data-reduced-motion="true"] .notif-backdrop,
+[data-reduced-motion="true"] .notif-backdrop.peek,
+[data-reduced-motion="true"] .notif-backdrop.full {
+  transition: none;
+}
+
+.notif-sheet-handle { width: 38px; height: 4px; background: var(--hairStr); border-radius: 999px; margin: 12px auto 8px; }
+.notif-sheet-header {
+  padding: 0 16px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--hair);
+}
+.notif-sheet-title { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -0.2px; }
+.notif-sheet-pills { display: flex; gap: 8px; }
+.ns-pill {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.8px; text-transform: uppercase;
+  color: var(--ink3);
+  background: var(--bgSun);
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: none; cursor: pointer;
+}
+.notif-items {
+  padding: 12px 0;
+  overflow: hidden;
+}
+.notif-overline {
+  padding: 8px 16px 4px;
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 1.6px; text-transform: uppercase;
+  color: var(--ink3);
+}
+.notif-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hair);
+}
+.notif-avatar {
+  width: 32px; height: 32px;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  flex-shrink: 0; color: #fff;
+}
+.notif-text { flex: 1; }
+.notif-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.notif-sub { font-size: 12px; font-weight: 500; color: var(--ink3); margin-top: 1px; }
+.notif-time { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--ink3); }
+
+/* ---- DEMO CONTROLS ---- */
+.demo-btn-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px 20px;
+  flex-wrap: wrap;
+}
+.demo-btn {
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+.demo-btn:hover { opacity: 0.85; }
+.demo-btn.primary { background: var(--accent); color: #fff; }
+.demo-btn.secondary { background: var(--accentSoft); color: var(--accent); }
+.demo-btn.ghost { background: var(--bgSun); color: var(--ink2); border: 1px solid var(--hair); }
+[data-theme="dark"] .demo-btn.ghost { color: var(--ink2); }
+
+/* ============================================================
+   STORYBOARD (right panel)
+   ============================================================ */
+.storyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.story-section {
+  background: rgba(255,255,255,0.05);
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.story-section-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.story-label {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+}
+.story-rule {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.8px;
+}
+.story-frames {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.story-frame {
+  padding: 16px 20px;
+  position: relative;
+}
+.story-frame + .story-frame {
+  border-left: 1px solid rgba(255,255,255,0.06);
+}
+.frame-label {
+  font-family: var(--mono);
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.frame-label.standard { color: #8575FF; }
+.frame-label.reduced  { color: #A8E063; }
+
+.spec-block {
+  background: rgba(0,0,0,0.3);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.spec-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.spec-key {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  color: rgba(255,255,255,0.35);
+  letter-spacing: 0.5px;
+  min-width: 68px;
+  flex-shrink: 0;
+}
+.spec-val {
+  font-family: var(--mono);
+  font-size: 11px; font-weight: 600;
+  color: rgba(255,255,255,0.8);
+}
+.spec-val.changed { color: #A8E063; }
+.spec-val.unchanged { color: rgba(255,255,255,0.45); }
+
+.motion-bar-wrap {
+  margin-top: 8px;
+}
+.motion-bar-label {
+  font-family: var(--mono);
+  font-size: 9px; font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.motion-bar {
+  height: 6px;
+  border-radius: 999px;
+  position: relative;
+  background: rgba(255,255,255,0.07);
+  overflow: visible;
+  margin-bottom: 4px;
+}
+.motion-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  position: absolute;
+  top: 0; left: 0;
+}
+.motion-bar-fill.standard {
+  background: #8575FF;
+  width: 80%; /* 320ms relative to 400ms scale */
+}
+.motion-bar-fill.standard.sheet { width: 70%; }  /* 280ms */
+.motion-bar-fill.standard.menu  { width: 37.5%; } /* 150ms */
+.motion-bar-fill.reduced {
+  background: #A8E063;
+  width: 50%; /* 200ms relative to 400ms scale */
+}
+.motion-bar-fill.reduced.menu  { width: 37.5%; } /* unchanged */
+.spring-indicator {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 14px; height: 14px;
+  border-radius: 999px;
+  background: #8575FF;
+  border: 2px solid rgba(26,24,48,0.9);
+  font-size: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 800;
+}
+.instant-marker {
+  font-family: var(--mono);
+  font-size: 9px; font-weight: 700;
+  color: #A8E063;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.story-note {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.5;
+}
+.story-note strong { color: rgba(255,255,255,0.65); font-weight: 600; }
+
+/* ============================================================
+   TWEAKS PANEL (R14-1)
+   ============================================================ */
+.tweaks-wrap {
+  position: absolute;
+  right: 14px;
+  bottom: 104px;
+  z-index: 200;
+}
+.tweaks-handle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bgEl);
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 6px 12px 6px 8px;
+  cursor: pointer;
+  transition: opacity 120ms;
+  user-select: none;
+}
+.tweaks-handle:hover { opacity: 0.85; }
+.tweaks-handle svg { fill: var(--ink3); width: 16px; height: 16px; }
+.tweaks-handle-label {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--ink3);
+}
+.tweaks-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: 220px;
+  background: var(--bgEl);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  overflow: hidden;
+  transform-origin: bottom right;
+  transform: scale(0.9) translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 150ms var(--easeOut), opacity 150ms var(--easeOut);
+}
+.tweaks-panel.open {
+  transform: scale(1) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.tweaks-panel-header {
+  padding: 10px 14px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hair);
+}
+.tweaks-panel-title {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 1.4px; text-transform: uppercase;
+  color: var(--ink3);
+}
+.tweaks-x {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: none; cursor: pointer;
+  border-radius: 8px;
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 700;
+}
+.tweaks-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  height: 40px;
+  border-bottom: 1px solid var(--hair);
+}
+.tweaks-row:last-child { border-bottom: none; }
+.tweaks-row-label {
+  font-size: 12px; font-weight: 600;
+  color: var(--ink2);
+}
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  width: 34px; height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toggle-switch input { display: none; }
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--bgSun);
+  transition: background 120ms var(--easeOut);
+}
+.toggle-switch input:checked + .toggle-track { background: var(--accent); }
+.toggle-knob {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  transition: transform 120ms var(--easeOut);
+}
+.toggle-switch input:checked ~ .toggle-knob { transform: translateX(14px); }
+
+/* select-pill cycling */
+.select-pill {
+  font-family: var(--mono);
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: var(--accentSoft);
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: none;
+  cursor: pointer;
+  max-width: 110px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ============================================================
+   ACTIVE DEMO INDICATOR
+   ============================================================ */
+.demo-indicator {
+  display: flex;
+  gap: 6px;
+  padding: 8px 20px 4px;
+  align-items: center;
+}
+.demo-dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: var(--hair);
+  cursor: pointer;
+  transition: background 150ms;
+}
+.demo-dot.active { background: var(--accent); }
+
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title"><strong>SyncUp</strong> · Reduced Motion · Round 14</div>
+  <div class="round-badge">A-11 · A-21 · R13-1</div>
+</div>
+
+<div class="main-layout">
+
+  <!-- ===== PHONE ===== -->
+  <div class="phone-wrap">
+    <div class="phone" id="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+
+        <!-- Status bar -->
+        <div class="status-bar">
+          <span class="status-time">9:41</span>
+          <div class="status-icons">
+            <svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0.5" width="3" height="11.5" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1" opacity=".3"/></svg>
+            <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 2.5C10.5 2.5 12.7 3.6 14.2 5.3L15.5 4C13.6 1.9 11 .7 8 .7S2.4 1.9.5 4L1.8 5.3C3.3 3.6 5.5 2.5 8 2.5Z"/><path d="M8 5.5C9.7 5.5 11.3 6.2 12.4 7.4L13.7 6.1C12.2 4.5 10.2 3.5 8 3.5S3.8 4.5 2.3 6.1L3.6 7.4C4.7 6.2 6.3 5.5 8 5.5Z"/><circle cx="8" cy="10.5" r="1.5"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12"><rect x="0" y="1" width="22" height="10" rx="3" stroke="currentColor" stroke-width="1.2" fill="none"/><rect x="1.5" y="2.5" width="16" height="7" rx="1.5" fill="currentColor"/><path d="M23 4v4a2 2 0 000-4z" fill="currentColor" opacity=".4"/></svg>
+          </div>
+        </div>
+
+        <!-- Flow header -->
+        <div class="flow-header">
+          <span class="flow-header-title" id="demo-screen-title">Home</span>
+          <button class="icon-btn" id="search-btn" aria-label="Search">
+            <svg width="20" height="20" viewBox="0 0 20 20"><path d="M8.5 3a5.5 5.5 0 100 11 5.5 5.5 0 000-11zm-7.5 5.5a7.5 7.5 0 1113.32 4.74l4.47 4.47-1.41 1.41-4.47-4.47A7.5 7.5 0 011 8.5z"/></svg>
+          </button>
+        </div>
+
+        <!-- Demo stage -->
+        <div class="demo-stage" id="demo-stage">
+
+          <!-- DEMO 1: Toast -->
+          <div id="demo-toast" class="demo-home" style="display:flex;">
+            <div class="demo-indicator">
+              <div class="demo-dot active" onclick="switchDemo(0)"></div>
+              <div class="demo-dot" onclick="switchDemo(1)"></div>
+              <div class="demo-dot" onclick="switchDemo(2)"></div>
+              <div class="demo-dot" onclick="switchDemo(3)"></div>
+              <div class="demo-dot" onclick="switchDemo(4)"></div>
+            </div>
+            <div class="home-body">
+              <div class="calendar-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24"><path d="M17 3h4a1 1 0 011 1v16a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1h4V1h2v2h6V1h2v2zm-2 2H9v2H7V5H4v4h16V5h-3v2h-2V5zm5 6H4v8h16v-8z"/></svg>
+                <span class="placeholder-label">Calendar</span>
+              </div>
+            </div>
+            <div class="demo-btn-row">
+              <button class="demo-btn primary" onclick="fireToast()">Fire Broadcast Toast</button>
+            </div>
+            <!-- Toast (appended to phone, not demo div) -->
+          </div>
+
+          <!-- DEMO 2: Bottom Sheet -->
+          <div id="demo-sheet" class="demo-home" style="display:none;">
+            <div class="demo-indicator">
+              <div class="demo-dot" onclick="switchDemo(0)"></div>
+              <div class="demo-dot active" onclick="switchDemo(1)"></div>
+              <div class="demo-dot" onclick="switchDemo(2)"></div>
+              <div class="demo-dot" onclick="switchDemo(3)"></div>
+              <div class="demo-dot" onclick="switchDemo(4)"></div>
+            </div>
+            <div class="home-body">
+              <div class="calendar-placeholder">
+                <svg width="32" height="32" viewBox="0 0 24 24"><path d="M8 9h8M8 13h5M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm0 4h14"/></svg>
+                <span class="placeholder-label">Event Detail</span>
+              </div>
+            </div>
+            <div class="demo-btn-row">
+              <button class="demo-btn primary" id="sheet-open-btn" onclick="openSheet()">Open RSVP Sheet</button>
+            </div>
+          </div>
+
+          <!-- DEMO 3: Stagger List -->
+          <div id="demo-stagger" class="demo-home" style="display:none;">
+            <div class="demo-indicator">
+              <div class="demo-dot" onclick="switchDemo(0)"></div>
+              <div class="demo-dot" onclick="switchDemo(1)"></div>
+              <div class="demo-dot active" onclick="switchDemo(2)"></div>
+              <div class="demo-dot" onclick="switchDemo(3)"></div>
+              <div class="demo-dot" onclick="switchDemo(4)"></div>
+            </div>
+            <div class="stagger-list" id="stagger-list">
+              <!-- items injected by JS -->
+            </div>
+            <div class="demo-btn-row">
+              <button class="demo-btn primary" onclick="triggerStagger()">Trigger StaggerList</button>
+              <button class="demo-btn ghost" onclick="resetStagger()">Reset</button>
+            </div>
+          </div>
+
+          <!-- DEMO 4: Card Expand -->
+          <div id="demo-card" class="demo-home" style="display:none;">
+            <div class="demo-indicator">
+              <div class="demo-dot" onclick="switchDemo(0)"></div>
+              <div class="demo-dot" onclick="switchDemo(1)"></div>
+              <div class="demo-dot" onclick="switchDemo(2)"></div>
+              <div class="demo-dot active" onclick="switchDemo(3)"></div>
+              <div class="demo-dot" onclick="switchDemo(4)"></div>
+            </div>
+            <div style="padding-top:8px;">
+              <div class="notif-card">
+                <div class="notif-card-row">
+                  <div class="avail-dot" style="background:var(--free)"></div>
+                  <div class="notif-card-body">
+                    <div class="notif-card-name">Ana is free tonight</div>
+                    <div class="notif-card-meta">7:00 PM · EVERYONE · +2 EARLIER</div>
+                  </div>
+                </div>
+                <div class="notif-card-actions">
+                  <button class="notif-pill accent">Plan something</button>
+                  <button class="notif-pill ghost" id="expand-toggle-btn" onclick="toggleStackExpand()">+2 earlier ▾</button>
+                </div>
+                <div class="stack-expand" id="stack-expand">
+                  <div class="stack-sub">
+                    <div class="stack-sub-row">
+                      <div class="stack-sub-dot" style="background:var(--free)"></div>
+                      <span class="stack-sub-text">Ana is free this weekend — 4:00 PM</span>
+                    </div>
+                    <div class="stack-sub-row">
+                      <div class="stack-sub-dot" style="background:var(--maybe)"></div>
+                      <span class="stack-sub-text">Ana might be free tomorrow — 10:00 AM</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="demo-btn-row">
+              <button class="demo-btn primary" onclick="toggleStackExpand()">Toggle Stack Expand</button>
+            </div>
+          </div>
+
+          <!-- DEMO 5: NotifSheet Snap -->
+          <div id="demo-notif" class="demo-home" style="display:none;">
+            <div class="demo-indicator">
+              <div class="demo-dot" onclick="switchDemo(0)"></div>
+              <div class="demo-dot" onclick="switchDemo(1)"></div>
+              <div class="demo-dot" onclick="switchDemo(2)"></div>
+              <div class="demo-dot" onclick="switchDemo(3)"></div>
+              <div class="demo-dot active" onclick="switchDemo(4)"></div>
+            </div>
+            <div class="home-body" style="padding-top:8px;">
+              <div class="pull-affordance" onclick="snapNotifSheet()">
+                <div class="pull-pill">
+                  <span class="pull-pill-text">3 NEW · PULL DOWN ▾</span>
+                </div>
+              </div>
+              <div class="calendar-placeholder" style="margin-top:40px;">
+                <span class="placeholder-label">Home Calendar</span>
+              </div>
+            </div>
+            <div class="demo-btn-row">
+              <button class="demo-btn primary" onclick="snapNotifSheet()">Snap Notif Sheet</button>
+              <button class="demo-btn ghost" onclick="closeNotifSheet()">Close</button>
+            </div>
+          </div>
+
+        </div><!-- /demo-stage -->
+
+        <!-- SHARED: Bottom Sheet (Demo 2) -->
+        <div class="sheet-backdrop" id="sheet-backdrop" onclick="closeSheet()"></div>
+        <div class="bottom-sheet" id="bottom-sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-header">
+            <span class="sheet-title">RSVP</span>
+            <button class="sheet-close" onclick="closeSheet()" aria-label="Close">
+              <svg width="20" height="20" viewBox="0 0 20 20"><path d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"/></svg>
+            </button>
+          </div>
+          <div class="sheet-body">
+            <div class="sheet-row"><div class="sheet-row-dot" style="background:var(--free)"></div><span class="sheet-row-label">Going</span></div>
+            <div class="sheet-row"><div class="sheet-row-dot" style="background:var(--maybe)"></div><span class="sheet-row-label">Maybe</span></div>
+            <div class="sheet-row"><div class="sheet-row-dot" style="background:var(--busy)"></div><span class="sheet-row-label">Not going</span></div>
+          </div>
+        </div>
+
+        <!-- SHARED: NotifSheet (Demo 5) -->
+        <div class="notif-backdrop" id="notif-backdrop" onclick="cycleNotifSheet()"></div>
+        <div class="notif-sheet closed" id="notif-sheet">
+          <div class="notif-sheet-handle"></div>
+          <div class="notif-sheet-header">
+            <span class="notif-sheet-title">Activity</span>
+            <div class="notif-sheet-pills">
+              <button class="ns-pill">Mark read</button>
+              <button class="ns-pill">Clear all</button>
+            </div>
+          </div>
+          <div class="notif-items">
+            <div class="notif-overline">TODAY</div>
+            <div class="notif-row">
+              <div class="notif-avatar" style="background:#4F3BFF;">A</div>
+              <div class="notif-text">
+                <div class="notif-name">Ana is free tonight</div>
+                <div class="notif-sub">Everyone · 7:00 PM</div>
+              </div>
+              <div class="notif-time">2m</div>
+            </div>
+            <div class="notif-row">
+              <div class="notif-avatar" style="background:#2BB673;">J</div>
+              <div class="notif-text">
+                <div class="notif-name">Jamie RSVP'd to Rooftop Dinner</div>
+                <div class="notif-sub">Going · Sat Jul 12</div>
+              </div>
+              <div class="notif-time">18m</div>
+            </div>
+            <div class="notif-row">
+              <div class="notif-avatar" style="background:#E8A93A;">M</div>
+              <div class="notif-text">
+                <div class="notif-name">Morgan sent you a friend request</div>
+                <div class="notif-sub">3 mutual friends</div>
+              </div>
+              <div class="notif-time">1h</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SHARED: Broadcast Toast -->
+        <div class="broadcast-toast" id="broadcast-toast" role="alert" aria-live="polite">
+          <div class="toast-dot free"></div>
+          <div class="toast-content">
+            <div class="toast-title">Broadcast sent · Free</div>
+            <div class="toast-sub">Everyone</div>
+          </div>
+          <button class="toast-undo">Undo</button>
+          <button class="toast-close" onclick="dismissToast()" aria-label="Dismiss">
+            <svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 1l12 12M13 1L1 13" stroke="rgba(242,239,234,0.5)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+
+        <!-- TweaksPanel -->
+        <div class="tweaks-wrap" id="tweaks-wrap">
+          <div class="tweaks-handle" onclick="toggleTweaks()" aria-label="Open Tweaks panel">
+            <svg viewBox="0 0 16 16"><path d="M2 4h1.5a2 2 0 003.8 0H14M2 8h7.7a2 2 0 003.8 0H14M2 12h1.5a2 2 0 003.8 0H14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/></svg>
+            <span class="tweaks-handle-label">Tweaks</span>
+          </div>
+          <div class="tweaks-panel" id="tweaks-panel">
+            <div class="tweaks-panel-header">
+              <span class="tweaks-panel-title">Tweaks</span>
+              <button class="tweaks-x" onclick="toggleTweaks()">×</button>
+            </div>
+            <!-- Extra control: Demo -->
+            <div class="tweaks-row">
+              <span class="tweaks-row-label">Demo</span>
+              <button class="select-pill" id="demo-select-pill" onclick="cycleDemoTweak()">Toast</button>
+            </div>
+            <!-- Standard: Reduced motion -->
+            <div class="tweaks-row">
+              <span class="tweaks-row-label">Reduced motion</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="rm-toggle" onchange="toggleReducedMotion(this.checked)">
+                <div class="toggle-track"></div>
+                <div class="toggle-knob"></div>
+              </label>
+            </div>
+            <!-- Standard: Dark mode -->
+            <div class="tweaks-row">
+              <span class="tweaks-row-label">Dark mode</span>
+              <label class="toggle-switch">
+                <input type="checkbox" id="dark-toggle" onchange="toggleDarkMode(this.checked)">
+                <div class="toggle-track"></div>
+                <div class="toggle-knob"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <div class="tab-item active">
+            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            <span class="tab-label">Home</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0M12 20h.01" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            <span class="tab-label">Broadcast</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            <span class="tab-label">Activity</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            <span class="tab-label">Friends</span>
+          </div>
+          <div class="tab-item">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            <span class="tab-label">Profile</span>
+          </div>
+        </div>
+
+      </div><!-- /phone-screen -->
+    </div><!-- /phone -->
+  </div><!-- /phone-wrap -->
+
+  <!-- ===== STORYBOARD ===== -->
+  <div class="storyboard">
+
+    <!-- 1. Toast -->
+    <div class="story-section">
+      <div class="story-section-header">
+        <span class="story-label">① BroadcastToast · flow-fade-up</span>
+        <span class="story-rule">A-11 · flow-fade-up keyframe</span>
+      </div>
+      <div class="story-frames">
+        <div class="story-frame">
+          <div class="frame-label standard">Standard</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val">320ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val">spring (0.34,1.56,0.64,1)</span></div>
+            <div class="spec-row"><span class="spec-key">transform</span><span class="spec-val">translateY(8px) → 0</span></div>
+            <div class="spec-row"><span class="spec-key">opacity</span><span class="spec-val">0 → 1</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">timeline</div>
+              <div class="motion-bar">
+                <div class="motion-bar-fill standard">
+                  <div class="spring-indicator">~</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="story-frame">
+          <div class="frame-label reduced">Reduced motion</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val changed">200ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val changed">easeOut (0.2,0,0,1)</span></div>
+            <div class="spec-row"><span class="spec-key">transform</span><span class="spec-val changed">none (no translate)</span></div>
+            <div class="spec-row"><span class="spec-key">opacity</span><span class="spec-val unchanged">0 → 1 (unchanged)</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">timeline</div>
+              <div class="motion-bar"><div class="motion-bar-fill reduced"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="story-note">
+        <strong>Key change:</strong> Remove the translateY spring — the toast appears in-place with a clean opacity fade. Spring overshoot on a notification element can feel alarming rather than playful. The visual change is limited to the translate axis.
+      </div>
+    </div>
+
+    <!-- 2. Bottom Sheet -->
+    <div class="story-section">
+      <div class="story-section-header">
+        <span class="story-label">② Bottom Sheet · flow-sheet-up</span>
+        <span class="story-rule">A-11 · flow-sheet-up keyframe</span>
+      </div>
+      <div class="story-frames">
+        <div class="story-frame">
+          <div class="frame-label standard">Standard</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val">280ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val">spring (0.34,1.56,0.64,1)</span></div>
+            <div class="spec-row"><span class="spec-key">transform</span><span class="spec-val">translateY(100%) → 0</span></div>
+            <div class="spec-row"><span class="spec-key">backdrop</span><span class="spec-val">crossfade 280ms easeStd</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">timeline</div>
+              <div class="motion-bar"><div class="motion-bar-fill standard sheet"><div class="spring-indicator">~</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="story-frame">
+          <div class="frame-label reduced">Reduced motion</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val changed">200ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val changed">easeOut (0.2,0,0,1)</span></div>
+            <div class="spec-row"><span class="spec-key">transform</span><span class="spec-val unchanged">translateY(100%) → 0</span></div>
+            <div class="spec-row"><span class="spec-key">backdrop</span><span class="spec-val changed">instant</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">timeline</div>
+              <div class="motion-bar"><div class="motion-bar-fill reduced"></div></div>
+            </div>
+            <div class="instant-marker">backdrop: instant switch</div>
+          </div>
+        </div>
+      </div>
+      <div class="story-note">
+        <strong>Key changes:</strong> No spring overshoot on the sheet enter. Backdrop flips instantly (no crossfade) — the fade itself is a motion effect that prefers-reduced-motion must suppress. Sheet translation is kept since it conveys direction and origin; only the physics are simplified.
+      </div>
+    </div>
+
+    <!-- 3. StaggerList -->
+    <div class="story-section">
+      <div class="story-section-header">
+        <span class="story-label">③ StaggerList · su-stagger-in</span>
+        <span class="story-rule">A-11 · "no stagger (all-at-once)"</span>
+      </div>
+      <div class="story-frames">
+        <div class="story-frame">
+          <div class="frame-label standard">Standard</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">per item</span><span class="spec-val">320ms spring</span></div>
+            <div class="spec-row"><span class="spec-key">delay</span><span class="spec-val">base 60ms + 30ms×N</span></div>
+            <div class="spec-row"><span class="spec-key">transform</span><span class="spec-val">translateY(8px) → 0</span></div>
+            <div class="spec-row"><span class="spec-key">cap</span><span class="spec-val">12 items max</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">item stagger (6 items)</div>
+              <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;">
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:8px;height:4px;border-radius:2px;background:rgba(133,117,255,0.3)"></div><div style="height:4px;border-radius:2px;background:#8575FF;width:80px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:14px;height:4px;border-radius:2px;background:rgba(133,117,255,0.3)"></div><div style="height:4px;border-radius:2px;background:#8575FF;width:80px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:20px;height:4px;border-radius:2px;background:rgba(133,117,255,0.3)"></div><div style="height:4px;border-radius:2px;background:#8575FF;width:80px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:26px;height:4px;border-radius:2px;background:rgba(133,117,255,0.3)"></div><div style="height:4px;border-radius:2px;background:#8575FF;width:80px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:32px;height:4px;border-radius:2px;background:rgba(133,117,255,0.3)"></div><div style="height:4px;border-radius:2px;background:#8575FF;width:80px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:38px;height:4px;border-radius:2px;background:rgba(133,117,255,0.3)"></div><div style="height:4px;border-radius:2px;background:#8575FF;width:80px;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="story-frame">
+          <div class="frame-label reduced">Reduced motion</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">per item</span><span class="spec-val changed">60ms easeOut</span></div>
+            <div class="spec-row"><span class="spec-key">delay</span><span class="spec-val changed">0ms — all at once</span></div>
+            <div class="spec-row"><span class="spec-key">transform</span><span class="spec-val changed">none</span></div>
+            <div class="spec-row"><span class="spec-key">cap</span><span class="spec-val unchanged">12 items (unchanged)</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">all items fire together</div>
+              <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;">
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:0px;height:4px;"></div><div style="height:4px;border-radius:2px;background:#A8E063;width:18px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:0px;height:4px;"></div><div style="height:4px;border-radius:2px;background:#A8E063;width:18px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:0px;height:4px;"></div><div style="height:4px;border-radius:2px;background:#A8E063;width:18px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:0px;height:4px;"></div><div style="height:4px;border-radius:2px;background:#A8E063;width:18px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:0px;height:4px;"></div><div style="height:4px;border-radius:2px;background:#A8E063;width:18px;"></div></div>
+                <div style="display:flex;align-items:center;gap:6px;"><div style="width:0px;height:4px;"></div><div style="height:4px;border-radius:2px;background:#A8E063;width:18px;"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="story-note">
+        <strong>Key change:</strong> The stagger delay cascade is suppressed entirely (delay → 0ms). For users with vestibular disorders, cascading motion across many elements is a significant trigger. All items fade in simultaneously with a short 60ms easeOut. The translateY entrance is also dropped.
+      </div>
+    </div>
+
+    <!-- 4. Card expand -->
+    <div class="story-section">
+      <div class="story-section-header">
+        <span class="story-label">④ InboundBroadcastCard · stack expand</span>
+        <span class="story-rule">A-21 · "instant stack expand"</span>
+      </div>
+      <div class="story-frames">
+        <div class="story-frame">
+          <div class="frame-label standard">Standard</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">type</span><span class="spec-val">max-height spring</span></div>
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val">320ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val">spring (0.34,1.56,0.64,1)</span></div>
+            <div class="spec-row"><span class="spec-key">from→to</span><span class="spec-val">0 → 200px</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">timeline</div>
+              <div class="motion-bar"><div class="motion-bar-fill standard"><div class="spring-indicator">~</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="story-frame">
+          <div class="frame-label reduced">Reduced motion</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">type</span><span class="spec-val changed">instant</span></div>
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val changed">0ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val changed">—</span></div>
+            <div class="spec-row"><span class="spec-key">from→to</span><span class="spec-val unchanged">0 → 200px (same)</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">timeline</div>
+              <div class="instant-marker">instant — 0ms transition</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="story-note">
+        A-21 explicitly calls out <strong>"instant stack expand"</strong> for reduced-motion. The max-height transition is the offender here — height animation creates a "pushing" motion that is a vestibular trigger. The content simply appears in-place.
+      </div>
+    </div>
+
+    <!-- 5. NotifSheet snap -->
+    <div class="story-section">
+      <div class="story-section-header">
+        <span class="story-label">⑤ NotifSheet · detent snap</span>
+        <span class="story-rule">R13-1 · A-21 gesture path</span>
+      </div>
+      <div class="story-frames">
+        <div class="story-frame">
+          <div class="frame-label standard">Standard</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val">320ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val">spring (0.34,1.56,0.64,1)</span></div>
+            <div class="spec-row"><span class="spec-key">tracking</span><span class="spec-val">1:1 (no anim)</span></div>
+            <div class="spec-row"><span class="spec-key">backdrop</span><span class="spec-val">crossfade 280ms</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">snap animation</div>
+              <div class="motion-bar"><div class="motion-bar-fill standard"><div class="spring-indicator">~</div></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="story-frame">
+          <div class="frame-label reduced">Reduced motion</div>
+          <div class="spec-block">
+            <div class="spec-row"><span class="spec-key">duration</span><span class="spec-val changed">200ms</span></div>
+            <div class="spec-row"><span class="spec-key">curve</span><span class="spec-val changed">easeOut (0.2,0,0,1)</span></div>
+            <div class="spec-row"><span class="spec-key">tracking</span><span class="spec-val unchanged">1:1 (unchanged)</span></div>
+            <div class="spec-row"><span class="spec-key">backdrop</span><span class="spec-val changed">instant at release</span></div>
+            <div class="motion-bar-wrap">
+              <div class="motion-bar-label">snap animation</div>
+              <div class="motion-bar"><div class="motion-bar-fill reduced"></div></div>
+            </div>
+            <div class="instant-marker">backdrop: instant</div>
+          </div>
+        </div>
+      </div>
+      <div class="story-note">
+        Live drag tracking is <strong>never suppressed</strong> — it is a direct input response, not an animation (R13-1: "NEVER suppress gesture tracking itself"). Only the release snap animation and backdrop crossfade are reduced.
+      </div>
+    </div>
+
+    <!-- Summary table -->
+    <div class="story-section">
+      <div class="story-section-header">
+        <span class="story-label">Summary — All reduced-motion changes</span>
+        <span class="story-rule">A-11 master rule</span>
+      </div>
+      <div style="padding:16px 20px;">
+        <div class="spec-block">
+          <div class="spec-row" style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:8px;margin-bottom:8px;">
+            <span class="spec-key" style="min-width:120px;color:rgba(255,255,255,0.5);">change</span>
+            <span class="spec-val" style="color:rgba(255,255,255,0.5);">rule</span>
+          </div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">springs → easeOut</span><span class="spec-val changed">all sheet / toast / card animations</span></div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">320ms → 200ms</span><span class="spec-val changed">toast, sheet, notif snap</span></div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">280ms → 200ms</span><span class="spec-val changed">sheet open / overlay open</span></div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">translateY → none</span><span class="spec-val changed">toast enter (translate dropped)</span></div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">stagger → 0ms</span><span class="spec-val changed">StaggerList delay zeroed</span></div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">expand → instant</span><span class="spec-val changed">stack expand (A-21)</span></div>
+          <div class="spec-row"><span class="spec-key" style="min-width:120px;">backdrop → instant</span><span class="spec-val changed">all sheet backdrops</span></div>
+          <div class="spec-row" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.07);">
+            <span class="spec-key" style="min-width:120px;">unchanged</span><span class="spec-val unchanged">Spinner rotation · gesture tracking · translateY on sheets (only physics changed)</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /storyboard -->
+</div><!-- /main-layout -->
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let toastTimer = null;
+let currentDemo = 0;
+let notifState = 'closed'; // closed | peek | full
+let stackExpanded = false;
+let staggerDone = false;
+
+const DEMOS = ['Toast', 'Sheet', 'Stagger', 'Card', 'NotifSnap'];
+const DEMO_IDS = ['demo-toast', 'demo-sheet', 'demo-stagger', 'demo-card', 'demo-notif'];
+const DEMO_TITLES = ['Home', 'Event Detail', 'Friends', 'Activity', 'Home'];
+
+// ============================================================
+// TWEAKS
+// ============================================================
+function toggleTweaks() {
+  document.getElementById('tweaks-panel').classList.toggle('open');
+}
+function toggleReducedMotion(on) {
+  document.getElementById('phone').dataset.reducedMotion = on ? 'true' : 'false';
+}
+function toggleDarkMode(on) {
+  document.getElementById('phone').dataset.theme = on ? 'dark' : 'light';
+}
+function cycleDemoTweak() {
+  currentDemo = (currentDemo + 1) % DEMOS.length;
+  document.getElementById('demo-select-pill').textContent = DEMOS[currentDemo];
+  showDemo(currentDemo);
+}
+
+// ============================================================
+// DEMO SWITCHING
+// ============================================================
+function switchDemo(idx) {
+  currentDemo = idx;
+  document.getElementById('demo-select-pill').textContent = DEMOS[idx];
+  showDemo(idx);
+}
+function showDemo(idx) {
+  DEMO_IDS.forEach((id, i) => {
+    document.getElementById(id).style.display = i === idx ? 'flex' : 'none';
+  });
+  document.getElementById('demo-screen-title').textContent = DEMO_TITLES[idx];
+  // reset states
+  if (idx !== 0) dismissToast(true);
+  if (idx !== 1) { closeSheet(true); }
+  if (idx !== 3) { stackExpanded = false; resetStackExpand(); }
+  if (idx !== 4) closeNotifSheet(true);
+}
+
+// ============================================================
+// DEMO 1: TOAST
+// ============================================================
+function fireToast() {
+  const toast = document.getElementById('broadcast-toast');
+  clearTimeout(toastTimer);
+  toast.classList.remove('visible', 'dismissing');
+  void toast.offsetWidth; // reflow
+  toast.classList.add('visible');
+  toastTimer = setTimeout(() => dismissToast(), 3200);
+}
+function dismissToast(silent) {
+  const toast = document.getElementById('broadcast-toast');
+  if (!toast.classList.contains('visible')) return;
+  toast.classList.remove('visible');
+  toast.classList.add('dismissing');
+  clearTimeout(toastTimer);
+  setTimeout(() => toast.classList.remove('dismissing'), 220);
+}
+
+// ============================================================
+// DEMO 2: BOTTOM SHEET
+// ============================================================
+function openSheet() {
+  document.getElementById('sheet-backdrop').classList.add('visible');
+  document.getElementById('bottom-sheet').classList.add('open');
+  document.getElementById('sheet-open-btn').textContent = 'Close RSVP Sheet';
+  document.getElementById('sheet-open-btn').setAttribute('onclick', 'closeSheet()');
+}
+function closeSheet(silent) {
+  document.getElementById('sheet-backdrop').classList.remove('visible');
+  document.getElementById('bottom-sheet').classList.remove('open');
+  if (!silent) {
+    document.getElementById('sheet-open-btn').textContent = 'Open RSVP Sheet';
+    document.getElementById('sheet-open-btn').setAttribute('onclick', 'openSheet()');
+  }
+}
+
+// ============================================================
+// DEMO 3: STAGGER LIST
+// ============================================================
+const FRIENDS = [
+  { name: 'Ana Torres', handle: '@ana_t', color: '#4F3BFF', letter: 'A' },
+  { name: 'Jamie Chen', handle: '@jamiechen', color: '#2BB673', letter: 'J' },
+  { name: 'Morgan Lee', handle: '@morganl', color: '#E8A93A', letter: 'M' },
+  { name: 'Riley Park', handle: '@rileypk', color: '#D14545', letter: 'R' },
+  { name: 'Sam Okafor', handle: '@samokafor', color: '#8575FF', letter: 'S' },
+  { name: 'Taylor Wu', handle: '@taylorwu', color: '#A8E063', letter: 'T' },
+];
+function buildStaggerList() {
+  const list = document.getElementById('stagger-list');
+  list.innerHTML = '';
+  FRIENDS.forEach((f, i) => {
+    const el = document.createElement('div');
+    el.className = 'stagger-item';
+    el.innerHTML = `
+      <div class="stagger-avatar" style="background:${f.color}">${f.letter}</div>
+      <div>
+        <div class="stagger-name">${f.name}</div>
+        <div class="stagger-handle">${f.handle}</div>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
+function triggerStagger() {
+  if (staggerDone) return resetStagger();
+  staggerDone = true;
+  const items = document.querySelectorAll('.stagger-item');
+  const isRM = document.getElementById('phone').dataset.reducedMotion === 'true';
+  items.forEach((el, i) => {
+    el.classList.remove('entered', 'entering');
+    void el.offsetWidth;
+    const delay = isRM ? 0 : (60 + i * 30);
+    el.style.animationDelay = delay + 'ms';
+    el.classList.add('entering');
+    el.addEventListener('animationend', () => {
+      el.classList.remove('entering');
+      el.classList.add('entered');
+    }, { once: true });
+  });
+}
+function resetStagger() {
+  staggerDone = false;
+  const items = document.querySelectorAll('.stagger-item');
+  items.forEach(el => {
+    el.classList.remove('entered', 'entering');
+    el.style.animationDelay = '';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(8px)';
+  });
+  // force reflow to apply reset
+  void document.getElementById('stagger-list').offsetWidth;
+  items.forEach(el => {
+    el.style.opacity = '';
+    el.style.transform = '';
+  });
+}
+
+// ============================================================
+// DEMO 4: STACK EXPAND
+// ============================================================
+function toggleStackExpand() {
+  stackExpanded = !stackExpanded;
+  const el = document.getElementById('stack-expand');
+  el.classList.toggle('open', stackExpanded);
+  const btn = document.getElementById('expand-toggle-btn');
+  btn.textContent = stackExpanded ? '▴ collapse' : '+2 earlier ▾';
+}
+function resetStackExpand() {
+  const el = document.getElementById('stack-expand');
+  if (el) el.classList.remove('open');
+  stackExpanded = false;
+  const btn = document.getElementById('expand-toggle-btn');
+  if (btn) btn.textContent = '+2 earlier ▾';
+}
+
+// ============================================================
+// DEMO 5: NOTIFSHEET SNAP
+// ============================================================
+function snapNotifSheet() {
+  const sheet = document.getElementById('notif-sheet');
+  const bd = document.getElementById('notif-backdrop');
+  if (notifState === 'closed') {
+    notifState = 'peek';
+  } else if (notifState === 'peek') {
+    notifState = 'full';
+  } else {
+    notifState = 'closed';
+  }
+  sheet.className = 'notif-sheet ' + notifState;
+  bd.className = 'notif-backdrop ' + notifState;
+}
+function cycleNotifSheet() { snapNotifSheet(); }
+function closeNotifSheet(silent) {
+  notifState = 'closed';
+  const sheet = document.getElementById('notif-sheet');
+  const bd = document.getElementById('notif-backdrop');
+  if (sheet) { sheet.className = 'notif-sheet closed'; }
+  if (bd)    { bd.className = 'notif-backdrop'; }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  buildStaggerList();
+  // Detect OS-level prefers-reduced-motion
+  const prefersRM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersRM) {
+    document.getElementById('rm-toggle').checked = true;
+    toggleReducedMotion(true);
+  }
+});
+
+// Close tweaks on outside click
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('tweaks-wrap');
+  const panel = document.getElementById('tweaks-panel');
+  if (panel.classList.contains('open') && !wrap.contains(e.target)) {
+    panel.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

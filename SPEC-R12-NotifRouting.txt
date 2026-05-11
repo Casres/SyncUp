@@ -1,0 +1,234 @@
+# SyncUp — Spec Patch: Notification Card Navigation
+# Item 1 of 3 — Event Detail routing from notification context
+# For incorporation into ANCHOR.txt (v3.2 / Round 12 or patch)
+# Author: Claude Design  |  Date: 2026-05-05
+# Status: DRAFT — pending review
+================================================================
+## PROBLEM STATEMENT
+================================================================
+The navigation graph has no outgoing edges from NotifSheet. The
+component specs for RsvpCard and EventReminderCard each describe a
+trailing chevron that routes to Event Detail, but the spec never
+defines:
+  – how the sheet behaves when a navigating tap fires
+  – which tab becomes active
+  – what the back destination is
+  – what haptic fires
+  – what happens when the event no longer exists
+
+The same gap affects CoHostCard (trailing chevron → Event Detail)
+and GroupActivityCard (row tap → Group Detail). All four share the
+same interaction model, so this patch addresses them together.
+
+InboundBroadcastCard body → Friend Profile and "Plan something" →
+Create Event are noted in the component spec with haptics but are
+also absent from the nav graph; they are included here for
+completeness.
+================================================================
+## PROPOSED HARD RULE
+================================================================
+R12-1. NOTIFICATION NAVIGATION COLLAPSES THE SHEET FIRST.
+       When any notification card tap fires navigation to a
+       destination screen, the sheet executes a dismiss transition
+       (flow-sheet-down · 240ms · easeStd) concurrently with the
+       destination mounting on the activated tab. The sheet does
+       NOT remain open or partially visible behind the destination.
+       Back from the destination returns to the activated tab's
+       top-of-stack at the moment the sheet closed — not back to
+       the notification sheet (which is gone). The navigating card
+       is marked read at the moment of tap.
+================================================================
+## NAVIGATION DESTINATIONS — ALL NOTIFICATION CARDS
+================================================================
+Card                  Tap target          Destination      Tab
+--------------------  ------------------  ---------------  -------
+RsvpCard              Trailing chevron    Event Detail     Home
+                      OR full row body
+EventReminderCard     Trailing chevron    Event Detail     Home
+                      OR full row body
+CoHostCard            Trailing chevron    Event Detail     Home
+                      OR full row body
+CoHostRevokedCard     (none)              —                —
+                      Informational only. No navigation.
+GroupActivityCard     Full row body       Group Detail     Friends
+                                          (Groups segment)
+InboundBroadcastCard  Row body            Friend Profile   Friends
+InboundBroadcastCard  "Plan something"    Create Event     Home
+                      pill                (Step 1, friend  (modal)
+                                          pre-selected)
+FriendRequestCard     "Accept" pill       In-place only    —
+                      "Decline" pill      In-place only    —
+GroupInviteCard       "Join" pill         In-place only    —
+                      "Decline" pill      In-place only    —
+
+Notes:
+  – "Trailing chevron OR full row body" means the entire card row
+    is tappable; the chevron is the visual affordance, not the
+    only hit target.
+  – GroupActivityCard: Friends tab activates; if the Friends/Groups
+    SegmentedSwitcher is on the Friends segment it switches to
+    Groups, then Group Detail pushes. If already on Groups, pushes
+    directly.
+  – InboundBroadcastCard "Plan something" opens Create Event as a
+    modal (flow-sheet-up) over whichever tab is active; Home tab
+    is NOT required to activate. Sheet still dismisses first per
+    R12-1.
+================================================================
+## HAPTICS — NOTIFICATION NAVIGATION TAPS
+================================================================
+Navigation taps from NotifSheet involve three simultaneous
+transitions (sheet close · tab switch · screen push), making them
+the highest-cost interaction in the app. Medium haptic is
+appropriate.
+
+  Card                    Tap target          Haptic
+  ----------------------  ------------------  ------
+  RsvpCard                Row / chevron       medium
+  EventReminderCard       Row / chevron       medium
+  CoHostCard              Row / chevron       medium
+  GroupActivityCard       Row body            medium
+  InboundBroadcastCard    Row body            light   ← already locked
+  InboundBroadcastCard    "Plan something"    medium  ← already locked
+
+Rule: these haptics fire once at the moment of tap, before or
+concurrent with the sheet dismiss animation. Never fire the haptic
+on the dismiss animation frame itself (H-1).
+================================================================
+## SHEET DISMISS TIMING
+================================================================
+Sheet close:  flow-sheet-down · 240ms · easeStd
+Tab activate: concurrent with sheet close (0ms delay)
+Screen push:  begins at sheet-close completion (~240ms after tap)
+              Standard screen push: 240ms · easeStd
+Total elapsed before destination is fully visible: ~480ms
+
+If the destination is already the active screen on the active tab
+(e.g., user was looking at the same Event Detail before opening
+NotifSheet), no push animation fires — the sheet simply closes and
+reveals the already-rendered destination.
+
+Reduced-motion: sheet collapses opacity 200ms easeOut (no translate
+per A-21); destination cross-fades in 200ms easeOut.
+================================================================
+## EDGE CASES
+================================================================
+Event deleted / not found:
+  Sheet dismisses · Home tab activates · ErrorState (kind: notFound)
+  renders at the Event Detail route.
+  ErrorState primary CTA: "Go home" → Home root.
+  The originating RsvpCard / EventReminderCard / CoHostCard is
+  removed from the notification feed in the same session (stale
+  event purge). No toast, no haptic for the removal — it is a
+  silent cleanup.
+
+User no longer has access to event (removed from invitees):
+  Same as not-found path above. Use the same notFound ErrorState.
+
+Network offline when tapping:
+  Sheet dismisses · Home tab activates · OfflineBar appears ·
+  cached Event Detail renders if available; ErrorState (kind:
+  network) renders if not cached.
+  Notification card remains in feed and stays marked unread.
+
+Group deleted:
+  Same as event-deleted path, but ErrorState renders at Group
+  Detail route. GroupActivityCard is removed from feed.
+
+NotifSheet at peek detent vs full detent:
+  Navigation behavior is identical regardless of detent. Dismiss
+  collapses from whichever position the sheet was at.
+================================================================
+## UPDATED COMPONENT NOTES
+================================================================
+The following component definitions in the anchor need one-line
+additions to cross-reference R12-1:
+
+RsvpCard({ T, n })
+  [ADD] Full row tappable. Tap → Event Detail per R12-1.
+
+EventReminderCard({ T, n })
+  [ADD] Full row tappable. Tap → Event Detail per R12-1.
+  "Informational only" refers to its in-sheet content (no
+  Accept/Decline actions) — it IS navigable. Clarify in anchor.
+
+CoHostCard({ T, n })
+  [EXISTING TEXT] "Trailing chevron → Event Detail."
+  [ADD] Full row tappable per R12-1. (Trailing chevron is the
+  visual affordance; row body fires the same nav.)
+
+GroupActivityCard({ T, n })
+  [EXISTING TEXT] "Tap → group detail."
+  [ADD] Tab activation and sheet dismiss per R12-1.
+
+InboundBroadcastCard({ T, n })
+  [EXISTING TEXT] "Tap body → friend profile (light haptic).
+  Tap 'Plan something' → Step 1 with friend pre-selected
+  (medium haptic)."
+  [ADD] Sheet dismisses per R12-1 before both destinations.
+================================================================
+## NAV GRAPH ADDITIONS (proposed text)
+================================================================
+Insert under the MAIN APP SHELL section, after the existing
+[Home] and [Activity tab] → NotifSheet entries:
+
+  [NotifSheet] notification card navigation (R12-1):
+        ├── tap RsvpCard              ──▶ [Event Detail]
+        │                                 Home tab activates · sheet closes
+        ├── tap EventReminderCard     ──▶ [Event Detail]
+        │                                 Home tab activates · sheet closes
+        ├── tap CoHostCard            ──▶ [Event Detail]
+        │                                 Home tab activates · sheet closes
+        ├── tap GroupActivityCard     ──▶ [Group Detail]
+        │                                 Friends tab activates (Groups segment)
+        │                                 · sheet closes
+        ├── tap InboundBroadcastCard  ──▶ [Friend Profile]
+        │     row body                    Friends tab activates · sheet closes
+        └── tap "Plan something"      ──▶ [Create Event Step 1]
+              (InboundBroadcastCard)       friend pre-selected · sheet closes
+                                          (modal · no tab change required)
+
+  Back from any notification-entry destination:
+        └── ← back                   ──▶ tab root (not NotifSheet)
+================================================================
+## HAPTIC TABLE ADDITIONS
+================================================================
+Add to the main HAPTIC FEEDBACK section:
+
+  Notification card tap → navigate    medium  (R12-1; all navigating cards
+                                               except InboundBroadcastCard
+                                               body which stays light)
+================================================================
+## OPEN ITEMS RESOLVED
+================================================================
+This patch closes the following item from OPEN QUESTIONS:
+  ✓ Event Detail routing from notification context — RsvpCard and
+      EventReminderCard route to event detail on tap; this path is not
+      yet in the nav graph for the notification context.
+
+The patch also implicitly resolves the same gap for CoHostCard and
+GroupActivityCard, and fully documents InboundBroadcastCard nav
+which was specified in the component but absent from the nav graph.
+================================================================
+## ANCHOR INCORPORATION INSTRUCTIONS
+================================================================
+When merging into ANCHOR.txt / ANCHOR-DESIGN.txt:
+
+1. Add R12-1 to the HARD RULES section (create a new
+   "Round 12 additions" block, or add to a "Patch additions"
+   block at the top if no full round is warranted).
+
+2. Insert the nav graph lines above under NAVIGATION GRAPH,
+   inside the MAIN APP SHELL section after the two existing
+   NotifSheet entry-point lines.
+
+3. Update EventReminderCard component note to remove ambiguity
+   around "Informational only" — clarify it means no in-card
+   actions, but the row IS navigable.
+
+4. Add the medium haptic row to the HAPTIC FEEDBACK table.
+
+5. Add the edge cases to the EDGE-CASE PATTERNS section under
+   a new "Notification navigation" sub-block.
+
+6. Move the resolved open question from "Still open" to a new
+   "Resolved in Round 12" (or "Resolved — patch") sub-section.

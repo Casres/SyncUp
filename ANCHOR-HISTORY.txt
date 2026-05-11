@@ -1,0 +1,298 @@
+# SyncUp — Design System History Archive
+# Extracted from ANCHOR.txt v3.1
+# This file contains changelog, build notes, and component refinement history.
+# It is NOT needed by Claude Design — kept here for developer reference only.
+# Source of truth: ANCHOR.txt
+================================================================
+## CHANGELOG
+================================================================
+v3.2 — Round 12: Notif routing · Quicksets save/name · People mini-profile
+  + Locked: R12-1 through R12-6 hard rules (notification navigation
+    collapses sheet, custom quickset save/name entry point, grid
+    expansion rules, built-in protection, mini-profile as sheet,
+    mini-profile limited data).
+  + Locked: QUICKSET SAVE/NAME SURFACE — "Save as Quickset" pill,
+    QuicksetNameSheet (new + rename modes), custom tile ⋯ menu,
+    TwoTapDestructive delete, haptic table.
+  + Locked: PUBLIC MINI-PROFILE SURFACE — QuickProfileSheet stacked
+    over Search overlay; identity block + CTA; mutual friends, bio,
+    2-up stats; all three friendRequestStatus states.
+  + Nav graph completed: NotifSheet → Event Detail / Group Detail /
+    Friend Profile / Create Event edges added with sheet-close + tab-
+    activation semantics; Availability Editor → QuicksetNameSheet
+    edge added; Search → QuickProfileSheet edge replaces (stub).
+  + New components: QuicksetNameSheet, QuickProfileSheet.
+  + Haptics updated: medium for notification nav; success for quickset
+    save/rename/delete and mini-profile Add/Accept; light for sheet
+    lifecycle events.
+  + Open questions: three items resolved; one new item added
+    (QuickProfileSheet mutual friend avatar tap path, stub).
+  + No prototype HTML deliverable this round (spec-only by decision).
+  + Anchor bumped to v3.2.
+v3.1 — Round 11: Co-host role (spec-only · no prototype)
+  + Locked: R11-1 through R11-7 hard rules (co-host permission scope,
+    grant/revoke via ⋯ menu in AttendeesSheet, CO-HOST badge visible
+    to all, remove consolidates into ⋯ menu, promotion notifications,
+    Event.coHostIds[] data shape, three-view AttendeesSheet).
+  + Locked: CO-HOST SURFACE block — grant flow, three AttendeesSheet
+    views, Event Detail edit condition, CoHostToast spec.
+  + New data shape: Event.coHostIds[] · EventAttendee.isCoHost.
+  + New components: RowOverflowMenu, CoHostBadge, CoHostCard,
+    CoHostRevokedCard, CoHostToast. AttendeeRow updated (⋯ replaces
+    trailing remove btn in host view).
+  + Nav graph updated: ⋯ menu paths, co-host "Invite more" edge,
+    Event Detail edit condition.
+  + Anchor bumped to v3.1.
+v3.0 — Round 10: AttendeesSheet (spec-only · no prototype)
+  + Locked: R10-1 through R10-7 hard rules (role-aware sheet, RSVP
+    filter, two-row host filter bar, swipe-or-tap TwoTapDestructive
+    remove, AudiencePickerSheet reuse for invite, list-only search,
+    AttendeeRow anatomy).
+  + Locked: ATTENDEESSHEET SURFACE block — full host and invitee
+    layouts, filter bar, search, remove flow, empty states, haptics.
+  + New data shape: EventAttendee.
+  + New components: AttendeesSheet, AttendeeRow, RSVPBadge.
+  + Nav graph updated: Event Detail "+N more" → AttendeesSheet edges.
+  + Co-host role deferred to next round.
+  + Anchor bumped to v3.0.
+v2.9 — Round 9: Onboarding (spec-only · no prototype)
+  + Locked: R9-1 through R9-10 hard rules (separate auth stack,
+    6-dot progress, back preserves state, CTA disabled-until-valid,
+    OTP auto-submit, handle real-time check, skippable steps,
+    invite-first context, format-agnostic sign-in, forgot-password
+    confirmation dead-end).
+  + Locked: ONBOARDING SURFACE block — Welcome, Sign-up Steps 1–6,
+    Sign-in, Forgot Password Request + Confirmation. Full copy spec,
+    layout rules, and haptic mappings.
+  + Locked: Invite-first deep-link variant — InviteContextBanner,
+    skippable availability step, Event Detail post-auth routing.
+  + New data shape: InviteContext { eventId, eventName }.
+  + New components: AuthStep, OTPInput, HandleInput, AvatarUploadWell,
+    InviteContextBanner, AuthInputField.
+  + Nav graph updated: full onboarding stack added above main app shell
+    section. Cross-fade 320ms easeOut on auth success → Home/EventDetail.
+  + Screen inventory: Round 9 block added (screens 01–10).
+  + Open questions updated: onboarding resolved; AttendeesSheet,
+    mini-profile, notif routing, Tweaks panel carried forward.
+  + No prototype HTML deliverable this round (spec-only by decision).
+  + Anchor bumped to v2.9.
+v2.8 — Round 8: Search
+  + New modules: flow/search-data.jsx (SEARCH_PEOPLE, SEARCH_EVENTS,
+    default recents, runSearch() matcher), flow/search-screens.jsx
+    (SearchOverlay, FriendResultRow, PeopleResultRow, GroupResultRow,
+    EventResultRow, RecentRow).
+  + New deliverable: Search.html — live interactive phone (tap magnifier
+    in FlowHeader to open) + 12-frame storyboard (recents, no-recents,
+    5 sample queries, no-matches, dark variants). Tweaks panel for
+    state/query/mode.
+  + Locked: R8-1 through R8-7 hard rules (Search surface, section order,
+    row anatomy, recents, empty state, input bar, row actions).
+  + Locked: SEARCH SURFACE block added to anchor.
+  + Locked: Round 8 screen entry + nav graph edge added.
+  + Locked: Haptic mappings updated (Search open, row tap, Add→Sent,
+    clear ×, Clear all recents).
+  + Added: SearchRecent data shape, flow-sheet-down keyframe,
+    Search offline edge case, A-23 → A-26 accessibility rules.
+  + Not done: wiring SearchOverlay into SyncUp Prototype.html app shell
+    (separate pass — needs search button in live FlowHeader on
+    Home/Friends/Groups + state lifted in app/syncup-shell.jsx).
+  + Anchor bumped to v2.8.
+v2.7 — Anchor refresh (doc-only · no code change). Six R6 open questions
+  resolved and promoted to hard rules:
+  + Locked: Quicksets are user-extensible. The 4 built-in presets remain;
+    users can save and name their own. Save/name flow design is pending
+    (next round). Hard Rule R7-1.
+  + Locked: BroadcastToast stays simple. NO "review recipients"
+    tap-action on the toast itself. Broadcast Settings remains the
+    single editor for audience. Hard Rule R7-2.
+  + Locked: Friend Types are non-overlapping and non-nested. One friend
+    belongs to exactly one type. AudiencePickerSheet and
+    FilterChipRowMulti do NOT do compound filtering. Hard Rule R7-3.
+  + Locked: Stale notifications auto-purge at 30 days. A manual
+    "Clear all" control is added to NotifSheet (overrides the v2.6
+    "no Clear all" note). Per-card swipe still handles one-off
+    dismissals. Hard Rule R7-4.
+  + Locked: Push notification copy matches in-app card copy verbatim.
+    Example: "Ana is free tonight" — NEVER "New activity from Ana."
+    Hard Rule R7-5.
+  + Locked: Group Detail AdminBar stays pinned. Does NOT collapse on
+    scroll. Hard Rule R7-6.
+  + OPEN QUESTIONS list updated — six items moved from Still open into
+    a new "Resolved in v2.7" sub-section.
+  + Two prior v2.6 notes superseded:
+    – "No 'Clear all' — broadcasts auto-expire 7d, RSVPs persist on
+       event" (NotifSheet swipe-to-action section) is REVISED: a
+       "Clear all" pill is now part of the sheet header alongside
+       "Mark read." See R7-4 for behavior.
+    – "Push notification copy parity ... out of scope" item in OPEN
+       QUESTIONS is RESOLVED by R7-5.
+v2.6 — Round 6: Notifications & Activity
+  + New module: flow/n6-data.jsx, flow/n6-primitives.jsx, flow/n6-sheet.jsx
+  + New components: NotifSheet (2-detent pull-down), PullDownAffordance
+    (Home top edge), N6TabBar (5-tab IA replacing FGTabBar 4-tab),
+    InboundBroadcastCard (H-3 carve-out), RsvpCard, FriendRequestCard,
+    GroupInviteCard, EventReminderCard, GroupActivityCard, NotifGroupHeader
+    (TODAY / YESTERDAY / named-day), SwipeRow (per-card swipe-to-action),
+    EmptyNotifications.
+  + New deliverable: Notifications & Activity.html — pull-down from Home,
+    Activity tab full open, dark mode, detent diagram, tab-bar IA shift,
+    inbound broadcast card spec, 6-card catalog, gesture & haptic table.
+  + Locked: 5-tab IA — Home · Broadcast · Activity · Friends · Profile.
+    Profile tab routes to Profile & Settings (resolves R5 open question).
+    Friends tab consolidates Friends + Groups (was 2 tabs in R3).
+  + Locked: Notifications surface = ONE pull-down sheet, TWO entry points.
+  + Locked: Sheet has exactly 2 detents — peek (44%) and full (88%).
+  + Locked: Inbound broadcasts STACK PER SENDER within a 60-minute window.
+  + Locked: H-3 promoted — inbound broadcast cards NEVER fire haptic on receive.
+  + Locked: Unread arbitration — Activity tab dot is silent; Home pull pill carries words.
+  + Locked: Grouping by TODAY / YESTERDAY / named-day overline (≤7d back).
+  + Locked: Per-card swipe-to-action — left-swipe reveals Mute + Dismiss.
+  + Empty state added: EmptyNotifications.
+  + A11y rules added for the sheet: A-17 → A-22.
+v2.5 — Anchor refresh (no code change). Promoted Round-5 implementation
+  detail into canonical reference:
+  + Motion tokens table CONFIRMED.
+  + Haptic rules by action type locked.
+  + Empty state pattern formalized.
+  + Loading pattern formalized (spinner-only).
+  + Error state pattern formalized.
+  + Accessibility rules consolidated.
+  + Component refinements from Round 5 audit folded in.
+  + Edge-case rules pulled out into their own pattern section.
+v2.4 — Round 5: Polish Pass (empty / loading / error / edge / haptics / motion / a11y)
+  + New module: flow/polish-primitives.jsx
+  + New components: Spinner, LoadingOverlay, ButtonLoading, ErrorState,
+    ErrorToast, OfflineBar, A11yLive, StaggerList, PolishKeyframes,
+    useHaptic() hook + HAPTIC_TYPES registry.
+  + New deliverable: Polish & States.html
+  + Locked: spinner only — NO skeletons, shimmer, or pulse anywhere.
+  + Locked: R5-1 through R5-8 hard rules.
+  + Empty, error, and edge-case states added for all screens.
+  + A11y fixes: ink3 floor, aria-labels, tap target fixes.
+v2.3 — Round 4: Profile, Settings, Availability, Broadcasts
+  + New data shapes: User, NotificationSettings, PrivacySettings,
+    AvailabilityEntry, BroadcastSettings, BroadcastRule, Quickset
+  + New components: SettingsRow, SettingsGroup, ThemePicker, AvailDot,
+    StatTile, BroadcastToast, AudienceSwitcher, AudiencePickerSheet,
+    MonthGrid, WeekView, DayView, BrushPicker, QuicksetGrid
+  + New screens: Profile & Settings, Availability Editor, Broadcast Settings, Step 3 wire-back
+  + Locked: 3-card broadcast IA, BroadcastToast, SettingsRow div/button rule, wire-back.
+v2.2 — Round 3: Friends & Groups
+  + Friend, FriendType, SocialGroup, Poll, Suggestion, GroupMember, Cover
+  + SegmentedSwitcher, CoverArt, QRArt, CategoryBadge, PrivateBadge,
+    PollRow, SuggestionRow, AdminBar, TwoTapDestructive, PlanningModeToggle,
+    FilterChipRowMulti, FGTabBar, TabPills, EmptyStateBlock
+  + Friends list, Add friend, Friend profile, Friend types manager,
+    Groups list, Create group, Group detail.
+v2.1 — Round 2: Create Event Flow
+  + AvailabilitySummaryBar, FilterChipRow, Step 1/2/3, ConfirmScreen,
+    EventDetail, RSVP sheet. Locked banded availability viz on Step 3.
+v2.0 — Round 1: Tokens, type, Home Calendar, Design System.
+================================================================
+## COMPONENT REFINEMENTS — Round 5 polish pass
+================================================================
+(Edits & tweaks made during the polish pass. Logged here for
+traceability; folded back into component definitions in ANCHOR.txt.)
+  SettingsRow
+    · Renders <div> when no onClick (was always <button>). Fix for
+      Toggle-in-button-in-button warning. Status: Hard Rule 16.
+  FilterChipRow / FilterChipRowMulti
+    · Visual height stays 30px; tap target raised to 44px via invisible
+      vertical padding (touch-action: manipulation).
+    · Long-press hint: 450ms · linear · subtle scale to 0.98.
+  RingAvatar
+    · Now ALWAYS rendered alongside an AvailDot or text label when
+      conveying state (R5-1). Ring color/arc alone is decorative.
+  BroadcastToast / ErrorToast
+    · Both gained role="alert" + aria-live (R5-4 / A-9).
+    · Error variant: leading marker is a popSoft alert-triangle, not a
+      state dot. Broadcast variant unchanged (state dot).
+  Spinner (NEW · R5)
+    · The ONLY loading affordance. Replaces all skeletons.
+    · Always rendered from first mount.
+  OfflineBar (NEW · R5)
+    · Color + icon + text triple. Slides down from FlowHeader.
+    · Warning haptic on entrance, no haptic on auto-hide.
+  StaggerList (NEW · R5)
+    · 30ms per item · base 60ms · spring · cap 12 items.
+    · Used on Friends list, Groups list, Notifications feed, Empty
+      state inventories. NOT used on day grids (would feel laggy).
+  ThemePicker (R4)
+    · Confirmed accessible: each cell has aria-pressed; active cell
+      passes 4.5:1 contrast on bgElevated.
+  Step3InviteWired (R4 wire-back)
+    · Danger banner gained role="alert" — announce-on-mount.
+    · Free/Maybe overline got AvailDot so it's not color-only (R5-1).
+  PillBtn / Toggle / FormField
+    · No changes; all met R5 audit on first pass.
+================================================================
+## CHANGES MADE IN ROUND 4
+================================================================
+  – Initial filename was double-encoded ("Profile &amp;…html"); renamed via
+    move to "Profile & Availability.html".
+  – SettingsRow originally rendered as <button> always, which produced a
+    React validateDOMNesting warning when the trailing slot held a Toggle
+    (button-in-button). Refactored to render <div> when no onClick is
+    provided. This is now Hard Rule 16.
+  – Broadcast IA approved before build (3-card stacked pattern); no
+    deviations during implementation.
+  – Wire-back was added as a new Step 3 variant (Step3InviteWired) rather
+    than mutating the original Step3Invite — original remains untouched
+    and still renders the locked Banded viz.
+================================================================
+## CHANGES MADE IN ROUND 5 (Polish Pass)
+================================================================
+  – Skeletons were initially prototyped (shimmer + pulse variants) but
+    cut after motion review: a real-time app with variable-shape data
+    creates layout-whiplash when fakes don't match real. Replaced with
+    spinner-only (R5-2). Skeleton tokens (skeletonBg, etc.) deleted from
+    FLOW_TOKENS to prevent regression.
+  – Initial haptic registry had 9 types (added selection / impact-soft /
+    impact-rigid). Trimmed to 6 to match expo-haptics 1:1; the extras
+    were aliases that drifted between iOS/Android. Locked at 6.
+  – First pass on ErrorToast used a state-colored dot (matched broadcast).
+    Felt indistinguishable from a successful broadcast at a glance.
+    Switched to popSoft alert-triangle so the variant is unmistakable.
+  – Filter chip carousel originally failed 44pt (visual 30px == hit 30px).
+    Fix: invisible vertical padding 7px each side bumps hit area to 44pt
+    while keeping visual height. Documented as A-5 inventory.
+  – ink3 contrast audit caught 4 surfaces using ink3 below 14px (toast
+    subtitle, broadcast card body, settings row sub, filter chip count).
+    All swapped to ink2. Codified as R5-5.
+  – Stagger entrance was originally on day grids; pulled — felt laggy on
+    a 30-cell month view. Now restricted to lists ≤ 12 items.
+  – Anchor doc bumped to v2.5 (this update). No code changes — doc-only
+    refresh promoting Round-5 details to canonical reference.
+================================================================
+## CHANGES MADE IN ROUND 6 (Notifications & Activity)
+================================================================
+  – First sketch had Activity as a full-screen tab feed AND a separate
+    pull-down peek-only sheet on Home. Cut after IA review: same data
+    surfacing through two divergent layouts created split-brain affordances.
+    Consolidated to ONE sheet · TWO entry points (R6-1, Hard Rule 18).
+  – Initially explored 3 detents (peek / mid / full). Cut — the mid
+    detent landed in a deadzone where neither the calendar nor the feed
+    was usable. Locked at 2 (R6-2, Hard Rule 19).
+  – Pull-down affordance prototyped as an invisible drag-zone (no visible
+    bar). Tested poorly — users didn't discover it. Replaced with a
+    visible PullDownAffordance pill that carries the unread copy too,
+    solving discovery + unread state in one element.
+  – Activity tab unread dot first prototyped as a numeric badge ("3").
+    Conflicted with Home pull pill ("3 NEW") — felt double-counted.
+    Switched to a count-less pop dot; Home pill is the only place the
+    number appears. Locked as R6-5 / Hard Rule 22.
+  – Inbound broadcast cards initially fired a light haptic on arrival,
+    matching outbound BroadcastToast. Cut after testing: a chatty friend
+    triggered haptic spam. Promoted to hard rule R6-3 / 20 — never
+    haptic on receive, only on user interaction. Aligns with H-3.
+  – Stack-by-sender window started at 15 minutes. Too tight — typical
+    "I'm free in 30min" scenarios produced 2–3 separate cards from the
+    same person. Widened to 60 min. Locked as Hard Rule 21.
+  – "Mark all read" was a destructive TwoTapDestructive at first.
+    Overkill — marking read is not destructive (items remain visible).
+    Downgraded to a single-tap pill in the sheet header.
+  – "Clear all" button was prototyped, then cut. Reversed in v2.7 —
+    Clear all IS now in the sheet header (R7-4).
+  – FGTabBar (4-tab) is retained for the Round-3 prototype shell only.
+    All new screens use N6TabBar. Documented in Tab Bar IA → Deprecated.
+  – Anchor doc bumped to v2.6 (this update).

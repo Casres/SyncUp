@@ -1,0 +1,1903 @@
+# SyncUp — Design System Anchor Document v3.4 (Claude Design working copy)
+# Paste this at the top of a new Claude Design chat to maintain consistency.
+# Updated: 2026-05-05
+# This is a trimmed working copy. Full source of truth: ANCHOR.txt
+# Removed: changelog, build notes, component refinements, file map.
+================================================================
+## HARD RULES — Round 14 additions (TweaksPanel · Reduced-motion prototype)
+================================================================
+R14-1. TWEAKSPANEL IS A PROTOTYPE-ONLY COMPONENT. NEVER ship it in
+       production builds or reference it outside HTML deliverables.
+       Its purpose is to surface demo-state toggles for prototype
+       reviewers without cluttering the phone frame itself.
+
+       VISUAL SPEC:
+         Closed handle: 32px-tall pill · right:14px · bottom:104px
+           (clears simulated tab bar + safe area). bgElevated · radius
+           999 · 1px hair border · shadow rgba(0,0,0,.10). Content:
+           sliders icon (16px ink3) + "TWEAKS" overline (10/600 ink3).
+           Tap → panel opens 150ms easeOut (scale 0.9→1 + opacity 0→1).
+         Open panel: fixed · right:14px · bottom:104px · width 220px ·
+           radius 14 · bgElevated · shadow 0 12px 40px rgba(0,0,0,.18) ·
+           max-height 320px · overflow-y auto.
+           Header: "TWEAKS" overline (10/600 ink3) + × icon-btn 32pt hit.
+           Body: control rows with 12px vertical padding, 16px horiz.
+           Panel closes on × tap or on Esc.
+
+       CONTROL ROW ANATOMY:
+         Each row: 40px min-height · label left (12/600 ink2) ·
+           control right (32px trailing). Row dividers 1px hair.
+         Toggle: 34×20px pill switch. On = accent fill + white knob.
+           Off = bgSunken fill + ink3 knob. Snap 120ms easeOut.
+         Select pill: tap cycles through values. 10/600 mono accent
+           text · accentSoft fill · radius 999 · 6×10 padding.
+
+       STANDARD CONTROLS (every prototype includes these unless noted):
+         "Reduced motion" toggle  — when ON, prototype applies
+           prefers-reduced-motion fallback rules (A-11, A-21, R13-1):
+           200ms easeOut translates, instant backdrops, no spring
+           overshoot, no stagger. Does NOT alter the Spinner.
+         "Dark mode" toggle       — switches FLOW_TOKENS.light →
+           FLOW_TOKENS.dark on the entire phone frame.
+
+       ADDITIONAL CONTROLS: each HTML deliverable declares its own
+         extra rows at the top of the control list above the standard
+         two (e.g., "Notif count" select, "Offline" toggle, query
+         preset picker). Document these per-deliverable in its HTML
+         source as a comment block at the top of the Tweaks config.
+
+       BEHAVIOR RULES:
+         Changes apply immediately — no "Apply" button.
+         State resets to defaults on page reload.
+         TweaksPanel MUST NOT interfere with the phone frame's own
+           event handlers (pointer-events none on panel backdrop).
+         NEVER add Tweaks rows that modify data a reviewer cannot
+           see changing (e.g., internal React Query cache TTLs).
+================================================================
+## HARD RULES — Round 13 additions (Gesture polish · Offline · Edge cases)
+================================================================
+R13-1. SHEET DRAG GESTURE IS VELOCITY-FIRST, DISPLACEMENT FALLBACK.
+       The NotifSheet drag gesture (on PullDownAffordance or drag
+       handle) resolves to a target detent in two phases:
+
+       PHASE A — ENTRY (closed → first detent):
+         Triggered by downward drag on PullDownAffordance.
+         Sheet follows touch 1:1 from the first pixel of movement.
+         Velocity ≥ 0.5px/ms (downward) at release → full directly.
+         Displacement < 60px at release → spring back to closed.
+         Displacement 60–159px → snap to peek (light haptic).
+         Displacement ≥ 160px → snap to full (light haptic).
+
+       PHASE B — INTER-DETENT (peek ↔ full ↔ closed):
+         Triggered by drag on the sheet grab handle area (44pt hit).
+         Sheet follows touch 1:1; clamps at translateY(12%) (full
+         cap) and snaps closed at bottom of screen.
+         Velocity-first rule: if |velocity| ≥ 0.7px/ms at release,
+           snap-direction determined by velocity sign regardless of
+           displacement:
+             Downward velocity ≥ 0.7px/ms from full  → peek.
+             Downward velocity ≥ 1.2px/ms from full  → close (skip peek).
+             Downward velocity ≥ 0.7px/ms from peek  → close.
+             Upward velocity   ≥ 0.7px/ms from peek  → full.
+             Upward velocity   ≥ 0.7px/ms from full  → no-op
+               (already at top; rubber-band 12px then spring back).
+         Displacement fallback (|velocity| < 0.7px/ms):
+             From peek: down >40px → close; up >40px → full.
+             From full: down >80px → peek; down >200px → close.
+             Inside thresholds → spring back to current detent.
+
+       SNAP ANIMATION: 320ms spring cubic-bezier(0.34,1.56,0.64,1).
+         Backdrop crossfades 280ms easeStd in lockstep with snap.
+         Haptic fires at snap moment (not at pointer-up).
+
+       REDUCED-MOTION FALLBACK FOR GESTURE PATH (A-11, A-21):
+         Live tracking: unchanged (1:1 follow is not an animation).
+         Snap animation: 200ms easeOut translate (no spring, no
+           overshoot). Backdrop: instant switch at release.
+         NEVER suppress gesture tracking itself — only the snap anim.
+
+       NEVER require a tap shortcut as the only path between detents
+         in production — the gesture is the primary affordance.
+
+R13-2. NOTIFSHEET OFFLINE STATE IS SHOWN INLINE, ABOVE THE FEED.
+       When the device loses network while NotifSheet is open, or
+       when the sheet is opened while offline:
+         OfflineBar appears immediately below the sheet header
+           (below "Activity" title + action pills, above the first
+           NotifGroupHeader). Same OfflineBar component (R5-7).
+         A stale-data sub-line appears between OfflineBar and feed:
+           "SYNCED {T} AGO" — mono 10/600 ink3. {T} = relative
+           time of last successful feed refresh (e.g., "3 MIN AGO").
+           Omit if last sync time is unavailable.
+         Feed content: show whatever was last loaded (stale but
+           visible). NEVER show a full empty state or spinner when
+           stale data exists.
+         Network-dependent actions are disabled while offline:
+           "Accept" / "Decline" on FriendRequestCard,
+           "Join" / "Decline" on GroupInviteCard,
+           "Plan something" on InboundBroadcastCard.
+           Disabled = opacity 0.4 + pointer-events: none.
+           NO tooltip required — OfflineBar provides context.
+         Local-only actions remain active while offline:
+           Swipe-to-reveal (Mute + Dismiss), Mark all read,
+           Clear all. These are local state mutations.
+         On reconnect: OfflineBar slides out (su-slide-up 240ms
+           easeStd). Stale sub-line hides. Feed auto-refreshes;
+           newly loaded items animate in via StaggerList.
+         A11y: OfflineBar has aria-live="polite".
+         NEVER show two OfflineBars simultaneously (E-1).
+
+R13-3. BROADCAST QUEUED OFFLINE TOAST OMITS THE UNDO PILL.
+       When a broadcast was written while offline and fires on
+       reconnect, BroadcastToast renders with a modified title:
+         Title: "Broadcast sent · was queued"  (13/700)
+         Sub:   audience label (same as standard toast)
+         Leading marker: state dot (Hard Rule 13 unchanged)
+         Undo pill: NOT rendered. The broadcast has already fired
+           during reconnect; the undo window has passed and
+           presenting an undo that cannot succeed is misleading.
+         Close X: present. Auto-dismiss: 3200ms. Haptic: success.
+         A11y: role="alert" · aria-live="polite" (unchanged).
+       NEVER render an Undo pill on a queued-broadcast toast.
+       In all other respects the toast is identical to the
+       standard BroadcastToast (position, sizing, tokens, border).
+
+R13-4. AUDIENCEPICKERSHEET IN MODE='FRIENDS' SHOWS AN EMPTY STATE
+       WHEN THE USER HAS ZERO FRIENDS.
+       When mode='friends' and the friend list is empty, the sheet
+       body renders an inline empty state instead of the friend list:
+         Icon tile: 56×56 · users glyph · bgSunken fill · radius 16.
+         Title:     "No friends yet"  (15/700 ink).
+         Body:      "Add friends to invite them to events."
+                    (13/500 ink2 · centered · max-width 260px).
+         No CTA pill — NEVER navigate away from a picker sheet
+           to add friends; doing so loses the user's event context.
+       Done pill in the sheet header: disabled (opacity 0.4,
+         non-interactive) while the selection count is zero.
+       Close X remains active so the user can exit cleanly.
+       If the user gains friends during the session (optimistic
+         add), the empty state replaces itself with the friend list
+         without a full remount — state update triggers re-render.
+       NEVER show this empty state for mode='types' (friend types
+         may legitimately be zero with no action needed from here).
+================================================================
+## HARD RULES — Round 12 additions (Notif routing · Quicksets · Mini-profile)
+================================================================
+R12-1. NOTIFICATION NAVIGATION COLLAPSES THE SHEET FIRST. When
+       any notification card tap fires navigation to a destination
+       screen, the sheet executes a dismiss transition
+       (flow-sheet-down · 240ms · easeStd) concurrent with the
+       destination mounting on the activated tab. The sheet does
+       NOT remain open behind the destination. Back from the
+       destination returns to that tab's top-of-stack at the time
+       the sheet closed — not back to the notification sheet.
+       The tapped card is marked read at the moment of tap.
+R12-2. CUSTOM QUICKSETS ARE SAVED FROM THE AVAILABILITY EDITOR.
+       The entry point is a "Save as Quickset" ghost pill in the
+       Availability Editor, positioned below the QuicksetGrid
+       section. It is enabled only when at least one day is set
+       (AvailabilityEntry map non-empty). Tapping it opens
+       QuicksetNameSheet. NEVER add a save affordance inside the
+       QuicksetGrid itself or on individual tiles.
+R12-3. QUICKSETGRID EXPANDS FOR CUSTOM QUICKSETS. Built-in tiles
+       always occupy the first 4 positions. Custom tiles follow
+       in user-creation order. The grid uses a 2-column layout
+       and wraps as needed. No cap on custom count. NEVER hard-
+       code the grid at 4 items.
+R12-4. BUILT-IN QUICKSETS CANNOT BE RENAMED OR DELETED. Custom
+       quicksets may be renamed or deleted via a ⋯ icon-btn
+       (18px ink3 · 44pt hit · top-right of tile). Built-in
+       tiles have NO ⋯ control. Delete is TwoTapDestructive.
+       NEVER render management controls on built-in tiles.
+R12-5. PUBLIC MINI-PROFILE IS A SHEET OVER SEARCH. Tapping a
+       PEOPLE row body in Search opens QuickProfileSheet stacked
+       on top of the Search overlay. The Search overlay remains
+       mounted behind it. Closing QuickProfileSheet returns to
+       Search. NEVER navigate away from Search to show this sheet.
+R12-6. PUBLIC MINI-PROFILE SHOWS LIMITED DATA ONLY. Visible:
+       name · handle · photo · bio (if set) · mutual friends
+       count + up to 5 avatars · hosted count · attended count.
+       NEVER show: availability · friend count · group membership
+       · friend type data. These are friends-only fields.
+================================================================
+## HARD RULES — Round 11 additions (Co-host)
+================================================================
+R11-1. CO-HOST PERMISSIONS ARE SCOPED TO TWO ACTIONS ONLY. A co-host
+       may: (a) invite additional attendees via "Invite more" →
+       AudiencePickerSheet, and (b) edit event details. A co-host may
+       NOT remove attendees, manage other co-hosts, or delete the event.
+       NEVER render remove controls, ⋯ menus, or type/group filter rows
+       to a co-host viewer.
+R11-2. CO-HOST IS GRANTED AND REVOKED FROM ATTENDEESSHEET ONLY. The
+       host taps ⋯ on any AttendeeRow to open a RowOverflowMenu with:
+       "Make co-host" (or "Remove co-host" if already promoted) +
+       "Remove from event" (destructive). No other surface grants or
+       revokes co-host. The host's own row has NO ⋯ menu — a host
+       cannot make themselves co-host or self-remove.
+R11-3. CO-HOST BADGE IS VISIBLE TO ALL VIEWERS. Every attendee who
+       opens AttendeesSheet sees the CO-HOST chip on promoted rows.
+       Visibility of elevated access is intentionally transparent —
+       it is NEVER host-only.
+R11-4. REMOVE FROM EVENT MOVES INTO ⋯ MENU. In host view, the
+       trailing remove icon-btn from R10-7 is replaced by the ⋯
+       overflow icon-btn. "Remove from event" inside that menu is
+       the tap-to-arm path and fires the same armed → commit flow
+       as R10-4. Swipe-to-arm (≥44px rightward) remains a second
+       path to arm, unchanged. NEVER keep both a standalone remove
+       btn AND a ⋯ menu on the same row.
+R11-5. CO-HOST PROMOTION FIRES NOTIFICATION + TOAST. The promoted
+       attendee receives: (a) CoHostCard in NotifSheet (persistent,
+       survives app restart), and (b) CoHostToast if they are active
+       in the app at the moment of promotion. Revocation fires
+       CoHostRevokedCard in NotifSheet ONLY — no toast on revoke.
+R11-6. CO-HOST ROLE LIVES ON EVENT AS AN ARRAY. Event.coHostIds:
+       string[] holds the IDs of all co-hosts for that event.
+       isCoHost = Event.coHostIds.includes(currentUser.id).
+       Roles are non-overlapping: a viewer is host, co-host, OR
+       invitee — never two at once. Host id MUST NOT appear in
+       coHostIds. Event Detail edit controls render for
+       isHost || isCoHost.
+R11-7. ATTENDEESSHEET HAS THREE ROLE VIEWS. Roles and their
+       AttendeesSheet capabilities:
+         HOST     2-row filter (RSVP + type/group) · search ·
+                  "Invite more" · ⋯ menu on all rows (not own).
+         CO-HOST  1-row filter (RSVP only) · search ·
+                  "Invite more" · NO ⋯ menu · NO type/group row.
+         INVITEE  1-row filter (RSVP only) · search ·
+                  NO "Invite more" · NO ⋯ menu.
+       CO-HOST badge is visible in all three views.
+================================================================
+## HARD RULES — Round 10 additions (AttendeesSheet)
+================================================================
+R10-1. ATTENDEESSHEET IS ROLE-AWARE. The sheet renders one of two
+       layouts based on the viewer's role on the event:
+         HOST    — filter bar (RSVP + type/group), search, full row
+                   with RSVP status, remove action, "Invite more" CTA.
+         INVITEE — filter bar (RSVP only), search, row with RSVP
+                   status, no remove, no "Invite more."
+       Role is determined by Event.hostId === currentUser.id.
+       Co-host role is NOT implemented in this round — deferred.
+       NEVER show remove or invite controls to non-host viewers.
+R10-2. RSVP FILTER CHIPS ARE LOCKED TO 4 VALUES. The RSVP chip row
+       contains exactly: All · Going · Maybe · Not going · No response.
+       "All" is selected by default and shows the full list.
+       Empty sections after filtering use the existing EmptyAttendees
+       pattern — NEVER show a zero-count chip as hidden or disabled.
+R10-3. HOST FILTER BAR HAS TWO ROWS. Row 1: RSVP chips (same 4+All as
+       R10-2). Row 2: Friend Type / Group chips — one chip per type or
+       group the host has, plus "All." Rows are independent filters
+       that combine as INTERSECTION (show attendees matching BOTH the
+       selected RSVP status AND the selected type/group). NEVER merge
+       the two rows into one.
+R10-4. REMOVE IS TWOTAPDESTRUCTIVE WITH SWIPE-TO-ARM. The armed state
+       can be reached two ways: (a) tap the trailing remove icon-btn on
+       an AttendeeRow, or (b) swipe the row rightward ≥44px. Both paths
+       enter the same armed state — row background shifts to dangerSoft,
+       "Remove" label appears, heavy haptic fires. Second tap on the
+       armed row confirms removal (success haptic + row animates out
+       320ms easeStd). Swipe <44px springs back. Armed state auto-
+       dismisses after 4s with no action. NEVER use a modal for remove.
+R10-5. "INVITE MORE" OPENS AUDIENCEPICKERSHEET. The host's "Invite
+       more" accent pill in the sheet header opens the existing
+       AudiencePickerSheet (mode='friends'). Already-invited attendees
+       are shown pre-checked and non-interactive. Confirming adds new
+       invitees; success haptic fires and rows animate in via StaggerList.
+R10-6. SEARCH FILTERS THE VISIBLE LIST ONLY. The search input inside
+       AttendeesSheet filters the currently visible list (post-chip-
+       filter). It does NOT fire a network search. Matching is
+       case-insensitive against name and @handle. No results within
+       the filtered set renders EmptyAttendees inline.
+R10-7. ROW ANATOMY IS LOCKED. Every AttendeeRow:
+         RingAvatar (40px, status ring reflects availability) +
+         name (15/600) + @handle (mono 12/500 ink3) +
+         RSVPBadge (right-aligned).
+       RSVPBadge: pill · 11/600 · radius 999 · 6×10 padding.
+         Going      → limeSoft fill · limeInk text
+         Maybe      → accentSoft fill · accent text
+         Not going  → popSoft fill · popInk text
+         No response→ bgSunken fill · ink3 text
+       Host view: trailing remove icon-btn (trash, 20px ink3, 44pt hit).
+       Invitee view: no trailing action. Tap row → Friend Profile.
+       Min-height 64px.
+================================================================
+## HARD RULES — Round 9 additions (Onboarding)
+================================================================
+R9-1.  ONBOARDING IS A SEPARATE NAVIGATION STACK. No tab bar, no
+       FlowHeader during any onboarding screen (sign-up, sign-in,
+       forgot password). The main app shell mounts ONLY after
+       successful authentication. Onboarding uses its own back arrow.
+R9-2.  SIGN-UP PROGRESS IS 6 DOTS. Steps 1–6 each show a 6-dot row
+       below the back arrow. Active = 8px accent dot. Completed = 8px
+       accent at 40% opacity. Upcoming = 8px hairStrong border, no fill.
+       6px gap between dots. NEVER show "Step N of 6" copy.
+R9-3.  BACK IS ALWAYS PRESENT AND PRESERVES STATE. Every sign-up step
+       and forgot-password screen has a 44pt back arrow. Tapping it
+       returns to the previous screen WITHOUT clearing form state.
+       Exception: Welcome has no back arrow.
+R9-4.  PRIMARY CTA DISABLES UNTIL VALID. The primary pill is disabled
+       (opacity 0.4, non-interactive) until minimum field validity is
+       met. NEVER show an error before the user first attempts submit.
+       After a failed submit, inline errors appear and persist.
+R9-5.  OTP AUTO-SUBMITS ON 6TH DIGIT. Entering the 6th digit fires the
+       submit automatically — no button tap required. The "Verify"
+       button remains as a visible fallback only. Show ButtonLoading on
+       auto-submit. NEVER require the tap to proceed.
+R9-6.  HANDLE IS CHECKED REAL-TIME WITH 400ms DEBOUNCE. After typing
+       stops 400ms, fire an availability check. During check: 18px
+       spinner trailing. Result: checkmark in limeInk (available) or ×
+       in danger + "Handle taken" inline error (taken). Continue CTA is
+       blocked during in-flight checks and when result is "taken."
+R9-7.  PROFILE PHOTO AND AVAILABILITY ARE ALWAYS SKIPPABLE. Both steps
+       MUST have a visible "Skip for now" path. Standard flow: ghost
+       pill below primary. Invite-context on availability step: accent
+       ghost pill (more prominent placement).
+R9-8.  INVITE-FIRST CONTEXT IS STORED BEFORE AUTH BEGINS. When the
+       app opens via event invite deep link, InviteContext (eventId +
+       eventName) is captured before the auth flow renders. It surfaces
+       as an InviteContextBanner on Welcome, adjusts copy/skip
+       prominence on Step 6, and routes post-auth to Event Detail
+       instead of Home.
+R9-9.  SIGN-IN IDENTIFIER FIELD IS FORMAT-AGNOSTIC. The identifier
+       input accepts phone number, email address, or @handle — no
+       format selector, no tabs. Keyboard type adapts to first
+       character: '@' or letter → default; digit → numeric; letter
+       string containing '.' → email. NEVER reject a format.
+R9-10. FORGOT PASSWORD ENDS AT CONFIRMATION SCREEN. After submitting a
+       reset request the user lands on a confirmation screen within the
+       forgot-password sub-flow. They exit ONLY by tapping "Back to
+       sign in." NEVER auto-navigate away from confirmation.
+================================================================
+## HARD RULES — Round 8 additions (Search)
+================================================================
+R8-1. SEARCH IS A FULL-SCREEN OVERLAY. Entry is the search icon in
+      FlowHeader on Home, Friends, and Groups screens. Tap → overlay
+      animates up over the current screen with a 280ms spring
+      (flow-sheet-up). Input auto-focuses, soft keyboard up. Left
+      "Cancel" / back arrow dismisses. NEVER a full route, tab, or
+      separate screen — it is a transient overlay over whichever
+      screen invoked it.
+R8-2. SECTION ORDER IS LOCKED. When a query is present, results
+      render in this exact order under mono overlines:
+        FRIENDS · PEOPLE · GROUPS · EVENTS
+      Empty sections are omitted entirely (no zero-count headers).
+      NEVER reorder. NEVER merge. NEVER add a "Top hit" or unified
+      results section above this stack.
+R8-3. RESULT-ROW ANATOMY IS LOCKED.
+      FRIENDS  RingAvatar (with status ring) + name + @handle
+               + CategoryBadge → tap row → Friend Profile.
+      PEOPLE   RingAvatar (NO status ring — these are not friends yet)
+               + name + @handle + "N mutual friends" sub-line + "Add"
+               accent pill. Tap pill → request sent, pill swaps to
+               "Sent" + success haptic. Tap row body → public mini-
+               profile (out of scope for prototype; route stub).
+      GROUPS   CoverArt chip (44px) + group name + member count
+               + PrivateBadge if private → tap → Group Detail.
+      EVENTS   accentSoft 44px calendar tile + event name (2-line
+               clamp) + date + RSVP status dot → tap → Event Detail.
+      RingAvatar size is 40 in all rows. Row min-height 64.
+R8-4. DEFAULT STATE = RECENTS, MAX 7. With no query the overlay shows
+      a "RECENT" overline + up to 7 recent terms newest first. Each
+      row has a per-row × to remove. A "Clear all" pill sits top-right
+      of the section header. Below the list: "Find anyone by @handle"
+      hint in ink3. Tapping a recent term populates the input and
+      shows CACHED results immediately — no new server call when
+      cache is fresh. Editing the term re-triggers a query.
+R8-5. EMPTY RESULTS USES EmptySearch. When a query returns zero hits
+      across all four sections, render the existing EmptySearch
+      pattern unchanged: search icon tile · "Nothing matched" ·
+      "Invite by handle" secondary CTA. NEVER add per-section empty
+      states; the entire result stack is replaced by EmptySearch.
+R8-6. INPUT BAR IS LOCKED. Full-width pill, radius 12, bgSunken fill,
+      placeholder "Search friends, groups, events…", magnifying-glass
+      leading icon in ink3, clear × inside right edge ONLY when text
+      is present (light haptic on tap). NEVER add filter chips,
+      scope pickers, or voice-input affordances inside the input.
+R8-7. ADD-FRIEND IS THE ONLY ROW-INTERNAL ACTION. PEOPLE row's "Add"
+      pill is the sole tap target inside any result row that does NOT
+      navigate. All other rows are wholly tappable surfaces with one
+      destination each. NEVER add hover/long-press menus, swipe
+      actions, or per-row overflow on the Search overlay.
+================================================================
+## CO-HOST SURFACE (LOCKED · Round 11)
+================================================================
+Role resolution (for all event surfaces):
+  isHost    = event.hostId === currentUser.id
+  isCoHost  = event.coHostIds.includes(currentUser.id)
+  isInvitee = !isHost && !isCoHost
+
+Grant flow (host only · R11-2):
+  Host taps ⋯ on any AttendeeRow in AttendeesSheet.
+  RowOverflowMenu appears (see component spec).
+  Items vary by target's current role:
+    Not co-host: "Make co-host"  · then: "Remove from event" (danger)
+    Is co-host:  "Remove co-host" · then: "Remove from event" (danger)
+  Host's own row: no ⋯ menu rendered.
+  "Make co-host" tap:
+    → target added to event.coHostIds (optimistic)
+    → CoHostCard queued to target's NotifSheet
+    → CoHostToast fires if target is active in app
+    → success haptic · row re-renders with CO-HOST badge
+    → menu dismisses.
+  "Remove co-host" tap:
+    → target removed from event.coHostIds (optimistic)
+    → CoHostRevokedCard queued to target's NotifSheet
+    → NO toast on revoke (R11-5)
+    → light haptic · CO-HOST badge animates off row
+    → menu dismisses.
+  "Remove from event" tap:
+    → menu dismisses → row enters armed state (R10-4 / R11-4)
+    → heavy haptic. Second tap commits remove. Success haptic.
+
+AttendeesSheet — header (CO-HOST view):
+  Title: "Attendees" 17/800.
+  Sub: "{N} invited" 12/500 ink3.
+  "Invite more" accent pill trailing (same as host — R11-1a).
+  Close X icon-btn · top-right · 44pt.
+
+AttendeesSheet — filter bar (CO-HOST view):
+  Row 1 only — RSVP chips: All · Going · Maybe · Not going ·
+    No response. NO Row 2 type/group filter (R11-7).
+
+Event Detail edit controls:
+  All edit affordances (pencil FAB, "Edit" pill, inline field taps)
+  render when isHost || isCoHost. Invitee view is read-only.
+  No new component required — condition change only.
+
+CoHostToast (fires on promotion · live app only · R11-5):
+  Docked above tab bar (same position as BroadcastToast).
+  accentSoft fill · radius 14 · 1.5px accent border.
+  Layout: star icon (16px accent) · "You're a co-host" (13/700 ink) ·
+    "{EventName}" (11/500 ink2, 1-line ellipsis) · close X.
+  flow-fade-up 320ms spring. Auto-dismiss 3200ms.
+  A11y: role="alert" · aria-live="polite".
+  Success haptic fires WITH the toast (H-5).
+
+Haptics — co-host additions:
+  "Make co-host" confirmed     success
+  "Remove co-host" confirmed   light
+  ⋯ menu open                  light
+  ⋯ menu dismiss               light
+  CoHostToast fires            success  (same gesture as promotion)
+================================================================
+## QUICKSET SAVE/NAME SURFACE (LOCKED · Round 12)
+================================================================
+Entry point:
+  "Save as Quickset" ghost pill · full-width · in Availability
+  Editor below QuicksetGrid section.
+  Enabled when AvailabilityEntry map is non-empty (≥1 day set).
+  Disabled: opacity 0.4 · non-interactive when map is empty.
+  Medium haptic on tap (opening a new sheet).
+
+QuicksetNameSheet:
+  Bottom sheet · radius 22 22 0 0 · max-height 50%.
+  38×4 grab handle centered at top.
+  Animation: flow-sheet-up 280ms spring · flow-sheet-down 240ms easeStd.
+  Backdrop: 42% black.
+  A11y: role="dialog" · aria-modal="true" · focus trap.
+        Esc / drag-down >80px → close (light haptic).
+  Header: "Name your Quickset" 17/800 · left-aligned.
+  Close X icon-btn · top-right · 44pt · light haptic.
+  AuthInputField label="Quickset name" · auto-focus · max 24 chars.
+  Validation: non-empty AND unique among existing custom quickset
+    names (case-insensitive). Name-exists error: "Name already in
+    use" · 12/500 danger · triangle-alert leading (A-16).
+  Detail hint (below input · non-editable):
+    "Applied over the next 30 days" · 12/500 ink3.
+  Footer (pinned above safe area):
+    "Save" accent PillBtn (disabled until field valid).
+    "Cancel" ghost pill · 12px below.
+
+  On "Save":
+    Sheet closes (flow-sheet-down 240ms).
+    New tile appears in QuicksetGrid via StaggerList entrance
+      (base 0ms · 30ms/item · spring · same stagger as list adds).
+    Success haptic.
+    AvailabilityEntry map unchanged — availability already set by
+      the user before entering the sheet. NO "Applied" confirm fires
+      on the new tile (nothing new was applied).
+
+Rename flow (custom tiles only · R12-4):
+  Tap ⋯ on tile → RowOverflowMenu → "Rename":
+    QuicksetNameSheet opens pre-populated with current name.
+    Header: "Rename Quickset".
+    Primary CTA: "Save" (current name is valid; only blocked on
+      empty or collision with a DIFFERENT custom quickset name).
+    On save: sheet closes · tile label cross-fades to new name
+      200ms easeOut. Success haptic.
+
+Delete flow (custom tiles only · TwoTapDestructive · R12-4):
+  Tap ⋯ on tile → RowOverflowMenu → "Delete" (destructive):
+    Menu dismisses → tile bg shifts to dangerSoft ·
+    "Delete?" 13/600 popInk label replaces content · heavy haptic.
+    Second tap on armed tile → tile animates out 320ms easeStd ·
+      remaining grid reflows · success haptic.
+    Auto-dismiss armed after 4s → tile restores to normal ·
+      light haptic. NEVER use a modal for delete.
+
+Custom tile anatomy (additions to existing QuicksetGrid tile spec):
+  Base: 66px min-height · radius 12 · state dot · 13/700 label ·
+    11/ink3 detail. (Unchanged from built-ins.)
+  ⋯ icon-btn: 18px ink3 · top-right of tile · 44pt hit area
+    (invisible padding extends into tile corner). Built-in tiles:
+    NO ⋯ control of any kind.
+  Armed state: dangerSoft fill · 1.5px danger border ·
+    "Delete?" label replaces normal content · ⋯ btn hidden.
+
+Haptics — Quickset save/name:
+  "Save as Quickset" pill tap     medium
+  Sheet open (grab handle drag)   (no haptic — drag open)
+  Sheet close X                   light
+  Save confirmed (new or rename)  success
+  ⋯ menu open                     light
+  ⋯ menu dismiss (outside tap)    light
+  Delete armed                    heavy
+  Delete committed                success
+  Delete arm auto-dismiss         light
+================================================================
+## PUBLIC MINI-PROFILE SURFACE (LOCKED · Round 12)
+================================================================
+Trigger:    Tap PEOPLE row body in Search overlay (R8-3 · R12-5).
+Sheet:      Bottom sheet · radius 22 22 0 0 · max-height 72%.
+            38×4 grab handle centered at top.
+Animation:  flow-sheet-up 280ms spring on open ·
+            flow-sheet-down 240ms easeStd on close.
+Backdrop:   30% black (lighter than standard 42% — sheet stacks
+            on top of Search overlay which is already opaque).
+A11y:       role="dialog" · aria-modal="true" · focus trap.
+            Esc / drag-down >80px → close (light haptic).
+Close X:    icon-btn · top-right · 44pt · light haptic.
+Loading:    40px MD Spinner centered in body while data fetches.
+
+Identity block (non-scrollable · centered):
+  RingAvatar 64px · NO status ring (non-friend · R12-6) ·
+    24px below grab handle.
+  Name: 20/800/-0.5 · centered · 8px below avatar.
+  @handle: mono 13/500 ink3 · centered · 4px below name.
+  CTA block (full-width · 24px below handle):
+    No request pending:
+      "Add friend" accent PillBtn · full-width.
+    Request sent by viewer (pending):
+      "Requested" ghost PillBtn · full-width · non-interactive ·
+      checkmark-circle leading icon (16px limeInk).
+    Request received from this person:
+      Two-up: "Accept" accent pill + "Decline" ghost pill.
+      "Accept" → success haptic · both sheet and underlying row
+        CTA update in-place.
+      "Decline" → TwoTapDestructive · light haptic arm ·
+        light haptic commit. (Not destructive enough for heavy.)
+
+Body (scrollable · 1px hair top separator):
+  Mutual friends section (omit entire block if 0 mutuals):
+    "N MUTUAL FRIEND[S]" overline · left-aligned.
+    AvatarRow: up to 5 RingAvatar 24px · WITH status ring
+      (these are your friends) · 6px gap · left-aligned.
+    Name labels omitted at this size.
+    Tap mutual friend avatar → no-op (stub · future pass).
+  Bio (omit if empty or not set):
+    13/500 ink2 · 3-line clamp + "Read more" text link (R5-6).
+    No section overline. Rendered directly below mutuals row.
+  Stats — always shown · 2-up:
+    StatTile: HOSTED · ATTENDED.
+    Two equal-width tiles · 8px gap.
+    NEVER show FRIENDS or GROUPS counts (R12-6).
+
+"Add friend" tap:
+  Pill swaps to "Requested" (success haptic).
+  Underlying PEOPLE row's "Add" pill also swaps to "Sent"
+    (optimistic · same in-session state sync).
+  On failure: ErrorToast (kind: friend) + pill reverts to "Add"
+    (and underlying row reverts to "Add").
+
+Closing QuickProfileSheet:
+  Returns to Search overlay (still open behind).
+  No change to Search results state.
+
+Haptics — QuickProfileSheet:
+  Sheet open                              light
+  Sheet close (X or drag-down)            light
+  "Add friend" → "Requested"             success
+  "Accept" friend request                 success
+  "Decline" first tap (arm)              light
+  "Decline" second tap (commit)          light
+  Tap mutual friend avatar               (no haptic · stub)
+================================================================
+## ATTENDEESSHEET SURFACE (LOCKED · Round 10)
+================================================================
+Trigger:    "+N more" pill on event when invitee count ≥ 50.
+            Also reachable from event detail attendee avatar stack tap.
+Sheet:      Bottom sheet · radius 22 22 0 0 · max-height 88%.
+            38×4 grab handle centered at top.
+Animation:  flow-sheet-up 280ms spring on open · flow-sheet-down
+            240ms easeStd on close. Backdrop 42% black.
+A11y:       role="dialog" · aria-modal="true" · focus trap.
+            Esc / drag-down >80px → close (light haptic).
+
+Header (HOST view):
+  Title: "Attendees" 17/800 · left-aligned.
+  Sub: "{N} invited" 12/500 ink3 · below title.
+  "Invite more" accent pill · trailing · opens AudiencePickerSheet
+    (mode='friends', pre-checks existing invitees per R10-5).
+  Close X icon-btn · top-right · 44pt · light haptic.
+
+Header (CO-HOST view):
+  Title + sub same as host. "Invite more" accent pill trailing.
+  Close X icon-btn · top-right · 44pt · light haptic.
+
+Header (INVITEE view):
+  Title: "Attendees" 17/800 · left-aligned.
+  Sub: "{N} invited" 12/500 ink3 · below title.
+  NO "Invite more." NO remove controls.
+  Close X icon-btn · top-right · 44pt · light haptic.
+
+Filter bar (HOST view):
+  Row 1 — RSVP chips: All · Going · Maybe · Not going · No response.
+  Row 2 — Type/Group chips: All · {each FriendType label} ·
+    {each SocialGroup name the host belongs to}.
+  Both rows: FilterChipRowMulti style · 12px horiz padding ·
+    8px between rows. Filters combine as INTERSECTION (R10-3).
+
+Filter bar (CO-HOST + INVITEE view):
+  Row 1 only — RSVP chips: All · Going · Maybe · Not going ·
+    No response. No Row 2.
+
+Search input:
+  Full-width · SearchInputBar style (bgSunken pill · radius 12 ·
+  leading magnifier · trailing × when value present) · 8px below
+  filter bar. Filters live list only — no network call (R10-6).
+  Light haptic on clear ×.
+
+List body:
+  Scrollable. Grouped by nothing — single flat list, sorted:
+    Going → Maybe → No response → Not going.
+  AttendeeRow per invitee (R10-7).
+  StaggerList entrance on initial load (320ms spring · 30ms/item).
+  New rows added via "Invite more" animate in at list bottom via
+    StaggerList (base delay 0ms, same stagger).
+
+Empty state (filtered/searched to zero):
+  EmptyAttendees ("No invites sent" / "Add invitees") — host view.
+  Inline centered block — "Nobody matches" · no CTA — invitee view
+    when filter/search yields zero (never show "Add invitees" to
+    non-host).
+
+Remove flow (HOST only · R10-4):
+  Arm:    Tap trailing remove btn OR swipe row rightward ≥44px.
+          Row bg → dangerSoft · "Remove" 13/600 popInk label
+          replaces trailing icon. Heavy haptic.
+  Commit: Tap armed row anywhere.
+          Row animates out 320ms easeStd. Success haptic.
+          Sub in header updates count immediately (optimistic).
+  Cancel: Tap elsewhere · or armed state auto-dismisses after 4s.
+          Row springs back. Light haptic.
+  Swipe <44px → spring back immediately. No haptic.
+
+Haptics — AttendeesSheet:
+  Sheet open                    light
+  Sheet close                   light
+  Chip tap (filter change)      light
+  Search clear ×                light
+  Row tap → Friend Profile      light
+  Remove armed (tap or swipe)   heavy
+  Remove committed              success
+  Remove cancelled / spring-back light
+  "Invite more" done            success
+  New invitee rows animate in   (no haptic — render event per H-3)
+================================================================
+## ONBOARDING SURFACE (LOCKED · Round 9)
+================================================================
+Auth stack: completely separate from main app shell.
+No tab bar. No FlowHeader. Own back arrow only.
+Screen transitions: push/pop 240ms easeStd between steps.
+Auth success → main shell: cross-fade 320ms easeOut.
+
+Welcome screen:
+  Full-screen centered layout. No progress dots. No back arrow.
+  Logo wordmark: h1 28/800 accent · centered.
+  Tagline: body 15/500 ink2 · centered · 8px below logo.
+  InviteContextBanner (if invite context present) · 16px below tagline.
+  "Get started" accent PillBtn · full-width · 32px below banner/tagline.
+  "Sign in" ghost PillBtn · full-width · 12px below "Get started."
+
+Sign-up Step 1 — Credential:
+  Progress: dot 1 of 6 active.
+  Title: "Create your account"
+  Sub: "We'll send you a code to verify."
+  AuthInputField label="Phone or email" · auto-focus.
+  Primary CTA: "Continue" (disabled until non-empty valid-format value).
+
+Sign-up Step 2 — Verify (OTP):
+  Progress: dot 2 of 6 active.
+  Title: "Enter the code"
+  Sub: "Sent to {credential}" · inline "Change" text link → Step 1.
+  OTPInput (6-cell). Auto-submits on 6th digit (R9-5).
+  "Resend code" text link · 30s cooldown · shows "Resend in {N}s"
+    ink3 while cooling. Tap fires success haptic + new code dispatch.
+  Primary CTA: "Verify" (fallback only).
+
+Sign-up Step 3 — Identity:
+  Progress: dot 3 of 6 active.
+  Title: "What should we call you?"
+  AuthInputField label="Full name" · stacked above:
+  HandleInput (with "@" prefix) · auto-populated from name (lowercase,
+    spaces stripped, first 20 chars) · real-time availability (R9-6).
+  Primary CTA: "Continue" (blocked during check or result=taken).
+
+Sign-up Step 4 — Password:
+  Progress: dot 4 of 6 active.
+  Title: "Set a password"
+  AuthInputField label="Password" · type=password · trailing eye toggle.
+  Requirement row below field: "8+ characters" · ink3 unmet → limeInk met.
+  Primary CTA: "Create account" (fires success haptic on submit).
+
+Sign-up Step 5 — Profile photo:
+  Progress: dot 5 of 6 active.
+  Title: "Add a photo"
+  Sub: "Help friends recognize you."
+  AvatarUploadWell (80px) · centered · 24px below sub.
+  Primary CTA: "Choose photo" (triggers native picker; state updates
+    well preview; CTA label changes to "Continue" after photo chosen).
+  Secondary: "Skip for now" ghost pill · 12px below primary.
+
+Sign-up Step 6 — Availability nudge:
+  Progress: dot 6 of 6 active.
+  InviteContextBanner (if invite context present) · above title.
+  Title: "Set your availability"
+  Sub (standard):        "Let friends know when you're free."
+  Sub (invite-context):  "You can always set this up later."
+  QuicksetGrid (4 built-in presets only · R7-1) · 24px below sub.
+  Primary CTA: "Set availability" → Availability Editor → return
+    → post-auth destination (Home standard · Event Detail invite-ctx).
+  Secondary (standard):       "Skip for now" ghost pill.
+  Secondary (invite-context): "Skip for now" ACCENT ghost pill
+    (more prominent per R9-7).
+
+Sign-in screen:
+  No progress dots. No back arrow on screen body
+    (Welcome "Sign in" entry; back arrow returns to Welcome).
+  Title: "Welcome back"
+  AuthInputField label="Phone, email, or @handle" · auto-focus.
+  AuthInputField label="Password" · type=password · trailing eye toggle.
+  "Forgot password?" text link (13/500 ink3) · 8px below password field.
+  Primary CTA: "Sign in" (disabled until both fields non-empty).
+  Footer: "New to SyncUp? Create account" text link (13/500 ink3)
+    centered · 24px below CTA · → Sign-up Step 1.
+  Wrong credentials: error haptic + AuthInputField error state on both
+    fields + inline error "Incorrect credentials" below password field.
+
+Forgot password — Request:
+  No progress dots. Back arrow → Sign-in.
+  Title: "Reset your password"
+  Sub: "Enter the phone or email on your account."
+  AuthInputField label="Phone or email" · auto-focus.
+  Primary CTA: "Send reset link" (fires success haptic on submit).
+
+Forgot password — Confirmation (R9-10):
+  No progress dots. No back arrow.
+  56×56 bgSunken tile · radius 16 ·
+    envelope icon if credential was email, message-bubble if phone.
+  Title: "Check your {email | messages}" (adapts to credential type).
+  Sub: "We sent a reset link to {credential}." (ink2).
+  "Back to sign in" ghost PillBtn · 24px below sub.
+  "Didn't get it? Resend" text link (13/500 ink3) · 8px below pill.
+
+Haptics — onboarding additions:
+  OTP 6th digit auto-submit    medium
+  Account created (Step 4)     success
+  Photo chosen from picker     light
+  Sign-in success              success
+  Sign-in wrong credentials    error
+  OTP wrong code               error
+  Handle available result      light  (status feedback, not commit)
+  Handle taken result          error
+  OTP resend tapped            light
+  Reset link sent              success
+================================================================
+## SEARCH SURFACE (LOCKED · Round 8)
+================================================================
+ONE overlay (R8-1), entry from FlowHeader search icon on Home,
+Friends, and Groups.
+Open animation:    flow-sheet-up · 280ms · spring
+Close animation:   flow-sheet-down · 240ms · easeStd
+Backdrop:          none — opaque T.bg overlay full screen
+Header:            56px · "Cancel" ghost btn left (15/600 ink2) ·
+                   centered title omitted · close X right hidden
+                   (Cancel is the sole dismiss).
+Input bar (R8-6):  full-width · radius 12 · bgSunken · 44px tall ·
+                   leading magnifier (16px ink3) · trailing × (only
+                   when value present, light haptic on tap) ·
+                   placeholder "Search friends, groups, events…"
+Section order:     FRIENDS → PEOPLE → GROUPS → EVENTS (R8-2)
+Section header:    Overline + count chip (mono 9/600 hairBg) right
+Row anatomy:       see R8-3
+Default state:     "RECENT" overline (left) + "Clear all" pill (right);
+                   ≤7 recent terms newest first, each with × icon-btn.
+                   "Find anyone by @handle" hint (13/500 ink3, mono
+                   "@handle" inline) below the list. Editing input
+                   re-queries; tapping recent uses cache (R8-4).
+Empty results:     EmptySearch unchanged (R8-5)
+Loading:           Section spinner (28px) top-right of overall
+                   results header during initial query; debounce 220ms
+                   after last keystroke before firing.
+Cache:             Last 30 queries cached client-side. Re-query a
+                   recent term within 5min uses cache; older re-fires.
+Haptics:
+  open overlay        light
+  tap result row      light  (medium for navigations across screens)
+  tap "Add" → "Sent"  success
+  tap clear ×         light
+  tap "Clear all"     warning
+  zero results render light  (once, on render only)
+================================================================
+## HARD RULES — v2.7 additions
+================================================================
+R7-1. QUICKSETS ARE USER-EXTENSIBLE. The 4 built-in presets
+      (weekends-free / weekdays-5pm / next30-maybe / clear-month) are
+      permanent and may not be deleted. Users CAN save additional
+      custom Quicksets beyond the four built-ins. A save/name flow is
+      required and will be designed in the next round; until shipped,
+      QuicksetGrid renders the 4 built-ins only. NEVER hard-code the
+      grid as fixed-length-4.
+R7-2. BROADCASTTOAST STAYS SIMPLE. The toast surface contains exactly:
+      state dot · title · sub · Undo pill · close X. There is NO
+      "review recipients" tap-action on the toast. The toast body
+      itself is NOT tappable to open audience editing. Broadcast
+      Settings is the SINGLE editor for audience. NEVER add a
+      "Tap to review" affordance, a recipient avatar stack, or a
+      chevron-to-edit on this component.
+R7-3. FRIEND TYPES ARE NON-OVERLAPPING. One friend belongs to exactly
+      one FriendType. No nested membership, no compound membership.
+      Assigning a friend to a new type REMOVES them from any previous
+      type. AudiencePickerSheet (mode='types') does NOT support compound
+      filtering. FilterChipRowMulti computes UNION, never INTERSECTION.
+      FriendType.members[] is disjoint across types.
+R7-4. STALE NOTIFICATIONS AUTO-PURGE AT 30 DAYS. Items older than 30
+      days are removed on next sheet open. The EARLIER bucket caps at
+      30 days. A manual "Clear all" pill IS in the NotifSheet header
+      next to "Mark read." Single-tap (not TwoTapDestructive). Fires
+      warning haptic + A11yLive announce ("Activity cleared"). Empties
+      feed; EmptyNotifications renders. Per-card left-swipe Dismiss
+      handles one-off cases.
+R7-5. PUSH COPY = IN-APP COPY VERBATIM. OS-level push strings match
+      in-app card title and body exactly. No "New activity from" /
+      "SyncUp:" / "You have a new" prefix.
+        ✓ "Ana is free tonight"
+        ✗ "New activity from Ana"
+        ✓ "Sam said yes to Dinner Friday"
+        ✓ "Maya wants to be friends"
+R7-6. GROUP-DETAIL ADMINBAR IS PINNED. AdminBar stays pinned when
+      Group Detail body scrolls. Does NOT collapse, fade, shrink, or
+      auto-hide on scroll. Visibility is binary on role only.
+================================================================
+## HARD RULES — Round 6 additions
+================================================================
+R6-1. NOTIFICATIONS = ONE SURFACE. Pull-down sheet is the canonical
+      notification surface. NEVER a separate full-screen feed, archive,
+      or inbox. Pull-from-Home and Activity-tab tap open the same component.
+R6-2. SHEET DETENTS ARE FIXED. Exactly two snaps — peek (44%) and full
+      (88%). NEVER add intermediate detents or continuous drag resize.
+      Pull-from-Home defaults to peek; Activity-tab tap defaults to full.
+R6-3. INBOUND BROADCASTS NEVER HAPTIC ON RECEIVE. The unread dot is the
+      only signal. Haptic fires only on user interaction (tap, swipe,
+      expand, plan).
+R6-4. STACK PER SENDER. Multiple inbound broadcasts from the same friend
+      within 60 minutes collapse into one card. Latest is primary; older
+      live behind a "+N earlier" springs-open pill.
+R6-5. UNREAD ARBITRATION. Activity tab dot = silent affordance (icon
+      pop-dot only, no copy). Home pull pill = verbal affordance ("3 NEW"
+      copy). They share state. Never communicate the same thing in the
+      same modality at the same time.
+R6-6. PROFILE TAB ROUTES TO PROFILE & SETTINGS. Tab order is fixed:
+      Home · Broadcast · Activity · Friends · Profile.
+R6-7. NOTIFICATIONS GROUPING. Day overlines only — TODAY · YESTERDAY ·
+      named-day ("TUE APR 22") for ≤7 days back · "EARLIER" beyond.
+      No grouping by kind, sender, or event. Recency is the index.
+================================================================
+## HARD RULES — Round 5 additions
+================================================================
+R5-1. STATUS NEVER BY COLOR ALONE. Free/Maybe/Busy must always render
+      BOTH a state-colored AvailDot AND a text label.
+R5-2. SPINNER ONLY. No skeletons, shimmers, or pulses anywhere.
+      Spinner = two arrows forming a circle, rotating clockwise, 900ms linear.
+R5-3. NO PARALLAX. No scroll-bound transforms.
+R5-4. ALL ICON-ONLY BUTTONS carry aria-label. Toasts use role="alert".
+      Spinners use role="status".
+R5-5. TEXT-COLOR FLOOR. ink3 (#8B8799) only at ≥14px. Below 14px, use ink2.
+R5-6. LONG-TEXT TRUNCATION:
+      • Event title: 2-line clamp
+      • Friend name: single-line ellipsis
+      • Description: 3-line clamp + "Read more"
+      • @handle: single-line ellipsis (mono)
+R5-7. OFFLINE INDICATOR uses color + icon + text — never any one alone.
+R5-8. HAPTICS — 6 types only (light/medium/heavy/success/warning/error).
+================================================================
+## HARD RULES (v2.2 + Round 4 additions)
+================================================================
+1.  Availability viz on Step 3 is LOCKED to Banded.
+2.  Min hit target 44px. Type never <12px on mobile, <24px on deck.
+3.  No emoji. No generic gradients as hero content.
+4.  Ring avatars: free=availFree ring, maybe=availMaybe, busy=availBusy,
+    null=no ring.
+5.  Mono overlines uppercase, letter-spacing 1.5–1.8.
+6.  Copy tone: direct, low-word-count, "your crew" not "your network".
+7.  All destructive actions → TwoTapDestructive (no modals). Exception:
+    "Log out" triggers OS-level confirm in production, not in prototype.
+8.  Friend Type is PRIVATE; Social Group is SHARED. Never confuse.
+9.  AdminBar always visible when userRole==='admin' on Group Detail.
+10. Invite flow lives in Group Detail > AdminBar, never in Create Group.
+11. PrivateBadge is used sparingly — never in list rows when the screen
+    title already states privacy.
+12. Broadcast IA is LOCKED to the 3-card stacked pattern. One card per
+    state. OFF = collapsed; ON springs open with AudienceSwitcher +
+    (non-'everyone') sheet preview row.
+13. BroadcastToast leading marker is ALWAYS a state-colored dot. Never
+    an emoji, never an icon. Title format: "Broadcast sent · {State}".
+14. AvailabilityEntry stores ONLY set days. Clearing a day deletes the
+    key — never persist null.
+15. Quicksets are pure functions over the AvailabilityEntry map scoped
+    to sensible windows. They do NOT operate on the full map indefinitely.
+16. SettingsRow MUST render as <div> when no onClick.
+17. Step 3 wire-back: event-day = busy → danger banner (dangerSoft fill,
+    popInk text). Free/Maybe → subtle status overline instead.
+18. Notifications are ONE pull-down sheet, never a full-screen feed or archive.
+19. Sheet has exactly two detents — peek (44%) and full (88%).
+20. Inbound broadcasts NEVER fire haptic on receive.
+21. Stack inbound broadcasts per sender within 60-minute window.
+22. Unread arbitration: Activity tab dot is silent; Home pull pill carries
+    words. Both clear in lockstep.
+23. Tab IA is LOCKED: Home · Broadcast · Activity · Friends · Profile.
+24. Notifications grouping is BY DAY only — TODAY · YESTERDAY ·
+    named-day (≤7d) · EARLIER.
+================================================================
+## TOKENS (light + dark)
+================================================================
+FLOW_TOKENS.light
+  bg          #F2EFEA    bgElevated  #FFFFFF    bgSunken    #EEEAE2
+  ink         #15141A    ink2        #45424F    ink3        #8B8799
+  hair        #E4DFD4    hairStrong  #CDC7B8
+  accent      #4F3BFF    accentInk   #2A1F9E    accentSoft  #E9E5FF
+  pop         #FF7A59    popInk      #9A3E22    popSoft     #FFE4D9
+  lime        #A8E063    limeInk     #3F6014    limeSoft    #ECF8DA
+  availFree   #2BB673    availMaybe  #E8A93A    availBusy   #D14545
+  danger      #D14545    dangerSoft  (popSoft equivalent for danger fills)
+  shadowAccent rgba(79,59,255,0.28)
+FLOW_TOKENS.dark
+  bg #0D0C12   bgElevated #17161F   bgSunken #0A0910
+  ink #F2EFEA  ink2 #B8B5C2         ink3 #6F6C7C
+  hair rgba(255,255,255,0.06)       hairStrong rgba(255,255,255,0.12)
+  accent #8575FF                    accentSoft rgba(79,59,255,0.18)
+Availability state tokens (LOCKED):
+  availFree / availMaybe / availBusy used for:
+    – Status rings on RingAvatar
+    – Banded section headers in Step 3
+    – Brush dots in BrushPicker
+    – AvailDot leading marker (8px filled circle)
+    – Day fills in MonthGrid: `${color}22`
+    – Day fills in WeekView/DayView: `${color}18`
+    – Broadcast card leading dot
+    – BroadcastToast leading dot
+================================================================
+## TYPE (FLOW_FONTS)
+================================================================
+sans = "Manrope, system-ui, -apple-system, sans-serif"
+mono = "JetBrains Mono, ui-monospace, monospace"
+Scale:
+  display    48 / 800 / -2.0
+  h1         28 / 800 / -1.0
+  h2         22 / 800 / -0.5
+  h3         17 / 700 / -0.2
+  title      15 / 700 / -0.2
+  body       15 / 500 / -0.1
+  bodyMed    14 / 600 / -0.15
+  caption    12 / 500 / 0
+  micro      11 / 500 / 0
+  overline   10 / 600 / +1.5–1.8 / uppercase / mono
+  stat-num   20 / 800 / -0.5
+================================================================
+## SPACING / RADII / MOTION
+================================================================
+4px grid: 4 · 8 · 12 · 14 · 16 · 18 · 22 · 28 · 32
+Radii:    8 (inline), 9 (tabpill segment), 10 (small), 12 (input),
+          14 (card), 16 (hero), 18 (surface), 22 (sheet top), 999 (pill)
+Hairlines: 1px hair / 1.5px dashed hairStrong (empty/add)
+Shadows:  0 6px 18px shadowAccent (accent buttons)
+          0 8px 28px shadowAccent (QR card)
+          0 12px 40px rgba(0,0,0,.18) (Tweaks panel)
+          0 12px 40px rgba(0,0,0,.25) (BroadcastToast on ink bg)
+Motion curves:
+  spring       cubic-bezier(0.34,1.56,0.64,1)
+  springSnappy cubic-bezier(0.2,0.9,0.3,1.2)
+  easeOut      cubic-bezier(0.2,0,0,1)
+  easeStd      cubic-bezier(0.4,0,0.2,1)
+  linear
+Motion table:
+  Tap / press feedback ............... 200ms · easeOut
+  Step push (Step 1→2→3) ............. 240ms · easeStd
+  Sheet up (RSVP, picker) ............ 280ms · spring
+  Modal up (Create event sheet) ...... 280ms · spring
+  Search overlay open ................ 280ms · spring
+  Search overlay close ............... 240ms · easeStd
+  Broadcast card open ................ 320ms · spring
+  Toast fade-up ...................... 320ms · spring
+  Stagger list entrance .............. 320ms · spring (30ms/item, base 60ms, cap 12)
+  Long-press arm ..................... 450ms · linear
+  Spinner rotation ................... 900ms · linear
+  Toast auto-dismiss ................. 3200ms
+  Quickset "Applied" confirm ......... 1600ms
+  Day-cell drag-paint ................ 0ms (instant)
+  Parallax / scroll-bound transforms . FORBIDDEN (R5-3)
+Keyframes:
+  su-spin          rotate 0→360deg
+  su-slide-down    translateY(-100%) → 0
+  su-stagger-in    translateY(8px) + opacity 0 → 0 + 1
+  flow-fade-up     translateY(8px) + opacity 0 → 0 + 1  (320ms spring)
+  flow-sheet-up    translateY(100%) → 0                 (280ms spring)
+  flow-sheet-down  translateY(0) → 100%                 (240ms easeStd)
+================================================================
+## DATA SHAPES
+================================================================
+InviteContext
+  eventId (string) · eventName (string)
+  Captured from deep link before auth flow renders.
+  Cleared after post-auth routing is complete.
+Event (additions · Round 11)
+  coHostIds: string[]   (user IDs with co-host role; disjoint from hostId)
+EventAttendee
+  userId, name, handle, letter
+  rsvp: 'going'|'maybe'|'not-going'|'no-response'
+  isCoHost: boolean     (derived from Event.coHostIds)
+  friendTypeId?: string (host's perspective only)
+  groupIds?: string[]   (host's perspective only)
+User
+  id, name, handle, letter, bio, email, phone
+  stats { hosted, attended, friends, groups }
+NotificationSettings
+  eventInvites, friendRequests, groupInvites, rsvps,
+  eventReminders, availBroadcasts (all bool)
+PrivacySettings
+  findableBy   'everyone'|'friends-of-friends'|'username-only'
+  invitableBy  'everyone'|'friends'|'bff-only'
+AvailabilityEntry
+  Flat map: { [iso: 'YYYY-MM-DD']: 'free'|'maybe'|'busy' }
+  Absent key = unset. Never store nulls — delete on clear.
+BroadcastSettings
+  free / maybe / busy   each a BroadcastRule
+BroadcastRule
+  on (bool), audience ('everyone'|'friends'|'types'), targets (string[])
+Quickset
+  id, label, detail, status ('free'|'maybe'|null)
+  Pure functions over AvailabilityEntry map.
+Friend
+  id, name, letter, handle, category, status, friendTypes[]
+FriendType
+  id, label, members[]   (disjoint per R7-3)
+SocialGroup, GroupMember, Cover, Poll, Suggestion, SharedHistory
+Draft
+  (Round 2 shape) + optional eventIso: 'YYYY-MM-DD'
+SearchRecent
+  term (string) · timestamp (iso) · max 7 stored, newest first
+================================================================
+## COMPONENTS — Round 14 (prototype-only)
+================================================================
+TweaksPanel({ open, onToggle, controls }) — PROTOTYPE ONLY (R14-1)
+  open: boolean. controls: Array<TweaksControl>.
+  TweaksControl: { label, type: 'toggle'|'select', value, options?,
+                   onChange }
+  Closed handle fixed bottom-right (right:14 · bottom:104). Opens
+  to 220px wide panel. Standard controls always appended last:
+    { label:'Reduced motion', type:'toggle' }
+    { label:'Dark mode', type:'toggle' }
+  All changes immediate. State resets on page reload. Never production.
+================================================================
+## COMPONENTS — Round 12
+================================================================
+QuicksetNameSheet({ T, open, mode, initialName, existingNames,
+                    onSave, onClose })
+  Bottom sheet. role="dialog" aria-modal="true". Focus trap.
+  mode: 'new' | 'rename'
+    'new'    → header "Name your Quickset" · CTA label "Save" ·
+               initialName ignored.
+    'rename' → header "Rename Quickset" · CTA label "Save" ·
+               input pre-filled with initialName.
+  Manages: nameValue (string), validationError (string|null).
+  Validates on CTA tap: non-empty AND unique in existingNames
+    (case-insensitive; when mode='rename', current initialName is
+    excluded from the collision check).
+  Error copy: "Name already in use" · 12/500 danger · A-16 format.
+  Detail hint: "Applied over the next 30 days" · 12/500 ink3 ·
+    static, non-editable.
+  CTA disabled (opacity 0.4) when nameValue is empty or error present.
+  Calls onSave(trimmedName) on valid submit.
+
+QuickProfileSheet({ T, open, person, mutualFriends, stats,
+                    friendRequestStatus, onAddFriend,
+                    onAccept, onDecline, onClose })
+  person: { id, name, handle, letter, photoUrl?, bio? }
+  mutualFriends: Array<{ id, name, letter, status }>  (renders max 5)
+  stats: { hosted: number, attended: number }
+  friendRequestStatus: 'none' | 'sent' | 'received'
+  Bottom sheet. role="dialog" aria-modal="true". Focus trap.
+  Loading state: renders 40px MD Spinner until person data resolves.
+  Handles "Add friend" optimistic update; calls onAddFriend().
+    On API failure: reverts friendRequestStatus to 'none' +
+    fires ErrorToast (kind: friend).
+  "Accept" calls onAccept() · success haptic.
+  "Decline" is TwoTapDestructive · calls onDecline() on commit.
+================================================================
+## COMPONENTS — Round 11
+================================================================
+RowOverflowMenu({ T, items, onClose })
+  Small floating menu · radius 12 · bgElevated ·
+    shadow 0 8px 28px rgba(0,0,0,.18).
+  Appears anchored below-trailing of the ⋯ btn that opened it.
+  Max 3 items. Each item: 44px row · 15/500 · leading icon (20px).
+  Destructive item: popInk text + danger icon.
+  Tapping outside or pressing Esc → onClose (light haptic).
+  A11y: role="menu" · each item role="menuitem" · focus trap.
+  Animation: opacity 0→1 + scale 0.95→1 · 150ms easeOut.
+
+CoHostBadge({ T })
+  Inline chip · "CO-HOST" · mono 9/600 · accentSoft fill ·
+    accent text · radius 999 · padding 3×8.
+  Renders inline after the name on AttendeeRow (trailing name).
+  Visible to all viewers (R11-3).
+
+CoHostCard({ T, n })
+  32×32 accentSoft calendar tile with star overlay ·
+    "You're a co-host of {EventName}" (15/700).
+  Sub: 12/500 ink2 · "{HostName} gave you co-host access."
+  Trailing chevron → Event Detail.
+  Follows existing notification card anatomy.
+
+CoHostRevokedCard({ T, n })
+  32×32 bgSunken calendar tile ·
+    "Co-host access removed for {EventName}" (15/600 ink2).
+  Sub: 12/500 ink3 · "{HostName} updated your access."
+  No trailing action (informational only).
+  Follows existing notification card anatomy.
+
+CoHostToast({ T, visible, eventName, onDismiss })
+  Docked above tab bar (left:14, right:14, bottom:24). Radius 14.
+  accentSoft fill · 1.5px accent border.
+  Layout: star icon (16px accent) · "You're a co-host" (13/700 ink) ·
+    "{eventName}" (11/500 ink2, 1-line ellipsis) · close X icon-btn.
+  flow-fade-up 320ms spring. Auto-dismiss 3200ms.
+  role="alert" · aria-live="polite".
+
+AttendeeRow — updated for Round 11 (replaces R10-7 trailing):
+  HOST view trailing: ⋯ icon-btn (20px ink3 · 44pt hit) on all
+    rows EXCEPT the host's own row. Opens RowOverflowMenu.
+    Items: "Make/Remove co-host" + "Remove from event" (destructive).
+    Standalone remove icon-btn is REMOVED (R11-4).
+  CO-HOST + INVITEE view trailing: RSVPBadge only. No ⋯ btn.
+  Co-host rows: CoHostBadge renders inline after name on all views.
+  Swipe-to-arm for remove (R10-4) unchanged — host view only.
+================================================================
+## COMPONENTS — Round 10
+================================================================
+AttendeesSheet({ T, open, event, attendees, currentUserId,
+                 friendTypes, groups, onRemove, onInviteMore, onClose })
+  Bottom sheet. role="dialog" aria-modal="true". Focus trap.
+  Internally computes isHost = event.hostId === currentUserId.
+  Manages: rsvpFilter ('all'|'going'|'maybe'|'not-going'|'no-response'),
+           typeGroupFilter ('all'|friendTypeId|groupId), searchQuery,
+           armedRowId (remove state).
+  Renders header, filter bar (role-aware), search input, and flat
+  AttendeeRow list sorted Going→Maybe→No response→Not going.
+  Passes isHost to each AttendeeRow.
+
+AttendeeRow({ T, attendee, isHost, armed, onArm, onCommit, onCancel })
+  64px min-height. Full-width. bgElevated (default) · dangerSoft (armed).
+  Left: RingAvatar 40px (status ring per availability).
+  Center: name 15/600 · @handle mono 12/500 ink3 below.
+  Right: RSVPBadge + (isHost: remove icon-btn 44pt trailing).
+  Armed: dangerSoft bg · "Remove" 13/600 popInk replaces icon ·
+    entire row tappable to commit.
+  Swipe handler: rightward drag ≥44px → onArm. <44px → spring back.
+  Tap row body (not armed, not host remove btn) → Friend Profile
+    (light haptic). Tap remove btn → onArm (heavy haptic).
+
+RSVPBadge({ T, status: 'going'|'maybe'|'not-going'|'no-response' })
+  Pill · 11/600 · radius 999 · padding 6×10.
+  going       → limeSoft fill · limeInk text   · "Going"
+  maybe       → accentSoft fill · accent text  · "Maybe"
+  not-going   → popSoft fill · popInk text     · "Not going"
+  no-response → bgSunken fill · ink3 text      · "No response"
+================================================================
+## COMPONENTS — Round 9
+================================================================
+AuthStep({ T, step?, totalSteps?, title, sub, children, onBack?,
+           primaryLabel, onPrimary, primaryDisabled?,
+           secondaryLabel?, onSecondary? })
+  Full-screen layout. No tab bar. No FlowHeader.
+  Back arrow: 44pt leading hit target · chevron-left 20px ink2 ·
+    shown only when onBack is provided. 20px from top safe-area.
+  Progress dots: rendered when step + totalSteps provided.
+    8px dots · 6px gap · centered · 16px below back arrow row.
+    Active: accent fill. Completed: accent 40% opacity. Upcoming: hair border.
+  Title: h1 28/800 · 24px below dots (or back row if no dots).
+  Sub: body 15/500 ink2 · 8px below title.
+  Children: scrollable content area · keyboard-avoiding behavior.
+  Bottom pinned (above safe area):
+    primaryLabel accent PillBtn full-width.
+    secondaryLabel text link or ghost pill · 12px below primary.
+    Primary at opacity 0.4 non-interactive when primaryDisabled=true.
+
+OTPInput({ T, length=6, value, onChange, onComplete, error? })
+  6 individual cells · 44×52pt · radius 10 · bgSunken fill.
+  Border: 1.5px hair (default) · accent (focused cell) · danger (error).
+  Auto-advance on digit input. Backspace retreats cursor.
+  Paste support: 6-digit string fills all cells instantly.
+  Fires onComplete when all cells filled.
+  Error: danger border all cells + error haptic.
+  A11y: role="group" · each cell aria-label="Digit {N} of 6".
+
+HandleInput({ T, value, onChange,
+              status: 'idle'|'checking'|'available'|'taken' })
+  AuthInputField with non-editable "@" prefix (ink3, inline).
+  Trailing indicator:
+    checking   → 18px Spinner
+    available  → checkmark icon limeInk
+    taken      → × icon danger
+  Inline error below (taken only): "Handle taken" 12/500 danger
+    + triangle-alert 12px leading (per A-16).
+  Rules: max 20 chars · lowercase · alphanumeric + underscore only ·
+    other chars stripped silently on input.
+
+AvatarUploadWell({ T, value?: dataUrl, letter: string, onPick })
+  80×80 circle. bgSunken fill when empty. Photo object-fit cover when set.
+  Letter avatar fallback: same rendering as RingAvatar (ink2 15/700 centered).
+  Camera badge: 24×24 bgElevated circle · radius 999 · bottom-right ·
+    14px camera icon ink2. Overlaid on circle edge.
+  Tap anywhere on circle → fires onPick (native photo picker).
+  Medium haptic on tap.
+
+InviteContextBanner({ T, eventName })
+  Full-width pill · accentSoft fill · radius 999 · padding 10×16.
+  Calendar icon (16px accent) leading · 8px gap ·
+    "{eventName}" 13/600 accent · single-line ellipsis.
+  Do not render when eventName is empty or missing.
+
+AuthInputField({ T, label, value, onChange,
+                 type: 'text'|'email'|'password'|'tel',
+                 error?, trailing?, disabled? })
+  56px min-height. Radius 12. bgSunken fill.
+  Border: 1.5px hair (default) · accent (focused) · danger (error).
+  Floating label: 15/500 ink3 when unfocused+empty ·
+    shrinks to 10/600 ink3 pinned top-left when focused or filled.
+  Password: trailing eye icon btn (aria-label="Show password" /
+    "Hide password") · toggles input type between password/text.
+  Error: danger border + 12/500 danger error text below field
+    + triangle-alert 12px leading (per A-16).
+  Disabled: opacity 0.4 · pointer-events none.
+  A11y: associated label via aria-labelledby (A-15).
+================================================================
+## COMPONENTS — Round 4
+================================================================
+SettingsRow({ T, icon, label, sub, trailing, onClick, destructive, last })
+  56px min-height, 32px icon tile (bgSunken), label 15/600, sub 12/ink3.
+  Trailing chevron when onClick && !destructive && !trailing.
+  Destructive: danger color + dangerSoft tile.
+  Renders <div> when onClick is undefined (Hard Rule 16).
+SettingsGroup({ T, label, children, footnote })
+  bgElevated + 1px hair, radius 14, overflow hidden. Optional footnote below.
+ThemePicker({ T, value, onChange })
+  3-up segmented picker (Light / Dark / System). Sunken track, active =
+  bgElevated. Each cell ~equal flex; padding 10×8.
+AvailDot({ T, status, size=8 })
+  status: 'free'|'maybe'|'busy'|null. Null = dashed-border ring (no fill).
+StatTile({ T, n, label })
+  20/800 number + 9/600/1.4 mono uppercase label. 4 across, 8px gaps.
+BrushPicker (inline)
+  4-up: Free / Maybe / Not available / Clear. 36px tall, radius 10.
+  Active = bgElevated + 1.5px state-colored border.
+MonthGrid({ T, anchor, setAnchor, avail, brush, setDay, dragging, setDragging })
+  7-col CSS grid, square cells, radius 10, 4px gap.
+  Fill: `${stateColor}22` when set, bgElevated otherwise.
+  Today: 1.5px accent border + 800-weight day number.
+  Tap-to-set; drag-paint via dragging state.
+WeekView({ T, anchor, avail, brush, setDay })
+  7 stacked rows. Fill `${stateColor}18`. 44px left col: mono dow + 22/800 date.
+DayView({ T, anchor, setAnchor, avail, setDay })
+  Day chevron header + 4 option rows. Active = `${color}18` + 1.5px border + check.
+QuicksetGrid (inline)
+  2×2, ~66px min-height, radius 12. State dot + 13/700 label + 11/ink3 detail.
+  Applied = accentSoft fill + accent border (1.6s).
+BroadcastToast({ T, visible, status, audienceLabel, queued, onUndo, onDismiss })
+  Docked above tab bar (left:14, right:14, bottom:24). Radius 14, ink bg.
+  Layout: state dot · title (13/700) · sub (11/0.6) · Undo pill · close X.
+  flow-fade-up 320ms spring. Auto-dismiss 3200ms.
+  Leading marker ALWAYS state dot — no emoji, no icon variants (Hard Rule 13).
+  queued=false (standard): title = "Broadcast sent · {State}". Undo pill shown.
+  queued=true (R13-3):     title = "Broadcast sent · was queued". Undo pill
+    OMITTED (R13-3). Sub shows audience label unchanged. All else identical.
+AudienceSwitcher({ T, value, onChange })
+  3-up: Everyone / Friends / Types. 30px pills, inset 3px, radius 10.
+  Used inside Broadcast cards only.
+AudiencePickerSheet({ T, mode, selected, onChange, onClose })
+  Bottom sheet, radius 22 22 0 0, max-height 78%. 38×4 grab handle.
+  Header: title (17/800), N selected sub, accent "Done" pill.
+  mode='types'   → type rows (PrivateBadge + label + N members + checkbox)
+  mode='friends' → friend rows (RingAvatar + name + handle + CategoryBadge)
+  Zero-friend empty state (mode='friends' only · R13-4):
+    Shown when friend list is empty. Replaces list body.
+    Icon tile: 56×56 · users glyph · bgSunken fill · radius 16.
+    Title: "No friends yet" (15/700 ink).
+    Body: "Add friends to invite them to events." (13/500 ink2 · centered
+      · max-width 260px).
+    No CTA pill.
+    Done pill: disabled (opacity 0.4, non-interactive). Close X: active.
+================================================================
+## COMPONENTS — Round 6
+================================================================
+NotifSheet({ T, open, source, notifs, expandedStacks, onToggleStack,
+              onChangeDetent, onClose })
+  open = 'closed'|'peek'|'full'. source = 'home'|'tab'.
+  Backdrop + sheet + drag handle + header ("Activity" 17/800, mark-read pill,
+  clear-all pill, close X) + scrollable feed grouped by NotifGroupHeader.
+  Spring 320ms · cubic-bezier(0.34,1.56,0.64,1).
+  A11y: role="dialog" · aria-modal="true" · focus trap on full detent.
+PullDownAffordance({ T, unread, onOpen })
+  Hairline pill at Home top edge, below iOS chrome.
+  unread = 0 → 16px tall · 11/600 ink3 · "Pull for activity ▾"
+  unread > 0 → 28px tall · accentSoft pill · mono 10/700 · "{N} NEW · PULL DOWN ▾"
+N6TabBar({ T, active, unread })
+  5-tab bar. Activity unread dot = 8px pop, 1.5px bg-colored stroke.
+  Tab change fires light haptic.
+InboundBroadcastCard({ T, n, expanded, onToggle })
+  Row 1: AvailDot · "{Name} is {state}" · timestamp mono 10/600 ink3
+  Row 2: Duration · • · Audience
+  Row 3: "Plan something" PillBtn · overflow ⋯
+  Stack pill when n.stackCount > 0: "+{N} earlier" chevron-down.
+  Expanded: compact sub-rows via StaggerList.
+  Tap body → friend profile (light haptic).
+  Tap "Plan something" → Step 1 with friend pre-selected (medium haptic).
+  NEVER fires haptic on receive (R6-3).
+RsvpCard({ T, n })
+  RingAvatar (24px) · "{Name} is {going|maybe|not going} to {EventName}"
+  Sub: 12/500 ink2 · When · Where. Trailing chevron → event detail.
+FriendRequestCard({ T, n })
+  RingAvatar (32px, no status ring) · Name (15/700) · @handle (mono ink3)
+  Sub: "{N} mutual friends". Two-up: "Accept" + "Decline".
+  Accept → success haptic. Decline → light haptic + TwoTapDestructive.
+GroupInviteCard({ T, n })
+  CoverArt (28px) · "{Inviter} invited you to {GroupName}"
+  Sub: N members · PrivateBadge. Two-up: "Join" + "Decline".
+EventReminderCard({ T, n })
+  32×32 calendar tile (accentSoft) · EventName (15/700)
+  Sub: "In {Time} · {Where}". Trailing chevron. Informational only.
+GroupActivityCard({ T, n })
+  CoverArt (24px) · "{Name} {action} in {GroupName}" (14/500 ink2)
+  Sub: 12/500 ink3 · text preview, 1-line ellipsis. Tap → group detail.
+NotifGroupHeader({ T, label })
+  36px tall · 18px horiz padding · 1px hair top (omit on first).
+  Label = Overline (mono 10/600/1.6/uppercase ink3). Sticky within scroll.
+SwipeRow({ children, revealedOffset, onCommit })
+  Per-card swipe-to-reveal. Right-side actions: Mute (warningSoft) + Dismiss (dangerSoft).
+  <80px → spring back; 80–148px → hold revealed; >148px → auto-commit Dismiss.
+EmptyNotifications({ T })
+  56×56 bell tile · "No activity yet" · 13/500 ink2 body · NO CTA.
+================================================================
+## COMPONENTS — Round 8
+================================================================
+SearchOverlay({ T, open, onClose })
+  Full-screen opaque overlay. flow-sheet-up 280ms spring on open;
+  flow-sheet-down 240ms easeStd on close.
+  Header: 56px · "Cancel" ghost btn (15/600 ink2) left · no title.
+  Input: SearchInputBar (see below).
+  Body: default state (recents) OR results state OR EmptySearch.
+FriendResultRow({ T, friend })
+  RingAvatar (40px, status ring) + name (15/600) + @handle (mono ink3)
+  + CategoryBadge. Min-height 64. Tap → Friend Profile. Light haptic.
+PeopleResultRow({ T, person, onAdd })
+  RingAvatar (40px, NO status ring) + name (15/600) + @handle (mono ink3)
+  + "N mutual friends" (12/500 ink2). "Add" accent pill trailing.
+  Tap pill → onAdd → pill swaps to "Sent" (success haptic).
+  Tap row body → public mini-profile stub.
+GroupResultRow({ T, group })
+  CoverArt (44px) + group name (15/600) + member count (12/500 ink2)
+  + PrivateBadge if private. Tap → Group Detail. Light haptic.
+EventResultRow({ T, event })
+  accentSoft 44px calendar tile + event name (15/600, 2-line clamp)
+  + date (12/500 ink2) + RSVP status dot. Tap → Event Detail.
+RecentRow({ T, term, onSelect, onRemove })
+  Clock icon (ink3) + term (15/500) + × btn (aria-label="Remove").
+  Tap row → onSelect (populates input + cached results).
+  Tap × → onRemove. Both light haptic.
+================================================================
+## NOTIFICATIONS SURFACE (LOCKED)
+================================================================
+ONE pull-down sheet, TWO entry points (R6-1).
+  Entry A — Pull-from-Home
+    PullDownAffordance at Home top. Full gesture spec: R13-1.
+    Displacement/velocity shortcuts preserved for reference:
+    Drag 60px → peek (light haptic). Drag 160px → full (light haptic).
+    Velocity ≥ 0.5px/ms (downward at entry) → full directly.
+  Entry B — Activity tab tap
+    Opens full detent immediately. 320ms spring from below tab bar.
+Detents (LOCKED · R6-2):
+  Closed   hidden · backdrop transparent
+  Peek     translateY(56%) · backdrop 18% black · ≤3 cards visible
+  Full     translateY(12%) · backdrop 42% black · scrollable
+  Full gesture + velocity rules: see R13-1 (authoritative).
+  Quick reference — drag from peek: down >40px → close; up >40px → full.
+  Drag from full: down >80px → peek; down >200px → close.
+  Velocity flick ≥ 0.7px/ms → velocity-first snap per R13-1.
+  Spring: 320ms · cubic-bezier(0.34,1.56,0.64,1)
+  Backdrop crossfade: 280ms · easeStd
+  Reduced-motion snap: 200ms easeOut; backdrop instant (R13-1, A-21).
+Grouping (LOCKED · R6-7):
+  TODAY / YESTERDAY / {WEEKDAY MMM D} (≤7d) / EARLIER (8d+)
+  Within group: newest first.
+Stacking (LOCKED · R6-4):
+  Same sender within 60min → one card. Latest primary.
+  Older → "+N earlier from {Name}" pill. Tap → StaggerList expand.
+  Mute/Dismiss apply to whole stack.
+Swipe-to-action (LOCKED):
+  Left-swipe → Mute + Dismiss on right edge.
+  <80px spring back · 80–148px hold revealed · >148px auto-commit Dismiss.
+  Bulk: "Mark read" pill + "Clear all" pill in sheet header.
+Unread arbitration (LOCKED · R6-5):
+  Activity tab: bell + 8px pop dot (no number). No dot when count=0.
+  Home pill: "{N} NEW · Pull down" on accentSoft when count>0.
+  Both clear on: mark-all-read · scroll-past-last-unread · card tap/expand.
+Empty state: EmptyNotifications — no CTA, centered vertically in sheet.
+Offline state (LOCKED · R13-2):
+  OfflineBar below sheet header, above feed. "SYNCED {T} AGO" mono
+  sub-line between OfflineBar and first NotifGroupHeader.
+  Stale feed visible. Network-dependent action buttons disabled (opacity
+  0.4). Local actions (swipe/mark-read/clear-all) remain active.
+  On reconnect: OfflineBar slides out, feed auto-refreshes.
+Dark mode notes (tokens only — no hardcoded color values in components):
+  Sheet surface: bgElevated. Feed background: bgBase.
+  Backdrop: rgba(0,0,0,.18) at peek · rgba(0,0,0,.42) at full.
+  These alpha-black overlays are intentional and unchanged in dark mode
+  (the dark bgBase behind them provides sufficient contrast differential).
+  SwipeRow reveal zones: warningSoft (Mute) · dangerSoft (Dismiss) —
+  both token-based, adapt to theme automatically.
+  NotifGroupHeader, card typography: all ink/ink2/ink3 tokens.
+  PullDownAffordance: accentSoft pill (unread) or transparent (0 unread) —
+  token-based. No additional dark mode overrides needed.
+  Prototype dark mode storyboard: pending (visual gap, not a spec gap).
+================================================================
+## TAB BAR IA (LOCKED)
+================================================================
+5 tabs LEFT → RIGHT:
+  1. Home       calendar glyph
+  2. Broadcast  radio-wave glyph
+  3. Activity   bell glyph → opens NotifSheet at full detent
+  4. Friends    users glyph (Friends + Groups via SegmentedSwitcher)
+  5. Profile    person glyph → Profile & Settings
+Bar: 64pt + 24pt safe-area · bgElevated · 1px hair top.
+Each tab: 44×44 hit area · 24px glyph · 10/700 mono label.
+Active: filled glyph · accent color · 4px dot under label (200ms easeOut).
+Inactive: stroke glyph · ink3.
+Activity unread dot: 8px T.pop, 1.5px bg-colored stroke, top-right of glyph.
+FGTabBar (4-tab) retained ONLY in Friends & Groups.html prototype. Deprecated elsewhere.
+================================================================
+## SCREENS — Round 4 inventory
+================================================================
+01 Profile & Settings
+   72px RingAvatar + edit FAB, name (22/800), handle (mono ink3), Edit pill.
+   Bio (13/ink2). 4-up StatTile (HOSTED · ATTENDED · FRIENDS · GROUPS).
+   Groups: AVAILABILITY · ACCOUNT · NOTIFICATIONS · PRIVACY · APPEARANCE · SUPPORT.
+   Destructive "Log out" in its own card. Footer: "SYNCUP · 2.2.0" mono.
+02 Availability Editor
+   Mode tabs (Month/Week/Day) + broadcast shortcut button.
+   BrushPicker row. Body: MonthGrid | WeekView | DayView.
+   QUICK-SET overline + 2×2 QuicksetGrid. Empty state when map is empty.
+03 Broadcast Settings
+   3 stacked broadcast cards (Free / Maybe / Busy).
+   OFF: compact — state dot · name · body · Toggle.
+   ON: springs open (flow-fade-up 320ms) — SEND TO + AudienceSwitcher
+     + (non-'everyone') sheet preview row + "Preview toast" pill.
+   Footnote: "Broadcasts send once per status change, with a 60-second undo toast."
+04 Step 3 wire-back
+   event-day = busy → dangerSoft danger banner at top (role="alert").
+   event-day = free/maybe → bgElevated status chip with AvailDot.
+   Footer status pill: "FROM YOUR AVAILABILITY".
+================================================================
+## SCREENS — Round 9 inventory
+================================================================
+01 Welcome
+   Full-screen centered. Logo wordmark (accent h1). Tagline (ink2).
+   InviteContextBanner if invite context present.
+   "Get started" accent pill + "Sign in" ghost pill.
+02 Sign-up Step 1 — Credential
+   AuthStep step=1 totalSteps=6.
+   AuthInputField label="Phone or email." "Continue" CTA.
+03 Sign-up Step 2 — OTP Verify
+   AuthStep step=2 totalSteps=6.
+   OTPInput 6-cell auto-submit. "Change" inline link. "Resend code" link.
+04 Sign-up Step 3 — Identity
+   AuthStep step=3 totalSteps=6.
+   AuthInputField "Full name" + HandleInput. "Continue" CTA.
+05 Sign-up Step 4 — Password
+   AuthStep step=4 totalSteps=6.
+   AuthInputField "Password" + eye toggle + requirement row.
+   "Create account" CTA.
+06 Sign-up Step 5 — Profile photo
+   AuthStep step=5 totalSteps=6.
+   AvatarUploadWell (80px) centered. "Choose photo" / "Continue" + "Skip."
+07 Sign-up Step 6 — Availability nudge
+   AuthStep step=6 totalSteps=6.
+   InviteContextBanner if invite context. QuicksetGrid (4 built-ins).
+   "Set availability" + "Skip for now" (accent ghost if invite-context).
+08 Sign-in
+   AuthStep (no progress, back arrow → Welcome).
+   AuthInputField "Phone, email, or @handle" + "Password" + eye toggle.
+   "Forgot password?" link. "Sign in" CTA. "Create account" footer link.
+09 Forgot Password — Request
+   AuthStep (no progress, back → Sign-in).
+   AuthInputField "Phone or email." "Send reset link" CTA.
+10 Forgot Password — Confirmation
+   AuthStep (no progress, no back arrow per R9-10).
+   56×56 icon tile (envelope or message-bubble).
+   Title + sub copy adapted to credential type.
+   "Back to sign in" ghost pill. "Didn't get it? Resend" text link.
+================================================================
+## SCREENS — Round 8 inventory
+================================================================
+01 Search overlay
+   Triggered by FlowHeader search icon on Home, Friends, Groups.
+   Header: Cancel (left) · spacer (no title) · 280ms spring up.
+   Input: bgSunken pill, leading magnifier, trailing × when value present.
+   Default body: RECENT overline + Clear all pill · ≤7 recent rows
+     (term + ×) · "Find anyone by @handle" hint.
+   Query body: FRIENDS → PEOPLE → GROUPS → EVENTS sectioned rows.
+   Empty: EmptySearch (unchanged).
+   Deliverable: Search.html — live interactive phone + 12-frame storyboard
+     (recents, no-recents, 5 sample queries, no-matches, dark variants).
+   Not yet wired into SyncUp Prototype.html app shell (next pass).
+================================================================
+## NAVIGATION GRAPH
+================================================================
+  ── ONBOARDING STACK (pre-auth · no tab bar) ──────────────────
+  [Welcome]
+        ├── "Get started"         ──▶ [Sign-up Step 1: Credential]
+        └── "Sign in"             ──▶ [Sign-in]
+
+  [Sign-up Step 1: Credential]
+        ├── Continue              ──▶ [Sign-up Step 2: OTP]
+        └── ← back               ──▶ [Welcome]
+
+  [Sign-up Step 2: OTP]
+        ├── Auto-submit / Verify  ──▶ [Sign-up Step 3: Identity]
+        ├── "Change"              ──▶ [Sign-up Step 1]
+        └── ← back               ──▶ [Sign-up Step 1]
+
+  [Sign-up Step 3: Identity]
+        ├── Continue              ──▶ [Sign-up Step 4: Password]
+        └── ← back               ──▶ [Sign-up Step 2]
+
+  [Sign-up Step 4: Password]
+        ├── "Create account"      ──▶ [Sign-up Step 5: Profile photo]
+        └── ← back               ──▶ [Sign-up Step 3]
+
+  [Sign-up Step 5: Profile photo]
+        ├── Continue / Skip       ──▶ [Sign-up Step 6: Availability nudge]
+        └── ← back               ──▶ [Sign-up Step 4]
+
+  [Sign-up Step 6: Availability nudge]
+        ├── "Set availability"    ──▶ [Availability Editor]
+        │                                   └── return ──▶ [Home]
+        ├── "Skip for now" (std)  ──▶ [Home]  ← cross-fade 320ms easeOut
+        ├── "Skip for now" (inv)  ──▶ [Event Detail]
+        └── ← back               ──▶ [Sign-up Step 5]
+
+  [Sign-in]
+        ├── "Sign in" (success)   ──▶ [Home]  ← cross-fade 320ms easeOut
+        ├── "Forgot password?"    ──▶ [Forgot Password: Request]
+        ├── "Create account"      ──▶ [Sign-up Step 1]
+        └── ← back               ──▶ [Welcome]
+
+  [Forgot Password: Request]
+        ├── "Send reset link"     ──▶ [Forgot Password: Confirmation]
+        └── ← back               ──▶ [Sign-in]
+
+  [Forgot Password: Confirmation]
+        └── "Back to sign in"     ──▶ [Sign-in]
+
+  ── MAIN APP SHELL (post-auth · tab bar active) ───────────────
+  [Event Detail] "+N more" pill (≥50 invitees) ──▶ [AttendeesSheet]
+        ├── tap AttendeeRow body              ──▶ [Friend Profile]  (all views)
+        ├── ⋯ btn → "Make co-host"           ──▶ promote in-place (host only)
+        ├── ⋯ btn → "Remove co-host"         ──▶ demote in-place (host only)
+        ├── ⋯ btn → "Remove from event"      ──▶ arm → commit remove (host only)
+        ├── swipe row rightward ≥44px         ──▶ arm → commit remove (host only)
+        ├── "Invite more" (host + co-host)   ──▶ [AudiencePickerSheet mode='friends']
+        │                                              └── Done ──▶ return to sheet
+        └── close X / drag down              ──▶ dismiss to [Event Detail]
+  [Event Detail] edit controls (isHost || isCoHost) ──▶ edit event details
+
+  [Home / Friends / Groups] FlowHeader search icon ──▶ [Search overlay]
+        ├── tap FRIENDS row     ──▶ [Friend Profile]
+        ├── tap PEOPLE row      ──▶ Add pill ──▶ Sent (in-place)
+        ├── tap PEOPLE row body ──▶ [QuickProfileSheet]
+        │                                  ├── "Add friend"      ──▶ Requested (in-place)
+        │                                  │                          + underlying row swaps to "Sent"
+        │                                  └── close / drag-down ──▶ return to [Search overlay]
+        ├── tap GROUPS row      ──▶ [Group Detail]
+        ├── tap EVENTS row      ──▶ [Event Detail]
+        ├── tap recent term     ──▶ cached results (no fetch)
+        └── Cancel              ──▶ dismiss to invoking screen
+  [Profile & Settings]
+        ├── Availability editor ──▶ [Availability Editor]
+        │                                  └── radio btn ──▶ [Broadcast Settings]
+        └── Broadcast settings ──▶ [Broadcast Settings]
+                                          ├── card preview ──▶ [AudiencePickerSheet]
+                                          └── Preview toast ──▶ fires BroadcastToast
+  [Availability Editor].avail ──▶ [Step 3 Invite] wire-back
+  [Availability Editor]
+        └── "Save as Quickset" pill ──▶ [QuicksetNameSheet]
+                                              ├── Save    ──▶ dismiss · new tile added to grid
+                                              └── Cancel / close X ──▶ return to editor
+  [Home] ──▶ PullDownAffordance drag ──▶ NotifSheet (peek)
+  [Activity tab] ──▶ tap ──▶ NotifSheet (full)
+  [NotifSheet] notification card navigation (R12-1):
+        ├── tap RsvpCard              ──▶ [Event Detail]
+        │                                 Home tab activates · sheet closes
+        ├── tap EventReminderCard     ──▶ [Event Detail]
+        │                                 Home tab activates · sheet closes
+        ├── tap CoHostCard            ──▶ [Event Detail]
+        │                                 Home tab activates · sheet closes
+        ├── tap GroupActivityCard     ──▶ [Group Detail]
+        │                                 Friends tab activates (Groups segment)
+        │                                 · sheet closes
+        ├── tap InboundBroadcastCard  ──▶ [Friend Profile]
+        │     row body                    Friends tab activates · sheet closes
+        └── tap "Plan something"      ──▶ [Create Event Step 1]
+              (InboundBroadcastCard)       friend pre-selected · sheet closes
+                                          (modal over current tab)
+  Back from any notification-entry destination:
+        └── ← back                   ──▶ tab root (not to NotifSheet)
+================================================================
+## HAPTIC FEEDBACK (LOCKED)
+================================================================
+6 types only — light / medium / heavy / success / warning / error.
+Call once per gesture via useHaptic(). Never on render or scroll.
+  light    Tab change · mode switch · brush change · filter chip · day cell tap
+           · open Search overlay · tap Search result row · clear input ×
+           · tap recent search term
+           · QuickProfileSheet open/close · QuicksetNameSheet close X
+           · Quickset ⋯ menu open/dismiss · delete arm auto-dismiss
+  medium   RSVP confirmed · step advance · send invites · Quickset applied
+           · toggle flipped · Done on picker
+           · notification card tap → navigate (R12-1; all nav cards except
+             InboundBroadcastCard body which stays light)
+           · "Save as Quickset" pill tap
+  heavy    TwoTapDestructive armed · long-press chip reaches 450ms
+           · drag-paint hits same-brush day (no-op)
+           · Quickset delete armed
+  success  Event created · friend accepted · invites sent · broadcast fired
+           · cover saved · group created · Quickset Applied confirm
+           · Search Add → Sent (PEOPLE row friend request)
+           · Quickset saved (new) · Quickset renamed · Quickset deleted
+           · QuickProfileSheet "Add friend" confirmed
+           · QuickProfileSheet "Accept" friend request
+           · BroadcastToast queued=true (broadcast sent on reconnect)
+  warning  Step 3 busy banner · RSVP Maybe on busy day
+           · Quickset overwrites >5 days · offline entered
+           · NotifSheet Clear all · Search Clear all recents
+  error    RSVP failed · invite failed · friend request failed
+           · broadcast failed · network error
+Hard rules:
+  H-1. NEVER haptic on scroll, drag-momentum, or visual transitions.
+  H-2. NEVER stack haptics within 80ms (debounce in useHaptic).
+  H-3. NEVER haptic on mount or auto-fired toasts not triggered by user.
+  H-4. Two-tap destructive: heavy on arm, success on commit.
+  H-5. Toasts fire haptic WITH the toast, not on dismiss.
+================================================================
+## EMPTY STATE PATTERN (LOCKED)
+================================================================
+Anatomy (centered, max-width 280):
+  1. 56×56 bgSunken tile · radius 16 · 18-stroke line icon at 50% ink2
+     (NEVER photo, 3D render, or emoji)
+  2. Headline: 17/700/-0.2 · ≤4 words ideal, 6 max
+  3. Body: 13/500 ink2 · 1 sentence ≤14 words
+  4. CTA: PillBtn accent verb-first ≤3 words + optional ghost secondary
+  Gaps: 10–14px between rows · 32px outer padding
+Inventory:
+  EmptyHome (today)      "No plans today" · "Plan something"
+  EmptyHome (week/month) "Quiet week" · "Tap + to start"
+  EmptyFriends           "No friends yet" · "Add one" + "Share QR"
+  EmptyGroups            "No groups yet" · "Create one"
+  EmptySearch            "Nothing matched" · "Invite by handle"
+  EmptyAvailability      "Set your first day" · "Try a Quickset"
+  EmptyAttendees         "No invites sent" · "Add invitees"
+  EmptyPolls             "No polls yet" · "Start a poll"
+  EmptySuggestions       "No ideas yet" · "Suggest one"
+  EmptyMutualEvents      "Nothing planned together" · "Plan an event"
+  EmptyNotifications     "No activity yet" · NO CTA
+================================================================
+## LOADING PATTERN (LOCKED)
+================================================================
+SPINNER ONLY. No skeletons, shimmer, pulses (R5-2).
+Spinner: two opposing 120° arcs. 900ms linear infinite (su-spin).
+Sizes: XS 18 · SM 20 · MD 28 (default) · LG 40
+Color: T.accent on light · #fff on ink/danger surfaces.
+A11y: role="status" + aria-label="Loading".
+Placement:
+  Full-screen  → LoadingOverlay (centered + optional mono caption ≤2 words)
+  Button tapped → ButtonLoading (replaces content)
+  Section refresh → 28px spinner top-right of section header
+  Sheet body waiting → 32px centered, no caption
+  Search results → 28px spinner top-right of results header (debounce 220ms)
+Rules:
+  L-1. Always render from first mount. No delay (exception: ≤120ms latency → nothing).
+  L-2. Never render inside a list cell.
+  L-3. Caption: mono uppercase 10/600 ink3.
+  L-4. Never stack two spinners — outermost only.
+================================================================
+## ERROR STATE PATTERN (LOCKED)
+================================================================
+Full-screen ErrorState → user tapped something and got nothing back.
+ErrorToast → discrete action failed but screen is still useful.
+ErrorState anatomy:
+  56×56 dangerSoft tile + triangle-alert (popInk stroke)
+  Headline 17/800 · Body 13/500 ink2 · Primary PillBtn · Secondary ghost
+  Kinds: network · server · notFound · permission
+ErrorToast: ink bg · alert-triangle (popSoft) · "{Action} failed" ·
+  1-line cause · Retry pill · close X. Auto-dismiss 3200ms.
+  A11y: role="alert" · aria-live="assertive".
+  Kinds: rsvp · invite · friend · generic
+OfflineBar: 36px · warningSoft · cloud-off icon + "OFFLINE · cached data shown"
+  + warning color. Slides from FlowHeader. Warning haptic on entrance.
+Rules:
+  E-1. Never show two error surfaces simultaneously.
+  E-2. Never use error color tile decoratively.
+  E-3. No status codes or stack traces in body copy.
+  E-4. Always offer a recovery path.
+================================================================
+## ACCESSIBILITY RULES (LOCKED)
+================================================================
+Color & contrast:
+  A-1.  ink3 = AA Large only. Use ink2 below 18px (or 14px bold).
+  A-2.  Availability state = AvailDot + text label always (R5-1).
+  A-3.  Offline indicator = color + icon + text (R5-7).
+  A-4.  Focus rings: 2px accent outline + 2px offset.
+Hit targets:
+  A-5.  Minimum 44×44pt. Filter chips: visual 30px, hit 44px via invisible padding.
+  A-6.  TwoTapDestructive: ≥600ms between arm and commit window.
+Labels & roles:
+  A-7.  All icon-only buttons carry aria-label.
+  A-8.  Spinner: role="status" + aria-label="Loading".
+  A-9.  Toasts: role="alert" + aria-live="assertive" (errors) or "polite" (broadcasts).
+  A-10. Use A11yLive for ephemeral status with no visible toast.
+Motion:
+  A-11. prefers-reduced-motion: no spring overshoot, opacity fade 200ms easeOut,
+        no stagger (all-at-once), keep spinner.
+  A-12. No parallax or scroll-bound transforms (R5-3).
+Text:
+  A-13. Long-text rules R5-6 apply system-wide.
+  A-14. Text-only tap targets ≥14/600 for 44pt with vertical padding.
+Forms:
+  A-15. Every input has associated label or aria-labelledby.
+  A-16. Input errors use popInk + triangle icon, never color alone.
+Sheet (Round 6 · A-17 → A-22):
+  A-17. Full detent: role="dialog" + aria-modal="true".
+        Peek: role="region" + aria-label="Activity preview".
+  A-18. Focus trap on full detent only. Esc collapses one detent.
+  A-19. SR order = visual order. NotifGroupHeader aria-level="3".
+  A-20. Dismiss = triple-redundant: drag handle + Esc + close X.
+  A-21. Reduced-motion: 200ms easeOut translate (no spring), instant
+        stack expand, tap-only affordance, instant backdrop.
+  A-22. PullDownAffordance announces count change via aria-live="polite".
+Search overlay (Round 8):
+  A-23. SearchOverlay uses role="dialog" + aria-modal="true".
+        Input auto-focuses on open; focus returns to invoking icon on close.
+  A-24. Cancel button is always reachable as first tab stop.
+  A-25. RecentRow × buttons carry aria-label="Remove {term}".
+  A-26. "Add" pill carries aria-label="Send friend request to {name}";
+        "Sent" state announces via aria-live="polite".
+================================================================
+## EDGE-CASE PATTERNS (LOCKED)
+================================================================
+Long-text:
+  Event title    2-line clamp
+  Friend name    single-line ellipsis
+  Description    3-line clamp + "Read more" pill
+  @handle        single-line ellipsis (mono)
+  Group name     2-line clamp on cards · single-line in headers
+  Toast subtitle single-line ellipsis
+Crowd & scale:
+  50+ invitees   First 8 avatars + "+N more" pill → opens AttendeesSheet
+  Group of 1     AdminBar shown; member list = YOU row; tabs show Empty states
+  No availability Step 3 footer: "FROM YOUR AVAILABILITY · NOT SET" mono ink3
+  Single friend  "All" auto-selected; FilterChipRowMulti hides chips <2 categories
+  Zero results   EmptySearch
+  No recents     Search default body shows only "@handle" hint, no RECENT section
+Connectivity:
+  Offline        OfflineBar + "LAST SYNCED · {T} AGO" mono ink3 on Home
+  Stale broadcast BroadcastToast on reconnect: "Broadcast sent · was queued"
+  Optimistic write All RSVP / invite / availability writes optimistic.
+    On failure: ErrorToast + Retry. State rolls back only after dismiss without retry.
+  Search offline  Search overlay still opens; cached results served from last
+                  30 queries. OfflineBar appears above input. Live queries disabled.
+================================================================
+## OPEN QUESTIONS / NEXT ROUNDS
+================================================================
+Resolved in Round 6:
+  ✓ Notifications surface — pull-down sheet, two entry points (R6-1).
+  ✓ Profile tab routes to Profile & Settings (R6-6).
+  ✓ Inbound broadcast UI — InboundBroadcastCard with H-3 carve-out (R6-3).
+  ✓ Tab IA finalized at 5 tabs.
+Resolved in v2.7:
+  ✓ Quicksets user-extensible (R7-1).
+  ✓ BroadcastToast stays simple — no recipient-review action (R7-2).
+  ✓ Friend Types non-overlapping (R7-3).
+  ✓ Stale notifications auto-purge 30 days + manual Clear all (R7-4).
+  ✓ Push copy = in-app copy verbatim (R7-5).
+  ✓ AdminBar stays pinned (R7-6).
+Resolved in Round 8 (Search):
+  ✓ Search is full-screen overlay, not a tab/route (R8-1).
+  ✓ Section order locked — FRIENDS · PEOPLE · GROUPS · EVENTS (R8-2).
+  ✓ Result row anatomy locked per type (R8-3).
+  ✓ Default = RECENT (≤7) + Clear all + @handle hint (R8-4).
+  ✓ Empty results uses existing EmptySearch (R8-5).
+  ✓ Input bar locked — no chips, scopes, or voice (R8-6).
+  ✓ Add-friend pill is sole row-internal action (R8-7).
+Resolved in Round 11 (Co-host):
+  ✓ Co-host permissions scoped to invite + edit event only (R11-1).
+  ✓ Grant/revoke via ⋯ RowOverflowMenu in AttendeesSheet (R11-2).
+  ✓ CO-HOST badge visible to all viewers (R11-3).
+  ✓ Remove from event consolidated into ⋯ menu; swipe-to-arm
+      unchanged (R11-4).
+  ✓ Promotion fires CoHostCard (notif) + CoHostToast (live app);
+      revoke fires CoHostRevokedCard only (R11-5).
+  ✓ Event.coHostIds[] is the role store; non-overlapping with
+      hostId (R11-6).
+  ✓ AttendeesSheet has three distinct role views (R11-7).
+  ✓ Event Detail edit controls render for isHost || isCoHost.
+Resolved in Round 10 (AttendeesSheet):
+  ✓ AttendeesSheet is role-aware — host vs. invitee views (R10-1).
+  ✓ RSVP filter locked to 4 values + All (R10-2).
+  ✓ Host filter bar has two independent rows — RSVP + type/group,
+      combined as INTERSECTION (R10-3).
+  ✓ Remove = TwoTapDestructive with swipe-to-arm variant (R10-4).
+  ✓ "Invite more" reuses AudiencePickerSheet mode='friends' (R10-5).
+  ✓ Search filters visible list only — no network call (R10-6).
+  ✓ AttendeeRow anatomy locked — RingAvatar + name + handle +
+      RSVPBadge + host trailing remove (R10-7).
+  ✓ Co-host role deferred to next round.
+Resolved in Round 9 (Onboarding):
+  ✓ Sign-up flow locked — 6-step with credential, OTP, identity,
+      password, photo, availability nudge (R9-1 through R9-10).
+  ✓ Sign-in locked — format-agnostic identifier field (R9-9).
+  ✓ Forgot password locked — request + confirmation sub-flow (R9-10).
+  ✓ Permissions are contextual, not onboarding steps.
+  ✓ Invite-first deep-link variant — InviteContextBanner + skippable
+      availability + Event Detail post-auth destination (R9-8).
+Resolved in Round 12:
+  ✓ Event Detail routing from notification context — RsvpCard,
+      EventReminderCard, CoHostCard, GroupActivityCard tap-to-navigate
+      from NotifSheet fully specced; nav graph complete (R12-1).
+  ✓ Quicksets save/name flow — QuicksetNameSheet, custom tile anatomy,
+      rename and delete flows designed (R12-2 through R12-4).
+  ✓ PEOPLE public mini-profile — QuickProfileSheet designed; route stub
+      replaced with full surface spec (R12-5, R12-6).
+Resolved in Round 13:
+  ✓ Sheet drag gesture — velocity-first, displacement fallback; entry and
+      inter-detent phases; reduced-motion fallback for gesture path (R13-1).
+  ✓ NotifSheet offline state — OfflineBar inline above feed, stale-data
+      sub-line, network-dependent actions disabled, local actions active,
+      auto-refresh on reconnect (R13-2).
+  ✓ Broadcast queued offline toast — "was queued" title variant; Undo pill
+      omitted on queued broadcasts (R13-3).
+  ✓ Zero-friend state on AudiencePickerSheet mode='friends' — EmptyState
+      icon + copy, Done pill disabled, no disruptive navigation (R13-4).
+  ✓ Notifications dark mode — confirmed all tokens are theme-aware; backdrop
+      alphas intentional; no hardcoded color overrides needed; prototype
+      dark mode storyboard marked as pending visual pass (not spec gap).
+Resolved in Round 14:
+  ✓ TweaksPanel — prototype-only debug/demo control panel fully specced
+      (R14-1). Standard controls: Reduced motion + Dark mode. Per-
+      deliverable extra controls documented in HTML source comments.
+  ✓ Reduced-motion prototype demo — Reduced-Motion.html deliverable built.
+      Five animations shown standard vs reduced: toast, bottom sheet,
+      StaggerList, broadcast card expand, NotifSheet snap. Includes
+      TweaksPanel with Reduced motion + Dark mode toggles.
+Still open:
+  - Search overlay wiring into SyncUp Prototype.html app shell — pending
+      (separate Claude Code pass, not a design task).
+  - QuickProfileSheet mutual friend avatar tap → Friend Profile path
+      not yet specced; stub no-op for now.

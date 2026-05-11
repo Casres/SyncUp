@@ -1,0 +1,163 @@
+# SyncUp — Design Backlog
+# Last updated: 2026-05-05
+# Anchor version: v3.4
+================================================================
+## HOW TO USE THIS FILE (read before starting work)
+================================================================
+This file is the single source of truth for pending design work
+on the SyncUp project. It is read and updated by Claude in every
+design session.
+
+SESSION STARTUP CHECKLIST:
+  1. Read DESIGN-BACKLOG.txt (this file) — find the first OPEN item.
+  2. Read ANCHOR-DESIGN.txt — load the full design system context.
+  3. Work the first OPEN item (or multiple if they are small / related).
+  4. Update ANCHOR-DESIGN.txt with all new rules, surfaces, components,
+     nav graph edges, haptics, and open-questions changes.
+  5. Mark completed items as DONE in this file (change [ ] to [x]).
+  6. Bump the anchor version number and update "Last updated" above.
+  7. Deliver the updated ANCHOR-DESIGN.txt to the user.
+
+STATUS KEY:
+  [x] DONE     — locked, merged into anchor
+  [ ] OPEN     — ready to work, pick this next
+  [-] DEFERRED — acknowledged, not ready to design yet
+
+ITEM FORMAT:
+  [status] Title
+           Category | Rule ref (if locked) | Notes
+================================================================
+## OPEN DESIGN DECISIONS
+================================================================
+Items that were open questions requiring a locked ruling.
+
+[x] Quicksets fixed or user-extensible?
+    Decision | R7-1 | Users can save custom quicksets beyond 4 built-ins
+
+[x] Broadcast toast "review recipients" tap-action?
+    Decision | R7-2 | Toast stays simple — no recipient-review action
+
+[x] Friend Types nested/overlapping membership?
+    Decision | R7-3 | Non-overlapping — one friend, one type
+
+[x] Stale notifications auto-purge from EARLIER?
+    Decision | R7-4 | Auto-purge at 30 days + manual Clear all
+
+[x] Group Detail AdminBar collapse on scroll?
+    Decision | R7-6 | AdminBar stays pinned — never collapses
+
+[x] Push notification copy parity with in-app cards?
+    Decision | R7-5 | Push copy = in-app copy verbatim
+================================================================
+## MISSING SCREENS / FLOWS
+================================================================
+Screens or nav paths that exist in spec but were not yet designed
+or were missing from the navigation graph.
+
+[x] Search screen
+    Screen | R8 | Full-screen overlay, section order, row anatomy locked
+
+[x] Onboarding flow
+    Screen | R9 | 6-step sign-up, sign-in, forgot password, invite-first variant
+
+[x] AttendeesSheet
+    Screen | R10 | Host/invitee views, RSVP + type/group filter, remove flow
+
+[x] Event Detail routing from notifications
+    Nav graph | R12-1 | All notification card nav edges, sheet dismiss behavior,
+               haptics, edge cases — RsvpCard, EventReminderCard, CoHostCard,
+               GroupActivityCard, InboundBroadcastCard fully specced
+
+[x] Quicksets save/name flow
+    Screen | R12-2, R12-3, R12-4 | QuicksetNameSheet, custom tile anatomy,
+            rename + delete flows; entry point in Availability Editor
+
+[x] PEOPLE public mini-profile
+    Screen | R12-5, R12-6 | QuickProfileSheet stacked over Search overlay;
+            identity block, all 3 friend request states, mutual friends,
+            bio, 2-up stats (hosted/attended only)
+================================================================
+## DEFERRED COMPONENTS
+================================================================
+Components that are acknowledged in the spec but whose detailed
+behavior has not yet been designed or prototyped.
+
+[x] Group Detail AdminBar scroll-collapse behavior
+    Component | R7-6 | Resolved: AdminBar does NOT collapse — stays pinned
+
+[x] Velocity-based sheet snapping on PullDownAffordance
+    Component | R13-1 | Velocity-first (≥0.7px/ms), displacement fallback;
+               entry phase (0.5px/ms threshold) and inter-detent phase fully
+               specced; reduced-motion fallback (200ms easeOut, instant
+               backdrop) added. Gesture is now authoritative path.
+
+[-] QuickProfileSheet mutual friend avatar tap → Friend Profile
+    Component | Deferred | Stub no-op for now. Needs: Friend Profile surface
+               spec to be defined first, then wire the tap through.
+               Do not design this until Friend Profile is fully specced.
+================================================================
+## PROTOTYPE / VISUAL GAPS
+================================================================
+Things that are specced in the anchor but not yet visually
+demonstrated in a prototype HTML deliverable.
+
+[x] Reduced-motion variants — prototype demo
+    Visual | A-11, A-21, R13-1 | Reduced-Motion.html deliverable.
+            5 interactive demos (Toast · Sheet · Stagger · Card expand
+            · NotifSheet snap). Side-by-side spec storyboard for each.
+            Includes TweaksPanel with Reduced motion + Dark mode.
+            Auto-detects OS prefers-reduced-motion on load.
+
+[x] Tweaks panel — spec + first use
+    Visual | R14-1 | Fully specced (position, open/closed, control row
+             anatomy, toggle/select, standard controls). TweaksPanel
+             component first used in Reduced-Motion.html.
+
+[x] Notifications & Activity dark mode pass
+    Visual | R13-2 notes | Spec confirmed — all tokens are theme-aware;
+             backdrop alphas intentional; no hardcoded overrides needed.
+             Prototype dark mode storyboard still pending (visual pass).
+================================================================
+## REMAINING EDGE CASES
+================================================================
+Edge cases that are called out in the anchor but not yet fully
+specced or prototyped.
+
+[x] Offline state on Notifications sheet
+    Edge case | R13-2 | OfflineBar below sheet header; "SYNCED {T} AGO"
+               mono sub-line; stale feed visible; network-dependent action
+               buttons disabled (opacity 0.4); local actions active;
+               auto-refresh on reconnect. A11y: aria-live="polite".
+
+[x] Broadcast queued while offline toast
+    Edge case | R13-3 | Title "Broadcast sent · was queued"; Undo pill
+               omitted; all other BroadcastToast properties unchanged.
+               queued prop added to component signature.
+
+[x] Zero-friend state on AudiencePickerSheet
+    Edge case | R13-4 | EmptyState: users glyph tile + "No friends yet" +
+               body copy; no CTA (avoids disruptive navigation); Done pill
+               disabled when list is empty.
+================================================================
+## COMPLETED SESSIONS LOG
+================================================================
+Quick reference for what was done each session.
+
+2026-05-05 (v3.3 → v3.4):
+  Completed: TweaksPanel spec (R14-1),
+             Reduced-Motion.html prototype deliverable.
+  Anchor bumped to v3.4.
+
+2026-05-05 (v3.2 → v3.3):
+  Completed: Velocity-based sheet snapping (R13-1),
+             NotifSheet offline state (R13-2),
+             Broadcast queued offline toast (R13-3),
+             Zero-friend state on AudiencePickerSheet (R13-4),
+             Notifications dark mode spec confirmation.
+  Anchor bumped to v3.3.
+
+2026-05-05 (v3.1 → v3.2):
+  Completed: Event Detail routing from notifications (R12-1),
+             Quicksets save/name flow (R12-2–4),
+             PEOPLE public mini-profile (R12-5–6).
+  Anchor bumped to v3.2.

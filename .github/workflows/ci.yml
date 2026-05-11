@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Cancel in-progress runs for the same branch on new commits.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        working-directory: social-calendar-api
+        # `--if-present` is a no-op until a `lint` script is added to the
+        # workspace's package.json. Replace with a hard failure once a
+        # linter (e.g. eslint) is wired up.
+        run: npm run lint --if-present
+
+  type-check:
+    name: Type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: social-calendar-api
+        run: npx prisma generate
+
+      - name: Type-check
+        working-directory: social-calendar-api
+        run: npx tsc --noEmit
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: syncup_test
+          POSTGRES_USER: syncup_migrate
+          POSTGRES_PASSWORD: syncup_migrate_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U syncup_migrate -d syncup_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://syncup_migrate:syncup_migrate_test@localhost:5432/syncup_test
+      DATABASE_URL_APP: postgresql://syncup_app:syncup_app_test@localhost:5432/syncup_test
+      REDIS_URL: redis://localhost:6379
+      CLERK_SECRET_KEY: sk_test_placeholder
+      CLERK_WEBHOOK_SECRET: whsec_placeholder
+      PORT: 3000
+      NODE_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: social-calendar-api
+        run: npx prisma generate
+
+      # Service containers in GitHub Actions don't run init scripts the way
+      # docker-compose does, so we apply the two-role setup explicitly.
+      # Mirrors docker/postgres/init.sql but uses the test password.
+      - name: Provision syncup_app role
+        env:
+          PGPASSWORD: syncup_migrate_test
+        run: |
+          psql -h localhost -U syncup_migrate -d syncup_test <<'SQL'
+          CREATE ROLE syncup_app LOGIN PASSWORD 'syncup_app_test';
+          GRANT CONNECT ON DATABASE syncup_test TO syncup_app;
+          GRANT USAGE   ON SCHEMA public        TO syncup_app;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES    TO syncup_app;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT USAGE,  SELECT                  ON SEQUENCES TO syncup_app;
+          SQL
+
+      - name: Apply migrations
+        working-directory: social-calendar-api
+        # `migrate deploy` (not `dev`) per Lead Manager Decision #5 — runs
+        # the existing migration history without prompting.
+        run: npx prisma migrate deploy
+
+      - name: Test
+        working-directory: social-calendar-api
+        # `--if-present` is a no-op until a `test` script is added to the
+        # workspace's package.json. The Jest/Supertest agent will wire this
+        # up after backend domain agents complete.
+        run: npm test --if-present

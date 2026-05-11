@@ -1,0 +1,41 @@
+{
+  "name": "social-calendar-api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.13.0",
+    "@prisma/client": "^5.22.0",
+    "fastify": "^5.0.0",
+    "fastify-plugin": "^5.0.1",
+    "ioredis": "^5.10.1",
+    "socket.io": "^4.8.3",
+    "svix": "^1.92.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.7.0",
+    "@types/supertest": "^7.2.0",
+    "jest": "^30.3.0",
+    "prisma": "^5.22.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

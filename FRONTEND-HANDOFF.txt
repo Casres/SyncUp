@@ -1,0 +1,501 @@
+# SyncUp — Frontend Handoff
+# For Claude Code (or any developer continuing the frontend build)
+# Generated: 2026-05-05  |  Anchor version: v3.4
+# Design source of truth: ANCHOR-DESIGN.txt (same folder)
+================================================================
+## HOW TO USE THIS FILE
+================================================================
+1. Read ANCHOR-DESIGN.txt in full before touching any screen.
+   Every locked rule lives there. This file maps those rules
+   to code — it does not repeat them.
+2. Check the BUILD GAPS section. Start there.
+3. Read SCREENS_HANDOFF.md, NAVIGATION_HANDOFF.md,
+   THEME_HANDOFF.md, API_STUB_HANDOFF.md, and MOCKS_HANDOFF.md
+   inside src/ — they contain per-directory notes.
+4. The design uses token names (bgElevated, ink3, accentSoft,
+   etc.) that map to src/theme/colors.ts. Always use theme
+   tokens, never hardcoded hex values.
+================================================================
+## TECH STACK
+================================================================
+Framework:        React Native 0.83.6 via Expo ~55.0.20
+Language:         TypeScript 5.9.2 (strict mode)
+Navigation:       React Navigation v7
+                  @react-navigation/native-stack (modal screens)
+                  @react-navigation/bottom-tabs (tab bar)
+Animation:        react-native-reanimated 4.2.1
+Gestures:         react-native-gesture-handler ~2.30.0
+Haptics:          expo-haptics (wraps useHaptic in src/theme/haptics.ts)
+SVG:              react-native-svg 15.15.3
+API / Async data: @tanstack/react-query v5
+Ephemeral state:  draftStore.ts (custom ref-based pub/sub, create flow only)
+Build:            EAS (eas.json present)
+================================================================
+## STATE MANAGEMENT RULES (hard — do not deviate)
+================================================================
+DATA RULE 1: If data comes from the API, it lives in React Query.
+             No exceptions. Never copy API responses into Zustand
+             or any other store.
+
+DATA RULE 2: If data never touches the network, it lives in
+             local component state (useState / useReducer) or
+             draftStore for the create-event flow.
+             No Zustand or global store for UI-only state.
+
+DATA RULE 3: Never store API response data manually in Zustand.
+             (There is no Zustand in this project — if you find
+             yourself reaching for it, you're off-pattern.)
+
+See src/api/ for all query keys, query functions, and the
+configured queryClient. Mock responses live in src/mocks/.
+================================================================
+## PROJECT STRUCTURE
+================================================================
+social-calendar-mobile/
+├── App.tsx                  Root entry; wraps QueryClientProvider
+├── src/
+│   ├── api/                 React Query hooks + query keys + utils
+│   │   └── API_STUB_HANDOFF.md   — read this before touching API layer
+│   ├── theme/               Design tokens mapped from ANCHOR-DESIGN.txt
+│   │   ├── colors.ts        FLOW_TOKENS.light + .dark → useTheme()
+│   │   ├── typography.ts    FLOW_FONTS scale (Manrope / JetBrains Mono)
+│   │   ├── spacing.ts       4px grid constants
+│   │   ├── radii.ts         Radius constants
+│   │   ├── motion.ts        Animation curves (spring, easeStd, easeOut)
+│   │   ├── haptics.ts       useHaptic() hook — 6 types only (R5-8)
+│   │   └── THEME_HANDOFF.md — read before styling anything
+│   ├── mocks/               Seed data for development + snapshot tests
+│   │   └── MOCKS_HANDOFF.md
+│   ├── navigation/
+│   │   ├── RootNavigator.tsx     Top-level: Auth stack OR main shell
+│   │   ├── TabBar.tsx            Custom tab bar (5 tabs, locked IA)
+│   │   ├── HomeStack.tsx
+│   │   ├── CreateEventStack.tsx  Modal stack
+│   │   ├── FriendsStack.tsx
+│   │   ├── GroupsStack.tsx
+│   │   ├── ProfileStack.tsx
+│   │   ├── types.ts              All route param types
+│   │   └── NAVIGATION_HANDOFF.md
+│   ├── components/
+│   │   ├── foundation/      Base primitives (PillBtn, FormField, etc.)
+│   │   ├── polish/          Error/loading states, OfflineBar, StaggerList
+│   │   ├── eventFlow/       Event cards, RSVPSheet, Step3 components
+│   │   ├── profile/         Availability editor, QuicksetGrid, Broadcast
+│   │   ├── social/          Friends, groups, AdminBar, TwoTapDestructive
+│   │   └── emptyStates/     All EmptyX components
+│   └── screens/
+│       ├── home/
+│       ├── events/
+│       ├── create/          draftStore.ts lives here
+│       ├── friends/
+│       ├── groups/
+│       ├── profile/
+│       └── SCREENS_HANDOFF.md
+================================================================
+## TAB BAR (LOCKED — R6-6, Hard Rule 23)
+================================================================
+Tab order is fixed and must never change:
+  1. Home        (house icon)
+  2. Broadcast   (megaphone / antenna icon)
+  3. Activity    (bell icon)  ← opens NotifSheet at full detent
+  4. Friends     (people icon)
+  5. Profile     (person icon)
+
+Unread dot on Activity tab = silent icon dot only (no copy).
+Home pull-to-reveal pill = "N NEW" verbal affordance.
+Both share unread count state and clear in lockstep (R6-5).
+================================================================
+## BUILD GAPS — WHAT NEEDS TO BE BUILT
+================================================================
+The following surfaces are fully specced in ANCHOR-DESIGN.txt
+but have no screen file yet. Build these in order.
+
+────────────────────────────────────────────────────────────────
+GAP 1: ONBOARDING STACK  (spec: Round 9 · R9-1 through R9-10)
+────────────────────────────────────────────────────────────────
+Files needed:
+  src/screens/auth/WelcomeScreen.tsx
+  src/screens/auth/SignUpStep1Screen.tsx     (credential)
+  src/screens/auth/SignUpStep2Screen.tsx     (OTP verify)
+  src/screens/auth/SignUpStep3Screen.tsx     (name + handle)
+  src/screens/auth/SignUpStep4Screen.tsx     (password)
+  src/screens/auth/SignUpStep5Screen.tsx     (profile photo)
+  src/screens/auth/SignUpStep6Screen.tsx     (availability nudge)
+  src/screens/auth/SignInScreen.tsx
+  src/screens/auth/ForgotPasswordScreen.tsx
+  src/screens/auth/ForgotPasswordConfirmScreen.tsx
+
+Navigation: Add an AuthStack to RootNavigator. It mounts
+  before the main shell and un-mounts on successful auth.
+  No tab bar on any auth screen (R9-1).
+
+Key rules:
+  - 6-dot progress indicator on all sign-up steps (R9-2)
+  - Back always preserves form state (R9-3)
+  - OTP auto-submits on 6th digit (R9-5)
+  - Handle availability checked with 400ms debounce (R9-6)
+  - Photo and availability steps are always skippable (R9-7)
+  - InviteContext captured before auth renders (R9-8) — affects
+    Step 6 copy/CTA prominence and post-auth destination
+
+────────────────────────────────────────────────────────────────
+GAP 2: SEARCH OVERLAY  (spec: Round 8 · R8-1 through R8-7)
+────────────────────────────────────────────────────────────────
+Files needed:
+  src/components/search/SearchOverlay.tsx
+  src/components/search/SearchInput.tsx
+  src/components/search/ResultRowFriend.tsx
+  src/components/search/ResultRowPeople.tsx
+  src/components/search/ResultRowGroup.tsx
+  src/components/search/ResultRowEvent.tsx
+  src/components/search/RecentSearches.tsx
+
+How it mounts:
+  NOT a screen or tab. Opens as a full-screen overlay over the
+  current screen (flow-sheet-up 280ms spring). Entry from the
+  search icon in FlowHeader on Home, Friends, and Groups (R8-1).
+  Implement as a React Navigation modal or a local Animated
+  overlay — either works as long as the underlying screen stays
+  mounted.
+
+Section order (locked): FRIENDS → PEOPLE → GROUPS → EVENTS
+Empty sections are omitted. No "Top hit" section. (R8-2)
+
+PEOPLE row "Add" pill: tap sends friend request in-place,
+  pill swaps to "Sent". This does NOT navigate. (R8-7)
+PEOPLE row body: tap opens QuickProfileSheet (see GAP 4).
+
+────────────────────────────────────────────────────────────────
+GAP 3: ATTENDEES SHEET  (spec: Round 10 + 11 · R10 / R11)
+────────────────────────────────────────────────────────────────
+Files needed:
+  src/components/social/AttendeesSheet.tsx
+  src/components/social/AttendeeRow.tsx       (if not exists)
+  src/components/social/RowOverflowMenu.tsx   (⋯ menu, also used
+                                               for co-host actions)
+Three role-views are rendered by one component; role is resolved
+  from event.hostId / event.coHostIds vs currentUser.id (R11-6):
+
+  isHost    = event.hostId === currentUser.id
+  isCoHost  = event.coHostIds.includes(currentUser.id)
+  isInvitee = !isHost && !isCoHost
+
+HOST view:    2-row filter (RSVP + type/group) · ⋯ menu per row
+              · "Invite more" pill · remove flow
+CO-HOST view: 1-row filter (RSVP only) · no ⋯ menu · "Invite more"
+INVITEE view: 1-row filter (RSVP only) · no actions · no "Invite more"
+
+Remove is TwoTapDestructive — arm via tap or ≥44px swipe (R10-4).
+TwoTapDestructive component already exists in components/social/.
+
+AttendeeRow anatomy (locked — R10-7):
+  RingAvatar 40px (status ring = availability state) + name 15/600
+  + @handle mono 12/500 ink3 + RSVPBadge right-aligned.
+
+RSVPBadge pills:
+  Going      → limeSoft / limeInk
+  Maybe      → accentSoft / accent
+  Not going  → popSoft / popInk
+  No response→ bgSunken / ink3
+
+────────────────────────────────────────────────────────────────
+GAP 4: QUICK PROFILE SHEET  (spec: Round 12 · R12-5, R12-6)
+────────────────────────────────────────────────────────────────
+File needed:
+  src/components/social/QuickProfileSheet.tsx
+
+Trigger: tap PEOPLE row body in SearchOverlay.
+Stacks ON TOP of SearchOverlay — SearchOverlay stays mounted
+behind. Backdrop is 30% black (lighter than standard 42% because
+the overlay underneath is already opaque) (R12-5).
+
+Identity block (non-scrollable):
+  RingAvatar 64px (NO status ring — non-friend per R12-6)
+  Name 20/800 · @handle mono 13/500 ink3
+
+CTA block (3 friend request states):
+  none     → "Add friend" accent PillBtn
+  sent     → "Requested" ghost pill + checkmark-circle (non-interactive)
+  received → "Accept" accent + "Decline" ghost (two-up)
+  "Decline" is TwoTapDestructive (light haptic arm + commit).
+
+Body (scrollable):
+  Mutual friends: overline + up to 5 RingAvatar 24px WITH status ring
+  Bio: 3-line clamp + "Read more" (omit if empty)
+  Stats: StatTile HOSTED + ATTENDED only (2-up, equal-width)
+  NEVER show: availability, friend count, group membership (R12-6)
+
+Optimistic in-session state sync:
+  "Add friend" tap also updates the underlying PEOPLE row's
+  "Add" pill to "Sent". On failure, both revert + ErrorToast fires.
+
+────────────────────────────────────────────────────────────────
+GAP 5: QUICKSET NAME SHEET  (spec: Round 12 · R12-2 through R12-4)
+────────────────────────────────────────────────────────────────
+File needed:
+  src/components/profile/QuicksetNameSheet.tsx
+
+Entry: "Save as Quickset" ghost pill in AvailabilityEditorScreen,
+  below QuicksetGrid. Enabled only when AvailabilityEntry map
+  non-empty (R12-2). Medium haptic on tap.
+
+Sheet spec:
+  Bottom sheet · radius 22 22 0 0 · max-height 50%
+  Auto-focus text input (max 24 chars).
+  Validation: non-empty AND unique among existing custom names
+  (case-insensitive). "Name already in use" inline error on collision.
+  "Save" accent pill disabled until valid.
+  "Cancel" ghost pill below.
+
+On save:
+  Sheet closes. New tile added to QuicksetGrid via StaggerList
+  entrance animation. Success haptic.
+
+Also handles RENAME (opened with pre-populated name, header says
+  "Rename Quickset") and is triggered from ⋯ menu on custom tile.
+
+QuicksetGrid additions needed (in existing component):
+  - ⋯ icon-btn (18px ink3, 44pt hit) on custom tiles only (R12-4)
+  - ⋯ opens RowOverflowMenu with "Rename" + "Delete" (destructive)
+  - Delete is TwoTapDestructive (heavy haptic arm, success haptic commit)
+  - Built-in tiles (positions 1–4) have NO ⋯ control (R12-4)
+  - Grid expands beyond 4 — wraps in 2-column layout (R12-3)
+
+────────────────────────────────────────────────────────────────
+GAP 6: NOTIF SHEET NAVIGATION EDGES  (spec: Round 12 · R12-1)
+────────────────────────────────────────────────────────────────
+The notification cards already exist in components. What's missing
+is the nav wiring when a navigating card is tapped.
+
+Rule (R12-1): sheet dismisses FIRST (flow-sheet-down 240ms easeStd),
+  CONCURRENT with destination mounting on the activated tab.
+  Back from destination → tab root (NOT back to NotifSheet).
+  Tapped card is marked read at tap moment.
+
+Card → Destination wiring:
+  RsvpCard            row/chevron → Event Detail     · Home tab activates
+  EventReminderCard   row/chevron → Event Detail     · Home tab activates
+  CoHostCard          row/chevron → Event Detail     · Home tab activates
+  GroupActivityCard   row body   → Group Detail      · Friends tab activates
+                                    (switches to Groups segment first)
+  InboundBroadcastCard row body  → Friend Profile    · Friends tab activates
+  InboundBroadcastCard "Plan something" → Create Event Step 1
+                                    (friend pre-selected · modal · no tab switch)
+
+Cards with NO navigation (in-place actions only):
+  FriendRequestCard   "Accept" / "Decline" — in-place, no dismiss
+  GroupInviteCard     "Join" / "Decline"   — in-place, no dismiss
+  CoHostRevokedCard   informational only   — no nav affordance
+
+Haptics on navigation taps: medium (fired at tap, before dismiss anim).
+Exception: InboundBroadcastCard row body stays light (already locked).
+
+────────────────────────────────────────────────────────────────
+GAP 7: NOTIF SHEET GESTURE UPGRADE  (spec: Round 13 · R13-1)
+────────────────────────────────────────────────────────────────
+The existing NotifSheet uses useSheetDrag. It needs to be updated
+to the velocity-first snap model:
+
+PHASE A (closed → first detent via PullDownAffordance):
+  velocity ≥ 0.5px/ms downward → snap full (light haptic)
+  displacement <60px → spring back to closed
+  displacement 60–159px → snap to peek (light haptic)
+  displacement ≥160px → snap to full (light haptic)
+
+PHASE B (inter-detent via grab handle):
+  velocity-first at ≥0.7px/ms overrides displacement.
+  Velocity table:
+    downward ≥0.7 from full   → peek
+    downward ≥1.2 from full   → close (skip peek)
+    downward ≥0.7 from peek   → close
+    upward   ≥0.7 from peek   → full
+    upward   ≥0.7 from full   → rubber-band 12px, spring back
+  Displacement fallback (<0.7):
+    peek → down>40px → close; up>40px → full
+    full → down>80px → peek; down>200px → close
+    inside thresholds → spring back to current detent
+
+Snap animation: 320ms spring cubic-bezier(0.34,1.56,0.64,1)
+Backdrop: crossfades 280ms easeStd in lockstep.
+Haptic fires at snap moment (not at pointer-up).
+
+Reduced-motion fallback (A-11, A-21):
+  Live tracking: unchanged (1:1 follow, never suppressed).
+  Snap animation: 200ms easeOut (no spring, no overshoot).
+  Backdrop: instant at release.
+
+────────────────────────────────────────────────────────────────
+GAP 8: NOTIF SHEET OFFLINE STATE  (spec: Round 13 · R13-2)
+────────────────────────────────────────────────────────────────
+When device is offline while NotifSheet is open (or opened offline):
+
+  OfflineBar renders immediately BELOW the sheet header,
+    ABOVE the first NotifGroupHeader. (OfflineBar component exists
+    in components/polish/.)
+  Below OfflineBar: "SYNCED {T} AGO" mono 10/600 ink3 sub-line.
+  Stale feed remains visible — never blank or spinner (R13-2).
+
+Disabled while offline (opacity 0.4, pointer-events none):
+  FriendRequestCard "Accept" / "Decline"
+  GroupInviteCard "Join" / "Decline"
+  InboundBroadcastCard "Plan something"
+
+Local actions REMAIN active while offline:
+  Swipe-to-reveal (Mute + Dismiss)
+  "Mark all read"
+  "Clear all"
+
+On reconnect: OfflineBar slides out (su-slide-up 240ms easeStd).
+  Stale sub-line hides. Feed auto-refreshes via React Query
+  invalidation; new items animate in via StaggerList.
+  aria-live="polite" on OfflineBar.
+
+────────────────────────────────────────────────────────────────
+GAP 9: BROADCAST QUEUED TOAST  (spec: Round 13 · R13-3)
+────────────────────────────────────────────────────────────────
+BroadcastToast already exists. Add a `queued` boolean prop.
+
+When queued=true:
+  Title: "Broadcast sent · was queued"
+  Undo pill: NOT rendered (do not show an undo that can't succeed)
+  All other props (sub, leading dot, close X, timing) unchanged.
+  Auto-dismiss 3200ms. Haptic: success. role="alert".
+
+────────────────────────────────────────────────────────────────
+GAP 10: AUDIENCE PICKER ZERO-FRIEND STATE  (spec: Round 13 · R13-4)
+────────────────────────────────────────────────────────────────
+AudiencePickerSheet already exists. Add zero-friend handling
+for mode='friends' only:
+
+When friend list is empty AND mode='friends':
+  Show inline EmptyState:
+    56×56 bgSunken tile · radius 16 · users glyph
+    "No friends yet" 15/700 ink
+    "Add friends to invite them to events." 13/500 ink2 centered
+    NO CTA — never navigate away from a picker sheet (R13-4)
+  "Done" pill in header: disabled (opacity 0.4, non-interactive)
+    while selection count is zero.
+  Close X remains active.
+
+mode='types': show normally. Zero types is not an error state.
+
+================================================================
+## CO-HOST ADDITIONS TO EXISTING SCREENS
+================================================================
+These require changes to already-built screens, not new screens.
+
+EventDetailScreen.tsx:
+  Add event.coHostIds: string[] to the Event type (TYPES.ts).
+  Edit controls (pencil FAB, "Edit" pill, inline field taps) render
+  for isHost || isCoHost. Currently likely isHost only. (R11-6)
+
+GroupDetailScreen.tsx:
+  No co-host concept here — no changes needed for co-host.
+
+When co-host is promoted (from AttendeesSheet):
+  a. event.coHostIds updated optimistically.
+  b. CoHostToast fires if target is active in app (R11-5).
+     CoHostToast spec: accentSoft fill · 1.5px accent border ·
+     star icon 16px · "You're a co-host" 13/700 · event name 11/500
+     1-line ellipsis · close X · flow-fade-up 320ms spring · 3200ms
+     auto-dismiss · success haptic.
+  c. CoHostCard queued to target's NotifSheet feed.
+
+================================================================
+## KEY RULES QUICK REFERENCE (read ANCHOR for full spec)
+================================================================
+Haptics (R5-8): Only 6 types — useHaptic('light'|'medium'|'heavy'|
+  'success'|'warning'|'error'). No raw Haptics.* calls outside that
+  hook. Never haptic on InboundBroadcast receive (R6-3).
+
+Loading states (R5-2): Spinner ONLY. No skeletons, no shimmer.
+  Spinner = rotating arrows, 900ms linear. role="status".
+
+Destructive actions (Hard Rule 7): ALL destructive flows use
+  TwoTapDestructive. No confirmation modals. Exception: "Log out"
+  uses OS confirm in production.
+
+Truncation (R5-6):
+  Event title: 2-line clamp
+  Friend name: 1-line ellipsis
+  Description: 3-line clamp + "Read more"
+  @handle: 1-line ellipsis (mono)
+
+Availability state: never store null for a day. Clearing a day
+  DELETES the key from the AvailabilityEntry map (Hard Rule 14).
+
+Friend Types are non-overlapping (R7-3). Assigning a friend to
+  a type removes them from any prior type. Never compound membership.
+
+Push notification copy = in-app card copy verbatim (R7-5).
+  Never prefix "New activity from" or "SyncUp:".
+
+AdminBar on Group Detail is ALWAYS pinned (R7-6). Never collapses.
+
+Notifications purge at 30 days on sheet open (R7-4).
+  "Clear all" is single-tap (not TwoTapDestructive). Warning haptic.
+
+Search is a full-screen overlay, not a screen or tab (R8-1).
+
+NotifSheet detents: exactly peek (44%) and full (88%) (R6-2, Hard
+  Rule 19). Pull from Home → peek. Activity tab tap → full.
+
+TweaksPanel (R14-1): prototype HTML only. NEVER ship in production.
+  Do not reference this component outside HTML deliverables.
+
+================================================================
+## DESIGN TOKENS → SRC/THEME MAPPING
+================================================================
+ANCHOR token name → src/theme/colors.ts key
+  bg            → colors.bg
+  bgElevated    → colors.bgElevated
+  bgSunken      → colors.bgSunken
+  ink           → colors.ink
+  ink2          → colors.ink2
+  ink3          → colors.ink3
+  hair          → colors.hair
+  hairStrong    → colors.hairStrong
+  accent        → colors.accent
+  accentInk     → colors.accentInk
+  accentSoft    → colors.accentSoft
+  pop           → colors.pop
+  popInk        → colors.popInk
+  popSoft       → colors.popSoft
+  lime          → colors.lime
+  limeInk       → colors.limeInk
+  limeSoft      → colors.limeSoft
+  availFree     → colors.availFree
+  availMaybe    → colors.availMaybe
+  availBusy     → colors.availBusy
+  danger        → colors.danger
+  dangerSoft    → colors.dangerSoft
+
+Motion curves from ANCHOR → src/theme/motion.ts:
+  spring    → Easing curve used for sheet snaps, list entrances
+  easeStd   → Standard cubic-bezier for most transitions
+  easeOut   → Reduced-motion fallback, simple exits
+
+Typography: src/theme/typography.ts mirrors the FLOW_FONTS scale.
+  Always reference named styles (styles.h3, styles.body, etc.)
+  rather than raw fontSize/fontWeight values.
+
+================================================================
+## ONE-TIME SYNC NOTE
+================================================================
+ANCHOR-DESIGN.txt (this folder, Mac filesystem) is the working
+copy updated by Cowork sessions.
+
+ANCHOR.txt in the Claude Project (claude.ai) is the copy held
+alongside the HTML prototype files. These two can drift.
+
+ACTION: After the Cowork design sessions are complete, manually
+copy ANCHOR-DESIGN.txt content into ANCHOR.txt in the Claude
+Project to keep prototypes and code-spec in sync.
+================================================================
+## DEFERRED (do not build yet)
+================================================================
+QuickProfileSheet mutual friend avatar tap → Friend Profile
+  Spec: stub no-op (tap fires no haptic, no navigation).
+  Reason: Friend Profile surface spec not yet defined.
+  Do NOT wire this until Friend Profile is fully specced.
+  See DESIGN-BACKLOG.txt for tracking status.
