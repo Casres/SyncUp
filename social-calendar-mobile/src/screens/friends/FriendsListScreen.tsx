@@ -97,6 +97,10 @@ export default function FriendsListScreen({
   const friendsCount = friends?.length ?? 0;
   const requestsCount = requests?.length ?? 0;
 
+  // TODO (GAP 2): wire SearchOverlay entry via FlowHeader search icon
+  //   (search icon to be added once Friends header right slot is unified
+  //    with Home — keeps Types pill in place for now).
+
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
       <FlowHeader

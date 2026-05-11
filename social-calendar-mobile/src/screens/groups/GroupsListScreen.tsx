@@ -75,6 +75,8 @@ export default function GroupsListScreen({
 
   const count = groups?.length ?? 0;
 
+  // TODO (GAP 2): wire SearchOverlay entry via FlowHeader search icon.
+
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
       <FlowHeader T={T} title={`Groups · ${count}`} />

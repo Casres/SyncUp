@@ -183,6 +183,31 @@ export type {
   FriendRequestStatus,
 } from './social/QuickProfileSheet';
 
+// ── GAP 2 — Search overlay + result rows ────────────────────────────────────
+export { SearchOverlay } from './social/SearchOverlay';
+export type { SearchOverlayProps } from './social/SearchOverlay';
+
+export { SearchProvider, useSearch } from './social/SearchContext';
+export type { SearchContextValue } from './social/SearchContext';
+
+export { FriendResultRow } from './social/FriendResultRow';
+export type { FriendResultRowProps } from './social/FriendResultRow';
+
+export { PeopleResultRow } from './social/PeopleResultRow';
+export type {
+  PeopleResultRowProps,
+  PeopleResultPerson,
+} from './social/PeopleResultRow';
+
+export { GroupResultRow } from './social/GroupResultRow';
+export type { GroupResultRowProps } from './social/GroupResultRow';
+
+export { EventResultRow } from './social/EventResultRow';
+export type { EventResultRowProps } from './social/EventResultRow';
+
+export { RecentRow } from './social/RecentRow';
+export type { RecentRowProps } from './social/RecentRow';
+
 // ────────────────────────────────────────────────────────────────────────────
 // Profile (13)
 // ────────────────────────────────────────────────────────────────────────────

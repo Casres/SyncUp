@@ -44,6 +44,7 @@ import {
   NotifSheet,
   NotifSheetProvider,
 } from '../components/notifications';
+import { SearchProvider } from '../components/social/SearchContext';
 
 // DESIGN DISCREPANCY (2026-05-10): ANCHOR R6-6 specifies tab order
 // Home·Broadcast·Activity·Friends·Profile. Current impl has
@@ -112,25 +113,27 @@ export default function RootNavigator() {
   }
 
   return (
-    <NotifSheetProvider>
-      <RootStack.Navigator
-        initialRouteName="Tabs"
-        screenOptions={{ headerShown: false }}
-      >
-        <RootStack.Screen name="Tabs" component={TabNavigator} />
-        <RootStack.Screen
-          name="CreateEventModal"
-          component={CreateEventStack}
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            gestureEnabled: true,
-          }}
-        />
-      </RootStack.Navigator>
-      {/* Mounted ABOVE the navigator: NotifSheet is a root-level overlay,
-          not a screen — see GAP 6 prompt and R6-1. */}
-      <NotifSheet />
-    </NotifSheetProvider>
+    <SearchProvider>
+      <NotifSheetProvider>
+        <RootStack.Navigator
+          initialRouteName="Tabs"
+          screenOptions={{ headerShown: false }}
+        >
+          <RootStack.Screen name="Tabs" component={TabNavigator} />
+          <RootStack.Screen
+            name="CreateEventModal"
+            component={CreateEventStack}
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+              gestureEnabled: true,
+            }}
+          />
+        </RootStack.Navigator>
+        {/* Mounted ABOVE the navigator: NotifSheet is a root-level overlay,
+            not a screen — see GAP 6 prompt and R6-1. */}
+        <NotifSheet />
+      </NotifSheetProvider>
+    </SearchProvider>
   );
 }

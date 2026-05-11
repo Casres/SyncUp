@@ -55,6 +55,8 @@ import {
   type FilterChip,
 } from '../../components';
 import { useNotifSheet } from '../../components/notifications';
+import { SearchOverlay } from '../../components/social/SearchOverlay';
+import { useSearch } from '../../components/social/SearchContext';
 import { colors, spacing, useHaptic } from '../../theme';
 import { useEvents, useNotifications } from '../../api';
 import type { HomeScreenProps } from '../../navigation/types';
@@ -90,6 +92,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
   const T = colors.light;
   const fire = useHaptic();
   const { translateY, screenHeight, openPeek, openFull, dismiss } = useNotifSheet();
+  const { open: searchOpen, openSearch, closeSearch } = useSearch();
   const { data: notifications } = useNotifications();
 
   const [view, setView] = useState<HomeView>('today');
@@ -166,6 +169,18 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
         title={TITLE_BY_VIEW[view]}
         right={
           <View style={styles.headerRight}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+              hitSlop={8}
+              onPress={() => {
+                // openSearch fires a light haptic internally.
+                openSearch();
+              }}
+              style={styles.bellWrap}
+            >
+              <Ionicons name="search" size={22} color={T.ink} />
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={hasUnread ? 'Activity (unread)' : 'Activity'}
@@ -275,6 +290,36 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
           )}
         </View>
       </GestureDetector>
+
+      {/* SearchOverlay — full-screen transient overlay (R8-1), mounted as a
+          SafeAreaView sibling so it sits above the screen body without
+          replacing the route. Navigation callbacks wire to React Navigation. */}
+      <SearchOverlay
+        T={T}
+        open={searchOpen}
+        onClose={closeSearch}
+        onNavigateToFriendProfile={(friendId) => {
+          closeSearch();
+          navigation.navigate('FriendsTab', {
+            screen: 'FriendProfile',
+            params: { friendId },
+          });
+        }}
+        onNavigateToGroupDetail={(groupId) => {
+          closeSearch();
+          navigation.navigate('GroupsTab', {
+            screen: 'GroupDetail',
+            params: { groupId },
+          });
+        }}
+        onNavigateToEventDetail={(eventId) => {
+          closeSearch();
+          navigation.navigate('HomeTab', {
+            screen: 'EventDetail',
+            params: { eventId },
+          });
+        }}
+      />
     </SafeAreaView>
   );
 }
