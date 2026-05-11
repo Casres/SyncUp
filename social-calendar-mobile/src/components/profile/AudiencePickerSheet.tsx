@@ -35,6 +35,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import { colors, durations, radii, spacing, springs, typography, useHaptic } from '../../theme';
 import { PillBtn } from '../foundation/PillBtn';
 import { RingAvatar } from '../foundation/RingAvatar';
@@ -112,6 +114,12 @@ export function AudiencePickerSheet({
 
   if (!visible) return null;
 
+  // R13-4 — zero-friend empty state applies ONLY to mode='friends'. mode='types'
+  // is never affected. When the friends array becomes non-empty during the
+  // session (parent re-renders with new props) the empty state is automatically
+  // replaced by the friend list — no special logic needed.
+  const isZeroFriendState = mode === 'friends' && friends.length === 0;
+
   return (
     <Animated.View
       accessibilityViewIsModal
@@ -131,34 +139,53 @@ export function AudiencePickerSheet({
             {`${selected.length} selected`}
           </Text>
         </View>
-        <PillBtn T={T} label="Done" onPress={handleDone} size="sm" />
+        <PillBtn
+          T={T}
+          label="Done"
+          onPress={handleDone}
+          size="sm"
+          disabled={isZeroFriendState}
+        />
       </View>
 
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-        {mode === 'friends' ? (
-          friends.map((f) => (
-            <FriendRow
-              key={f.id}
-              T={T}
-              friend={f}
-              selected={selectedSet.has(f.id)}
-              onToggle={() => toggle(f.id)}
-              resolveCategoryLabel={resolveCategoryLabel}
-              resolveCategoryTint={resolveCategoryTint}
-            />
-          ))
-        ) : (
-          types.map((t) => (
-            <TypeRow
-              key={t.id}
-              T={T}
-              type={t}
-              selected={selectedSet.has(t.id)}
-              onToggle={() => toggle(t.id)}
-            />
-          ))
-        )}
-      </ScrollView>
+      {isZeroFriendState ? (
+        <View style={styles.emptyFill}>
+          <View style={[styles.emptyTile, { backgroundColor: T.bgSunken }]}>
+            <Ionicons name="people-outline" size={28} color={T.ink3} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: T.ink }]}>No friends yet</Text>
+          <Text style={[styles.emptyBody, { color: T.ink2 }]}>
+            Add friends to invite them to events.
+          </Text>
+          {/* R13-4 — NO CTA. Never navigate away from a picker sheet. */}
+        </View>
+      ) : (
+        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+          {mode === 'friends' ? (
+            friends.map((f) => (
+              <FriendRow
+                key={f.id}
+                T={T}
+                friend={f}
+                selected={selectedSet.has(f.id)}
+                onToggle={() => toggle(f.id)}
+                resolveCategoryLabel={resolveCategoryLabel}
+                resolveCategoryTint={resolveCategoryTint}
+              />
+            ))
+          ) : (
+            types.map((t) => (
+              <TypeRow
+                key={t.id}
+                T={T}
+                type={t}
+                selected={selectedSet.has(t.id)}
+                onToggle={() => toggle(t.id)}
+              />
+            ))
+          )}
+        </ScrollView>
+      )}
 
       <Pressable
         accessibilityRole="button"
@@ -340,5 +367,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.md,
+  },
+  emptyFill: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing['3xl'],
+  },
+  emptyTile: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.hero,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    maxWidth: 260,
   },
 });
