@@ -36,7 +36,7 @@ without losing context. Always update this file after each GAP completes.
 | 2 | GAP 3 | AttendeesSheet (R10, R11) | ✅ Complete — committed `bb9a7e6` |
 | 3 | GAP 4 | QuickProfileSheet (R12-5, R12-6) | ✅ Complete — committed (see log) |
 | 4 | GAP 5 | QuicksetNameSheet (R12-2 through R12-4) | ✅ Complete — committed (see log) |
-| 5 | GAP 9 | BroadcastToast `queued` prop (R13-3) | ⏳ Prompt ready — gaps/GAP-09-broadcast-toast-queued.md |
+| 5 | GAP 9 | BroadcastToast `queued` prop (R13-3) | ✅ Complete — see commit log |
 | 6 | GAP 10 | AudiencePickerSheet zero-friend state (R13-4) | ⏳ Prompt ready — gaps/GAP-10-audience-picker-zero-state.md |
 | 7 | GAP 2 | Search overlay (R8-1 through R8-7) | ⏳ Prompt ready — gaps/GAP-02-search-overlay.md |
 | 8 | GAP 1 | Onboarding stack (R9-1 through R9-10) | ⏳ Prompt ready — gaps/GAP-01-onboarding.md (lowest priority) |

@@ -23,6 +23,12 @@
  * or any other affordance that opens audience editing. The toast body is
  * NOT tappable — only the Undo pill and close X have onPress. Audience
  * editing lives ONLY in BroadcastSettings.
+ *
+ * R13-3 — QUEUED VARIANT. When the toast fires on reconnect after the
+ * broadcast was queued offline, pass `queued`. The Undo window has
+ * already passed, so the Undo pill is omitted and the title becomes
+ * "Broadcast sent · was queued". Position, sizing, tokens, border,
+ * close X, auto-dismiss, success haptic, A11y — all unchanged.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -52,6 +58,12 @@ export interface BroadcastToastProps {
   audienceLabel: string;
   onUndo: () => void;
   onDismiss: () => void;
+  /**
+   * R13-3 — when true, the broadcast was queued offline and fired on
+   * reconnect. Omits the Undo pill and changes the title copy. All other
+   * toast properties are identical to the standard surface.
+   */
+  queued?: boolean;
 }
 
 const STATE_LABEL: Record<AvailState, string> = {
@@ -68,6 +80,7 @@ export function BroadcastToast({
   audienceLabel,
   onUndo,
   onDismiss,
+  queued = false,
 }: BroadcastToastProps): React.JSX.Element | null {
   const opacity = useSharedValue(0);
   const translate = useSharedValue(8);
@@ -111,26 +124,30 @@ export function BroadcastToast({
       </View>
       <View style={styles.body}>
         <Text style={[styles.title, { color: T.bgElevated }]} numberOfLines={1}>
-          {`Broadcast sent · ${STATE_LABEL[status]}`}
+          {queued
+            ? 'Broadcast sent · was queued'
+            : `Broadcast sent · ${STATE_LABEL[status]}`}
         </Text>
         <Text style={[styles.sub, { color: T.bgElevated }]} numberOfLines={1}>
           {audienceLabel}
         </Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Undo broadcast"
-        onPress={() => {
-          dismissedRef.current = true;
-          onUndo();
-        }}
-        style={({ pressed }) => [
-          styles.undo,
-          { backgroundColor: 'rgba(255,255,255,0.14)', opacity: pressed ? 0.7 : 1 },
-        ]}
-      >
-        <Text style={[styles.undoLabel, { color: T.bgElevated }]}>Undo</Text>
-      </Pressable>
+      {!queued ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Undo broadcast"
+          onPress={() => {
+            dismissedRef.current = true;
+            onUndo();
+          }}
+          style={({ pressed }) => [
+            styles.undo,
+            { backgroundColor: 'rgba(255,255,255,0.14)', opacity: pressed ? 0.7 : 1 },
+          ]}
+        >
+          <Text style={[styles.undoLabel, { color: T.bgElevated }]}>Undo</Text>
+        </Pressable>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Dismiss"
