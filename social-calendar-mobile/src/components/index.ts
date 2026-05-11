@@ -173,6 +173,16 @@ export type { CoHostBadgeProps } from './social/CoHostBadge';
 export { CoHostToast } from './social/CoHostToast';
 export type { CoHostToastProps } from './social/CoHostToast';
 
+// ── GAP 4 — QuickProfileSheet (public mini-profile) ─────────────────────────
+export { QuickProfileSheet } from './social/QuickProfileSheet';
+export type {
+  QuickProfileSheetProps,
+  QuickProfilePerson,
+  QuickProfileMutualFriend,
+  QuickProfileStats,
+  FriendRequestStatus,
+} from './social/QuickProfileSheet';
+
 // ────────────────────────────────────────────────────────────────────────────
 // Profile (13)
 // ────────────────────────────────────────────────────────────────────────────
@@ -199,6 +209,12 @@ export type { MonthGridProps } from './profile/MonthGrid';
 
 export { QuicksetGrid, BUILTIN_QUICKSETS } from './profile/QuicksetGrid';
 export type { QuicksetGridProps } from './profile/QuicksetGrid';
+
+export { QuicksetNameSheet } from './profile/QuicksetNameSheet';
+export type {
+  QuicksetNameSheetProps,
+  QuicksetNameSheetMode,
+} from './profile/QuicksetNameSheet';
 
 export { SettingsGroup } from './profile/SettingsGroup';
 export type { SettingsGroupProps } from './profile/SettingsGroup';

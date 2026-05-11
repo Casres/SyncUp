@@ -74,6 +74,7 @@ import {
   Overline,
   PillBtn,
   QuicksetGrid,
+  QuicksetNameSheet,
   TabPills,
   WeekView,
   type TabPillsTab,
@@ -96,14 +97,12 @@ import type {
 } from '../../../../TYPES';
 
 // ────────────────────────────────────────────────────────────────────────────
-// R7-1 — Quicksets are USER-EXTENSIBLE. The 4 built-in presets come from
-// `BUILTIN_QUICKSETS` (frozen, non-deletable). Until the save-custom-quickset
-// flow ships, only the 4 built-ins render. The grid is NEVER fixed-length-4
-// internally — `QuicksetGrid` iterates whatever array we hand it. When the
-// custom-quickset feature lands, this becomes:
-//   const quicksets = [...BUILTIN_QUICKSETS, ...userCustomQuicksets];
+// R7-1 / R12-2 — Quicksets are USER-EXTENSIBLE. The 4 built-in presets come
+// from `BUILTIN_QUICKSETS` (frozen, non-deletable). User-saved customs are
+// kept in a local state slice and spread after the built-ins. The grid is
+// NEVER fixed-length-4 internally — `QuicksetGrid` iterates whatever array
+// we hand it (R12-3 — wraps via flexWrap for any count).
 // ────────────────────────────────────────────────────────────────────────────
-const QUICKSETS: Quickset[] = [...BUILTIN_QUICKSETS];
 
 // State order for the inline broadcast preview section (Hard Rule 12).
 const BROADCAST_STATE_ORDER: Array<{
@@ -142,6 +141,14 @@ export default function AvailabilityEditorScreen({
   const [dragging, setDragging] = useState(false);
   const [hintDismissed, setHintDismissed] = useState(false);
   const [broadcastsExpanded, setBroadcastsExpanded] = useState(false);
+
+  // R12-2 / R12-4 — custom quicksets + naming sheet state.
+  const [customQuicksets, setCustomQuicksets] = useState<Quickset[]>([]);
+  const [nameSheetOpen, setNameSheetOpen] = useState(false);
+  const [nameSheetMode, setNameSheetMode] = useState<'new' | 'rename'>('new');
+  const [renamingQuickset, setRenamingQuickset] = useState<Quickset | null>(null);
+
+  const allQuicksets: Quickset[] = [...BUILTIN_QUICKSETS, ...customQuicksets];
 
   // Reset transient drag state on mode change (preserves brush).
   useEffect(() => {
@@ -334,7 +341,36 @@ export default function AvailabilityEditorScreen({
         {/* 6 — Quickset section */}
         <View style={styles.section}>
           <Overline T={T}>QUICK-SET</Overline>
-          <QuicksetGrid T={T} quicksets={QUICKSETS} onApply={handleQuicksetApply} />
+          <QuicksetGrid
+            T={T}
+            quicksets={allQuicksets}
+            onApply={handleQuicksetApply}
+            onRename={(q) => {
+              setRenamingQuickset(q);
+              setNameSheetMode('rename');
+              setNameSheetOpen(true);
+            }}
+            onDelete={(id) => {
+              setCustomQuicksets((prev) => prev.filter((q) => q.id !== id));
+            }}
+          />
+          {/* R12-2 — Save as Quickset entry point. Enabled only when the
+              availability map has at least one day set. */}
+          <View style={styles.saveQuicksetWrap}>
+            <PillBtn
+              T={T}
+              label="Save as Quickset"
+              variant="ghost"
+              size="md"
+              disabled={isEmpty}
+              onPress={() => {
+                fire('medium');
+                setRenamingQuickset(null);
+                setNameSheetMode('new');
+                setNameSheetOpen(true);
+              }}
+            />
+          </View>
         </View>
 
         {/* 7 — INLINE COLLAPSE: Broadcast rules preview (Decision #6 Option C) */}
@@ -362,6 +398,39 @@ export default function AvailabilityEditorScreen({
           </View>
         ) : null}
       </ScrollView>
+
+      {/* QuicksetNameSheet — mounted as a SafeAreaView sibling (outside the
+          ScrollView) so it overlays the screen and not the scrolled content. */}
+      <QuicksetNameSheet
+        T={T}
+        open={nameSheetOpen}
+        mode={nameSheetMode}
+        initialName={renamingQuickset?.label}
+        existingNames={customQuicksets.map((q) => q.label)}
+        onSave={(name) => {
+          if (nameSheetMode === 'new') {
+            const newQuickset: Quickset = {
+              id: `custom-${Date.now()}`,
+              label: name,
+              detail: 'Custom quickset',
+              status: 'free',
+              isCustom: true,
+            };
+            setCustomQuicksets((prev) => [...prev, newQuickset]);
+            fire('success');
+          } else if (renamingQuickset !== null) {
+            const idToRename = renamingQuickset.id;
+            setCustomQuicksets((prev) =>
+              prev.map((q) =>
+                q.id === idToRename ? { ...q, label: name } : q,
+              ),
+            );
+            fire('success');
+          }
+          setNameSheetOpen(false);
+        }}
+        onClose={() => setNameSheetOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -733,5 +802,8 @@ const styles = StyleSheet.create({
   },
   emptyWrap: {
     paddingVertical: spacing.lg,
+  },
+  saveQuicksetWrap: {
+    paddingTop: spacing.md,
   },
 });

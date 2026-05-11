@@ -181,12 +181,15 @@ export type AvailabilityEntry = {
  * AvailabilityEntry map, scoped to sensible windows — Hard Rule 15).
  */
 export interface Quickset {
-  id: QuicksetId;
+  /** Built-ins use a `QuicksetId`; user-saved customs use an arbitrary string. */
+  id: QuicksetId | string;
   label: string;
   /** One-line description shown under the label. */
   detail: string;
   /** null = clear (delete keys in window). */
   status: QuicksetStatus;
+  /** True for user-saved quicksets (R12-4). Built-ins omit or set false. */
+  isCustom?: boolean;
 }
 
 // ============================================================================

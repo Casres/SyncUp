@@ -17,6 +17,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
+import type { HapticType } from '../../theme';
 
 type Theme = typeof colors.light;
 
@@ -27,6 +28,17 @@ export interface TwoTapDestructiveProps {
   confirmLabel: string;
   onConfirm: () => void;
   disabled?: boolean;
+  /**
+   * Haptic fired on the first tap (arm). Defaults to `heavy` per H-4.
+   * Lower-intensity flows (e.g. declining a friend request — softer
+   * destructive than deleting an event) may override to `light`.
+   */
+  armHaptic?: HapticType;
+  /**
+   * Haptic fired on the second tap (commit). Defaults to `success`.
+   * Override when the action is reversible / soft destructive.
+   */
+  commitHaptic?: HapticType;
 }
 
 const ARM_MIN_MS = 600;     // A-6 minimum between arm and commit
@@ -38,6 +50,8 @@ export function TwoTapDestructive({
   confirmLabel,
   onConfirm,
   disabled = false,
+  armHaptic = 'heavy',
+  commitHaptic = 'success',
 }: TwoTapDestructiveProps): React.JSX.Element {
   const fire = useHaptic();
   const [armed, setArmed] = useState(false);
@@ -62,7 +76,7 @@ export function TwoTapDestructive({
   const onPress = (): void => {
     if (disabled) return;
     if (!armed) {
-      fire('heavy');
+      fire(armHaptic);
       setArmed(true);
       armedAtRef.current = Date.now();
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -72,7 +86,7 @@ export function TwoTapDestructive({
     // Already armed — gate on the 600ms minimum.
     const elapsed = Date.now() - armedAtRef.current;
     if (elapsed < ARM_MIN_MS) return;
-    fire('success');
+    fire(commitHaptic);
     disarm();
     onConfirm();
   };
