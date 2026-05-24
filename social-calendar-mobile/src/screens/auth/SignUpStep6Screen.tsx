@@ -36,17 +36,11 @@ export default function SignUpStep6Screen({
   const inviteContext = route.params?.inviteContext ?? null;
 
   function finishOnboarding() {
-    // TODO (real Clerk): setActive({ session }) hands off to RootNavigator,
-    // which then unmounts AuthNavigator and renders the main shell.
     fire('medium');
-    // For now this is a no-op stub — the parent navigator's auth state
-    // controls actual hand-off. Leave as a TODO until Clerk wiring lands.
+    navigation.navigate('PushPermissionGate');
   }
 
   function onSetAvailability() {
-    // TODO: cross-stack nav into ProfileTab > AvailabilityEditor once
-    // AuthNavigator is unmounted. For now finish onboarding and let the
-    // user open the Availability Editor from Profile.
     finishOnboarding();
   }
 

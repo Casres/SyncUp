@@ -36,6 +36,9 @@ import {
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
 import { useFriendRequests, useFriends, useRespondToFriendRequest } from '../../api';
 import { MOCK_FRIEND_LABELS, MOCK_FRIEND_TYPES } from '../../mocks';
+import { ContactsDeniedAffordance } from '../../components/social/ContactsDeniedAffordance';
+import { useIsFirstRun } from '../auth/onboarding/useIsFirstRun';
+import { useContactsPermissionStatus } from '../auth/onboarding/useContactsPermissionStatus';
 import type { FriendsListScreenProps } from '../../navigation/types';
 import type { Friend } from '../../../../TYPES';
 
@@ -50,6 +53,8 @@ export default function FriendsListScreen({
 }: FriendsListScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const firstRun = useIsFirstRun();
+  const contactsStatus = useContactsPermissionStatus();
 
   const [segment, setSegment] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
@@ -130,6 +135,8 @@ export default function FriendsListScreen({
         />
       </View>
 
+      {contactsStatus === 'denied' ? <ContactsDeniedAffordance T={T} /> : null}
+
       {requestsCount > 0 && segment !== 'pending' ? (
         <View style={[styles.requestBanner, { backgroundColor: T.accentSoft }]}>
           <Overline T={T} color="accentInk">
@@ -151,7 +158,7 @@ export default function FriendsListScreen({
         <ScrollView contentContainerStyle={styles.listContent}>
           {requests.length === 0 ? (
             <View style={styles.emptyWrap}>
-              <EmptyFriends T={T} />
+              <EmptyFriends T={T} firstRun={firstRun} />
             </View>
           ) : (
             requests.map((req) => (
@@ -188,7 +195,7 @@ export default function FriendsListScreen({
         </ScrollView>
       ) : visibleFriends.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContent}>
-          <EmptyFriends T={T} onAdd={() => navigation.navigate('AddFriend')} />
+          <EmptyFriends T={T} firstRun={firstRun} onAdd={() => navigation.navigate('AddFriend')} />
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>

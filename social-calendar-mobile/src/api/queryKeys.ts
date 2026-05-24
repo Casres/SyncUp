@@ -45,6 +45,9 @@ export const queryKeys = {
     /** Activity feed (NotifSheet items). Distinct from profile.notifications which holds SETTINGS. */
     all: () => ['notifications'] as const,
   },
+  onboarding: {
+    contactsMatches: (hashKey: string) => ['onboarding', 'contactsMatches', hashKey] as const,
+  },
   explore: {
     /**
      * Feed key includes bucketed location + active category filter so each

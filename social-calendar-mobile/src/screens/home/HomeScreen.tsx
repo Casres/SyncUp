@@ -59,6 +59,7 @@ import { SearchOverlay } from '../../components/social/SearchOverlay';
 import { useSearch } from '../../components/social/SearchContext';
 import { colors, spacing, useHaptic } from '../../theme';
 import { useEvents, useNotifications } from '../../api';
+import { useIsFirstRun } from '../auth/onboarding/useIsFirstRun';
 import type { HomeScreenProps } from '../../navigation/types';
 import type { Event } from '../../../../TYPES';
 
@@ -91,6 +92,7 @@ const PHASE_A_FULL_PX = 160;
 export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const firstRun = useIsFirstRun();
   const { translateY, screenHeight, openPeek, openFull, dismiss } = useNotifSheet();
   const { open: searchOpen, openSearch, closeSearch } = useSearch();
   const { data: notifications } = useNotifications();
@@ -258,6 +260,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
               <EmptyHome
                 T={T}
                 variant={view}
+                firstRun={firstRun}
                 onPlan={() => {
                   fire('light');
                   navigation.navigate('CreateEventModal', { screen: 'Step1' });

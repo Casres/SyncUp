@@ -56,6 +56,12 @@ export type AuthStackParamList = {
   SignUpStep6: { inviteContext?: AuthInviteContext };
   ForgotPassword: undefined;
   ForgotPasswordConfirm: { credential: string };
+  // R15-7..R15-12: post-Step-6 onboarding tail
+  PushPermissionGate: undefined;
+  FriendFindDecision: undefined;
+  FriendFindMatches: undefined;
+  FriendFindNoWorries: undefined;
+  YoureIn: { inviteContext?: AuthInviteContext } | undefined;
 };
 
 export type HomeStackParamList = {
@@ -178,6 +184,12 @@ export type SignUpStep5ScreenProps = NativeStackScreenProps<AuthStackParamList, 
 export type SignUpStep6ScreenProps = NativeStackScreenProps<AuthStackParamList, 'SignUpStep6'>;
 export type ForgotPasswordScreenProps = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 export type ForgotPasswordConfirmScreenProps = NativeStackScreenProps<AuthStackParamList, 'ForgotPasswordConfirm'>;
+// R15 post-Step-6 onboarding tail
+export type PushPermissionGateScreenProps = NativeStackScreenProps<AuthStackParamList, 'PushPermissionGate'>;
+export type FriendFindDecisionScreenProps  = NativeStackScreenProps<AuthStackParamList, 'FriendFindDecision'>;
+export type FriendFindMatchesScreenProps   = NativeStackScreenProps<AuthStackParamList, 'FriendFindMatches'>;
+export type FriendFindNoWorriesScreenProps = NativeStackScreenProps<AuthStackParamList, 'FriendFindNoWorries'>;
+export type YoureInScreenProps             = NativeStackScreenProps<AuthStackParamList, 'YoureIn'>;
 
 // --- Explore ---
 export type ExploreScreenProps = CompositeScreenProps<

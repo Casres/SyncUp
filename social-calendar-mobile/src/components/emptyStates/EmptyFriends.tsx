@@ -14,19 +14,25 @@ export interface EmptyFriendsProps {
   T?: Theme;
   onAdd?: () => void;
   onShareQR?: () => void;
+  firstRun?: boolean;
 }
 
 export function EmptyFriends({
   T = colors.light,
   onAdd,
   onShareQR,
+  firstRun = false,
 }: EmptyFriendsProps): React.JSX.Element {
+  const headline = firstRun ? 'Find your first friend.' : 'No friends yet';
+  const body = firstRun
+    ? 'Search by @handle or share your QR for them to scan.'
+    : 'Add one to start planning.';
   return (
     <EmptyStateBlock
       T={T}
       icon={<UserPlusIcon T={T} />}
-      headline="No friends yet"
-      body="Add one to start planning."
+      headline={headline}
+      body={body}
       primary={onAdd ? { label: 'Add one', onPress: onAdd } : undefined}
       secondary={onShareQR ? { label: 'Share QR', onPress: onShareQR } : undefined}
     />

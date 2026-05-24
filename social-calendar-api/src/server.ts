@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { initSocketServer } from './sockets/index.js';
+import { startExplorePrewarmWorker } from './workers/explorePrewarm.worker.js';
 
 async function start() {
   const app = await buildApp();
@@ -24,6 +25,13 @@ async function start() {
   app.io = initSocketServer(app);
 
   app.log.info('socket.io server initialised');
+
+  // Start the Explore cache pre-warmer in production only.
+  // Skipped in dev/test to avoid burning API quota on non-user traffic.
+  if (env.NODE_ENV === 'production') {
+    startExplorePrewarmWorker();
+    app.log.info('explore pre-warm worker started');
+  }
 }
 
 start();

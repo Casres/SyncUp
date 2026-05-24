@@ -2,7 +2,7 @@
  * Explore service — Redis cache-aside layer over Eventbrite + Google Places.
  *
  * Cache keys
- *   explore:feed:{bucketedLat}:{bucketedLng}:{category}   TTL 600s  (10 min)
+ *   explore:feed:{bucketedLat}:{bucketedLng}:{category}   TTL env.EXPLORE_CACHE_TTL_SECONDS (10 min)
  *   explore:detail:{id}                                    TTL 1800s (30 min)
  *
  * GPS bucketing: lat/lng rounded to 2 decimal places (~1.1 km precision).
@@ -12,37 +12,21 @@
  * Feed merge order: featured (future DB query) → Eventbrite → Google Places.
  * Within each tier results are sorted by distance (nearest first).
  *
- * Redis failures are non-fatal — the service logs and falls back to a
- * live fetch on every request. This keeps the Explore tab working even
- * when Redis is temporarily unavailable.
+ * Redis failures are non-fatal — the service falls back to a live fetch on
+ * every request. This keeps the Explore tab working even when Redis is
+ * temporarily unavailable.
  */
 
-import { redis } from '../config/redis.js';
 import { env } from '../config/env.js';
 import { fetchEventbriteVenues } from './eventbrite.client.js';
 import { fetchGooglePlacesVenues } from './googlePlaces.client.js';
+import { exploreCache } from './exploreCache.js';
+import { exploreFeaturedHook } from '../workers/exploreFeatured.hook.js';
 import type { ExploreCategory, ExploreVenue } from '../types/explore.types.js';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const FEED_TTL = 600;    // seconds — matches client staleTime of 10 min
-const DETAIL_TTL = 1800; // seconds — matches client staleTime of 30 min
 const PAGE_SIZE = 20;
-
-// ── Cache key helpers ─────────────────────────────────────────────────────────
-
-/** Round to 2 dp — ~1.1 km precision, reduces cache key cardinality. */
-function bucket(v: number): number {
-  return Math.round(v * 100) / 100;
-}
-
-function feedKey(lat: number, lng: number, category: ExploreCategory): string {
-  return `explore:feed:${bucket(lat)}:${bucket(lng)}:${category}`;
-}
-
-function detailKey(id: string): string {
-  return `explore:detail:${id}`;
-}
 
 // ── Response types ────────────────────────────────────────────────────────────
 
@@ -76,22 +60,6 @@ function paginate(all: ExploreVenue[], cursor: number): ExploreFeedPage {
   };
 }
 
-async function safeRedisGet(key: string): Promise<string | null> {
-  try {
-    return await redis.get(key);
-  } catch {
-    return null;
-  }
-}
-
-async function safeRedisSet(key: string, value: string, ttl: number): Promise<void> {
-  try {
-    await redis.set(key, value, 'EX', ttl);
-  } catch {
-    // Non-fatal — live fetch is the fallback
-  }
-}
-
 // ── Service ───────────────────────────────────────────────────────────────────
 
 export const exploreService = {
@@ -109,13 +77,10 @@ export const exploreService = {
     category: ExploreCategory,
     cursor: number,
   ): Promise<ExploreFeedPage> {
-    const cacheKey = feedKey(lat, lng, category);
-
     // ── Cache read ─────────────────────────────────────────────────────────
-    const cached = await safeRedisGet(cacheKey);
+    const cached = await exploreCache.getFeed(lat, lng, category);
     if (cached) {
-      const all = JSON.parse(cached) as ExploreVenue[];
-      return paginate(all, cursor);
+      return paginate(cached, cursor);
     }
 
     // ── Cache miss — fetch both APIs in parallel ────────────────────────────
@@ -135,10 +100,13 @@ export const exploreService = {
       ...gpVenues.sort(byDistance),
     ]);
 
-    // ── Cache write ────────────────────────────────────────────────────────
-    await safeRedisSet(cacheKey, JSON.stringify(merged), FEED_TTL);
+    // Phase C: run the featured-listings hook (identity for now; future B2B layer).
+    const withFeatured = await exploreFeaturedHook(merged);
 
-    return paginate(merged, cursor);
+    // ── Cache write ────────────────────────────────────────────────────────
+    await exploreCache.setFeed(lat, lng, category, withFeatured);
+
+    return paginate(withFeatured, cursor);
   },
 
   /**
@@ -158,20 +126,17 @@ export const exploreService = {
     lng: number,
   ): Promise<ExploreVenue | null> {
     // Step 1: detail cache
-    const detCacheKey = detailKey(id);
-    const detCached = await safeRedisGet(detCacheKey);
+    const detCached = await exploreCache.getDetail(id);
     if (detCached) {
-      return JSON.parse(detCached) as ExploreVenue;
+      return detCached;
     }
 
     // Step 2: try to find the venue in the warm 'all' feed cache
-    const feedCacheKey = feedKey(lat, lng, 'all');
-    const feedCached = await safeRedisGet(feedCacheKey);
+    const feedCached = await exploreCache.getFeed(lat, lng, 'all');
     if (feedCached) {
-      const feed = JSON.parse(feedCached) as ExploreVenue[];
-      const found = feed.find((v) => v.id === id);
+      const found = feedCached.find((v) => v.id === id);
       if (found) {
-        await safeRedisSet(detCacheKey, JSON.stringify(found), DETAIL_TTL);
+        await exploreCache.setDetail(id, found);
         return found;
       }
     }
@@ -184,7 +149,7 @@ export const exploreService = {
     const venue = [...ebVenues, ...gpVenues].find((v) => v.id === id) ?? null;
 
     if (venue) {
-      await safeRedisSet(detCacheKey, JSON.stringify(venue), DETAIL_TTL);
+      await exploreCache.setDetail(id, venue);
     }
 
     return venue;

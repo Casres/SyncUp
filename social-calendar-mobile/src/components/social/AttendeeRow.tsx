@@ -66,13 +66,15 @@ export interface AttendeeRowProps {
   viewerRole: AttendeeViewerRole;
   /** True when attendee.id === currentUserId — host's own row gets no ⋯. */
   isOwnRow: boolean;
+  /** R15-3: true when this row is the event host (shows HOST chip). */
+  isHost?: boolean;
   armed: boolean;
   onArm: () => void;
   onCommit: () => void;
   onCancel: () => void;
   onMakeCoHost: () => void;
   onRemoveCoHost: () => void;
-  /** Row body tap (non-armed) — host stub for Friend Profile nav. */
+  /** R15-1: row body tap → QuickProfileSheet. No-op when isOwnRow. */
   onPress: () => void;
 }
 
@@ -84,6 +86,7 @@ export function AttendeeRow({
   attendee,
   viewerRole,
   isOwnRow,
+  isHost = false,
   armed,
   onArm,
   onCommit,
@@ -207,6 +210,8 @@ export function AttendeeRow({
       onCommit();
       return;
     }
+    // R15-1: self-row tap is a no-op — no haptic, no navigation.
+    if (isOwnRow) return;
     fire('light');
     onPress();
   }
@@ -264,6 +269,14 @@ export function AttendeeRow({
         </GestureDetector>
 
         <View style={styles.trailing}>
+          {/* R15-3: HOST chip appears right of center, left of RSVPBadge */}
+          {isHost && !armed ? (
+            <View style={[styles.hostChip, { backgroundColor: T.accentSoft }]}>
+              <Text style={[styles.hostChipLabel, { color: T.accent, fontFamily: fonts.mono }]}>
+                HOST
+              </Text>
+            </View>
+          ) : null}
           {!armed ? <RSVPBadge T={T} status={attendee.rsvpStatus} /> : null}
           {armed ? (
             <Pressable
@@ -367,5 +380,15 @@ const styles = StyleSheet.create({
   armedLabel: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  hostChip: {
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  hostChipLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

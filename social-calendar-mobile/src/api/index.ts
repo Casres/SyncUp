@@ -26,3 +26,4 @@ export * from './availability';
 export * from './profile';
 export * from './explore';
 export * from './notifications';
+export * from './onboarding';

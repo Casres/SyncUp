@@ -50,6 +50,7 @@ import { Overline } from '../foundation/Overline';
 import { Spinner } from '../polish/Spinner';
 import { StatTile } from '../profile/StatTile';
 import type { AvailState } from '../../../../TYPES';
+// AvailState re-used for friend-variant status ring (R15-2).
 
 import { TwoTapDestructive } from './TwoTapDestructive';
 
@@ -90,6 +91,18 @@ export interface QuickProfileSheetProps {
   mutualFriends: QuickProfileMutualFriend[];
   stats: QuickProfileStats | null;
   friendRequestStatus: FriendRequestStatus;
+  /**
+   * R15-2: true when the target is already a friend (appears in any FriendType
+   * assignment). Friend variant shows status ring + FriendType chip in place of
+   * the Add/Requested/Accept/Decline CTA block.
+   */
+  isFriend?: boolean;
+  /**
+   * R15-2: The Friend Type label assigned to this person (e.g. "CLOSE FRIENDS").
+   * Omit or pass null/undefined when isFriend=true but no type is assigned —
+   * the chip slot is left blank (spec: "chip is OMITTED entirely").
+   */
+  friendTypeName?: string | null;
   onAddFriend: () => void;
   onAccept: () => void;
   onDecline: () => void;
@@ -109,6 +122,8 @@ export function QuickProfileSheet({
   mutualFriends,
   stats,
   friendRequestStatus,
+  isFriend = false,
+  friendTypeName,
   onAddFriend,
   onAccept,
   onDecline,
@@ -227,7 +242,13 @@ export function QuickProfileSheet({
               <>
                 {/* Identity block — non-scrollable, centered */}
                 <View style={styles.identity}>
-                  <RingAvatar T={T} letter={person.letter} size={64} status={null} />
+                  {/* R15-2: friend variant shows status ring; non-friend has no ring */}
+                  <RingAvatar
+                    T={T}
+                    letter={person.letter}
+                    size={64}
+                    status={isFriend ? (person as QuickProfilePerson & { availState?: AvailState | null }).availState ?? null : null}
+                  />
                   <Text style={[styles.name, { color: T.ink }]}>{person.name}</Text>
                   <Text
                     style={[
@@ -239,9 +260,19 @@ export function QuickProfileSheet({
                   </Text>
                 </View>
 
-                {/* CTA block */}
+                {/* CTA block — R15-2: friend variant shows FriendType chip or nothing */}
                 <View style={styles.ctaBlock}>
-                  {renderCta({
+                  {isFriend ? (
+                    friendTypeName ? (
+                      <View style={styles.friendTypeChipWrap}>
+                        <View style={[styles.friendTypeChip, { backgroundColor: T.accentSoft }]}>
+                          <Text style={[styles.friendTypeLabel, { color: T.accent, fontFamily: fonts.mono }]}>
+                            {friendTypeName.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    ) : null
+                  ) : renderCta({
                     T,
                     status: localStatus,
                     onAdd: handleAddFriend,
@@ -450,6 +481,19 @@ const styles = StyleSheet.create({
   ctaBlock: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing['3xl'],
+  },
+  friendTypeChipWrap: {
+    alignItems: 'center',
+  },
+  friendTypeChip: {
+    borderRadius: radii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  friendTypeLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   ctaRow: {
     flexDirection: 'row',

@@ -23,6 +23,11 @@ import SignUpStep3Screen from '../screens/auth/SignUpStep3Screen';
 import SignUpStep4Screen from '../screens/auth/SignUpStep4Screen';
 import SignUpStep5Screen from '../screens/auth/SignUpStep5Screen';
 import SignUpStep6Screen from '../screens/auth/SignUpStep6Screen';
+import PushPermissionGateScreen from '../screens/auth/PushPermissionGateScreen';
+import FriendFindDecisionScreen from '../screens/auth/FriendFindDecisionScreen';
+import FriendFindMatchesScreen from '../screens/auth/FriendFindMatchesScreen';
+import FriendFindNoWorriesScreen from '../screens/auth/FriendFindNoWorriesScreen';
+import YoureInScreen from '../screens/auth/YoureInScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import ForgotPasswordConfirmScreen from '../screens/auth/ForgotPasswordConfirmScreen';
 
@@ -46,6 +51,32 @@ export default function AuthNavigator(): React.JSX.Element {
       <Stack.Screen name="SignUpStep4" component={SignUpStep4Screen} />
       <Stack.Screen name="SignUpStep5" component={SignUpStep5Screen} />
       <Stack.Screen name="SignUpStep6" component={SignUpStep6Screen} />
+      {/* Post-Step-6 onboarding flow (R15-7..R15-12) — no back arrow, no back stack */}
+      <Stack.Screen
+        name="PushPermissionGate"
+        component={PushPermissionGateScreen}
+        options={{ animation: 'none', gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="FriendFindDecision"
+        component={FriendFindDecisionScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="FriendFindMatches"
+        component={FriendFindMatchesScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="FriendFindNoWorries"
+        component={FriendFindNoWorriesScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="YoureIn"
+        component={YoureInScreen}
+        options={{ gestureEnabled: false }}
+      />
       <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       <Stack.Screen
         name="ForgotPasswordConfirm"

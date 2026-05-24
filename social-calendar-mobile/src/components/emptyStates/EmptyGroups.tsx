@@ -13,18 +13,24 @@ type Theme = typeof colors.light;
 export interface EmptyGroupsProps {
   T?: Theme;
   onCreate?: () => void;
+  firstRun?: boolean;
 }
 
 export function EmptyGroups({
   T = colors.light,
   onCreate,
+  firstRun = false,
 }: EmptyGroupsProps): React.JSX.Element {
+  const headline = firstRun ? 'Start a group for your regulars.' : 'No groups yet';
+  const body = firstRun
+    ? 'Easier than tagging the same people every time.'
+    : 'Make a space to plan together.';
   return (
     <EmptyStateBlock
       T={T}
       icon={<UsersIcon T={T} />}
-      headline="No groups yet"
-      body="Make a space to plan together."
+      headline={headline}
+      body={body}
       primary={onCreate ? { label: 'Create one', onPress: onCreate } : undefined}
     />
   );

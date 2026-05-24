@@ -1,29 +1,35 @@
 /**
  * Per-user rate limiter for the Explore feed endpoint.
  *
- * Algorithm: fixed-window counter using Redis INCR + EXPIRE.
- *   Key:    explore:rate:{userId}
- *   Window: 3 600 s (1 hour), reset on first request in each window.
- *   Limit:  env.EXPLORE_RATE_LIMIT (default 30 req / hr).
+ * Two overlapping counters:
+ *   Hour bucket:  explore:rate:{userId}:hour   — limit env.EXPLORE_RATE_LIMIT (default 20 req/hr)
+ *   Burst bucket: explore:rate:{userId}:burst  — limit env.EXPLORE_RATE_LIMIT_BURST (default 5 req/60s)
  *
- * On limit exceeded → 429 with Retry-After header set to the remaining
- * seconds in the current window.
+ * Both counters use Redis INCR + conditional EXPIRE (fixed-window).
+ * On limit exceeded → 429 with Retry-After + X-RateLimit-* headers.
+ * Every allowed response also carries X-RateLimit-* headers so clients can
+ * self-throttle before hitting the limit.
  *
- * Redis failures are non-fatal: if the INCR call throws the middleware
- * logs and passes through, preferring availability over enforcement.
+ * Redis failures are non-fatal: the middleware logs and passes through,
+ * preferring availability over rate-limit enforcement.
  *
- * Usage: register this as a preHandler on the explore feed route only,
- * not on the detail route (detail is cache-heavy and user-triggered).
+ * Usage: registered as a preHandler on GET /explore/feed only.
  */
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { redis } from '../config/redis.js';
 import { env } from '../config/env.js';
 
-const WINDOW_SECONDS = 3_600; // 1 hour
+const HOUR_WINDOW_SECONDS = 3_600;
+const BURST_WINDOW_SECONDS = 60;
 
-function rateLimitKey(userId: string): string {
-  return `explore:rate:${userId}`;
+const hourKey  = (uid: string) => `explore:rate:${uid}:hour`;
+const burstKey = (uid: string) => `explore:rate:${uid}:burst`;
+
+async function incrWithTtl(key: string, ttl: number): Promise<number> {
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, ttl);
+  return count;
 }
 
 export async function exploreRateLimit(
@@ -31,41 +37,58 @@ export async function exploreRateLimit(
   reply: FastifyReply,
 ): Promise<void> {
   const userId = request.user.id;
-  const key = rateLimitKey(userId);
-  const limit = env.EXPLORE_RATE_LIMIT;
+  const limit  = env.EXPLORE_RATE_LIMIT;       // default 20 req/hr
+  const burst  = env.EXPLORE_RATE_LIMIT_BURST; // default 5 req/60s
 
-  let count: number;
+  let hourCount: number;
+  let burstCount: number;
   try {
-    // INCR returns the value after the increment.
-    count = await redis.incr(key);
-
-    if (count === 1) {
-      // First request in this window — set the expiry.
-      // If this call fails the key has no TTL; it will accumulate until
-      // eviction, which is a mild over-counting issue, not a security risk.
-      await redis.expire(key, WINDOW_SECONDS);
-    }
+    [hourCount, burstCount] = await Promise.all([
+      incrWithTtl(hourKey(userId),  HOUR_WINDOW_SECONDS),
+      incrWithTtl(burstKey(userId), BURST_WINDOW_SECONDS),
+    ]);
   } catch (err) {
     request.log.warn({ err }, 'exploreRateLimit: Redis error — passing through');
-    return; // Fail open
+    return; // fail-open
   }
 
-  if (count > limit) {
-    // Calculate remaining TTL for the Retry-After header.
-    let ttl = WINDOW_SECONDS;
-    try {
-      const remaining = await redis.ttl(key);
-      if (remaining > 0) ttl = remaining;
-    } catch {
-      // Best-effort; fall back to the full window duration.
-    }
+  // Derive the hour bucket TTL for X-RateLimit-Reset and Retry-After.
+  let hourTtl = HOUR_WINDOW_SECONDS;
+  try {
+    const r = await redis.ttl(hourKey(userId));
+    if (r > 0) hourTtl = r;
+  } catch { /* best-effort */ }
 
+  const resetsAt = Math.floor(Date.now() / 1000) + hourTtl;
+
+  // Always emit headers (even on denied responses) so clients can self-throttle.
+  reply.header('X-RateLimit-Limit', String(limit));
+  reply.header('X-RateLimit-Remaining', String(Math.max(0, limit - hourCount)));
+  reply.header('X-RateLimit-Reset', String(resetsAt));
+
+  // Burst quota deny — short Retry-After (≤60s).
+  // Check burst before hour so the client gets the shorter Retry-After first.
+  if (burstCount > burst) {
     return reply
       .code(429)
-      .header('Retry-After', String(ttl))
+      .header('Retry-After', String(BURST_WINDOW_SECONDS))
+      .send({
+        error: 'Explore burst limit exceeded',
+        reason: 'burst_quota',
+        retryAfterSeconds: BURST_WINDOW_SECONDS,
+        limit: burst,
+      });
+  }
+
+  // Hour quota deny — long Retry-After (= remaining TTL in current window).
+  if (hourCount > limit) {
+    return reply
+      .code(429)
+      .header('Retry-After', String(hourTtl))
       .send({
         error: 'Explore rate limit exceeded',
-        retryAfterSeconds: ttl,
+        reason: 'hour_quota',
+        retryAfterSeconds: hourTtl,
         limit,
       });
   }

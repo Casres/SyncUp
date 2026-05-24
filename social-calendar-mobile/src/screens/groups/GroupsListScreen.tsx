@@ -31,6 +31,7 @@ import {
 } from '../../components';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
 import { useGroups } from '../../api';
+import { useIsFirstRun } from '../auth/onboarding/useIsFirstRun';
 import type { GroupsListScreenProps } from '../../navigation/types';
 import type { SocialGroup } from '../../../../TYPES';
 
@@ -45,6 +46,7 @@ export default function GroupsListScreen({
 }: GroupsListScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const firstRun = useIsFirstRun();
   const [segment, setSegment] = useState<string>('all');
 
   const { data: groups, isLoading, error, refetch } = useGroups();
@@ -87,7 +89,7 @@ export default function GroupsListScreen({
 
       {visibleGroups.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContent}>
-          <EmptyGroups T={T} onCreate={() => navigation.navigate('CreateGroup')} />
+          <EmptyGroups T={T} firstRun={firstRun} onCreate={() => navigation.navigate('CreateGroup')} />
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>

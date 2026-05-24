@@ -39,6 +39,7 @@ import { StaggerList } from '../polish/StaggerList';
 import { PillBtn } from '../foundation/PillBtn';
 import { colors, durations, easings, radii, spacing, springs, typography, useHaptic } from '../../theme';
 import { queryKeys, useNotifications } from '../../api';
+import { useIsFirstRun } from '../../screens/auth/onboarding/useIsFirstRun';
 import type {
   CoHostNotif,
   CoHostRevokedNotif,
@@ -110,6 +111,7 @@ export function NotifSheet({
   lastSyncedAt,
 }: NotifSheetProps): React.JSX.Element {
   const fire = useHaptic();
+  const firstRun = useIsFirstRun();
   const sheet = useNotifSheet();
   const queryClient = useQueryClient();
   const {
@@ -413,7 +415,7 @@ export function NotifSheet({
             <Spinner T={T} size="MD" />
           </View>
         ) : groups.length === 0 ? (
-          <EmptyNotifications T={T} />
+          <EmptyNotifications T={T} firstRun={firstRun} />
         ) : (
           <ScrollView
             contentContainerStyle={styles.scroll}
@@ -562,17 +564,25 @@ function renderCard(n: Notif, c: RenderCtx): React.ReactNode {
 
 interface EmptyProps {
   T: Theme;
+  firstRun?: boolean;
 }
 
-function EmptyNotifications({ T }: EmptyProps): React.JSX.Element {
+function EmptyNotifications({ T, firstRun = false }: EmptyProps): React.JSX.Element {
+  const title = firstRun ? 'Nothing yet.' : 'No activity';
+  const body = firstRun ? 'Add friends or plan an event to start seeing activity.' : null;
   return (
     <View style={styles.emptyFill}>
       <View style={[styles.emptyTile, { backgroundColor: T.bgSunken }]}>
         <Ionicons name="notifications-off-outline" size={28} color={T.ink3} />
       </View>
       <Text style={[typography.bodyMed, { color: T.ink2, marginTop: spacing.md }]}>
-        No activity
+        {title}
       </Text>
+      {body ? (
+        <Text style={[typography.caption, { color: T.ink3, textAlign: 'center', maxWidth: 240, marginTop: 4 }]}>
+          {body}
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -23,6 +23,7 @@ export interface EmptyHomeProps {
   T?: Theme;
   variant?: EmptyHomeVariant;
   onPlan?: () => void;
+  firstRun?: boolean;
 }
 
 const COPY: Record<EmptyHomeVariant, { headline: string; body?: string }> = {
@@ -31,12 +32,15 @@ const COPY: Record<EmptyHomeVariant, { headline: string; body?: string }> = {
   month: { headline: 'Quiet month',    body: 'Tap + to start.' },
 };
 
+const FIRST_RUN_COPY = { headline: 'Plan your first event.', body: 'Tap + to start.' };
+
 export function EmptyHome({
   T = colors.light,
   variant = 'today',
   onPlan,
+  firstRun = false,
 }: EmptyHomeProps): React.JSX.Element {
-  const c = COPY[variant];
+  const c = firstRun ? FIRST_RUN_COPY : COPY[variant];
   return (
     <EmptyStateBlock
       T={T}
