@@ -65,6 +65,8 @@ export interface QuickProfilePerson {
   letter: string;
   photoUrl?: string | null;
   bio?: string | null;
+  /** R15-2: availability state for friend-variant status ring. */
+  availState?: AvailState | null;
 }
 
 export interface QuickProfileMutualFriend {
@@ -247,7 +249,7 @@ export function QuickProfileSheet({
                     T={T}
                     letter={person.letter}
                     size={64}
-                    status={isFriend ? (person as QuickProfilePerson & { availState?: AvailState | null }).availState ?? null : null}
+                    status={isFriend ? person.availState ?? null : null}
                   />
                   <Text style={[styles.name, { color: T.ink }]}>{person.name}</Text>
                   <Text

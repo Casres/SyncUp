@@ -572,6 +572,7 @@ export function AttendeesSheet({
             name: quickTarget.name,
             handle: quickTarget.handle,
             letter: quickTarget.letter,
+            availState: quickTarget.availState ?? null,
           }}
           mutualFriends={[]}
           stats={null}
