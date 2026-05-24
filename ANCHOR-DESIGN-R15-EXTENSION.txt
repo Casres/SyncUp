@@ -1,0 +1,1049 @@
+# SyncUp — Design System Anchor · Round 15 Extension
+# Generated: 2026-05-22
+# Source: Cowork design session with Christian
+# Target merge: ANCHOR-DESIGN.txt (insert above "## HARD RULES — Round 14 additions" block)
+# Scope: AttendeesSheet (extends R10/R11) + Onboarding stack (extends R9)
+================================================================
+## HARD RULES — Round 15 additions (AttendeesSheet row-tap + scale · Onboarding stack)
+================================================================
+R15-1. ATTENDEEROW TAP OPENS QUICKPROFILESHEET (TERMINAL). Tapping any
+       AttendeeRow body in AttendeesSheet opens QuickProfileSheet
+       stacked above the sheet. The friend/non-friend variant is
+       resolved at tap time (see R15-2). QuickProfileSheet's scope
+       (R12-5) extends from "Search overlay only" to include
+       AttendeesSheet as a valid host surface. The sheet is TERMINAL
+       in this round — no "See full profile" affordance, no drill-
+       through to a deeper surface. Friend Profile routing from
+       AttendeesSheet is deferred and tracked in DESIGN-BACKLOG.txt
+       alongside the existing Friend Profile entry. SUPERSEDES the
+       "Tap row → Friend Profile" clause in R10-7. The viewer's own
+       row renders normally (with their RSVPBadge visible to others)
+       but tap is a no-op: no haptic, no navigation.
+       NEVER navigate away from AttendeesSheet on row tap in this round.
+       NEVER stack QuickProfileSheet over a row owned by the viewer.
+
+R15-2. QUICKPROFILESHEET HAS TWO VARIANTS RESOLVED BY RELATIONSHIP.
+       Variant resolution: friend = the target appears in any of
+       currentUser's Friend Type assignments (R7-3). Non-friend =
+       everyone else (including the host of an event the viewer is
+       attending, if they aren't yet friends).
+         Non-friend variant: identical to R12-5 / R12-6 (unchanged).
+         Friend variant differs ONLY in three ways:
+           (a) RingAvatar 64px shows the status ring (viewer has
+               permission per friendship · per existing token rules).
+           (b) The CTA block (R12-5 · "Add friend" / "Requested" /
+               Accept+Decline) is REPLACED by a single non-interactive
+               Friend Type chip at the same vertical position:
+               10/600 mono · accentSoft fill · accent text · radius
+               999 · 6×10 padding · centered. Label = the Friend Type
+               currentUser has assigned to the target (e.g.,
+               "CLOSE FRIENDS").
+           (c) If the target is untyped (no Friend Type assigned), the
+               chip is OMITTED entirely. No placeholder. No "UNTYPED"
+               label. No empty pill outline. The CTA slot is just blank.
+         Body content (mutual friends · bio · Hosted/Attended stats)
+         is identical to the non-friend variant.
+       Friend variant is also TERMINAL per R15-1 — no Message, no
+       View Shared Events, no Remove Friend in this surface.
+       NEVER show Add/Requested/Accept/Decline controls in the friend
+         variant. NEVER show the status ring on the non-friend variant.
+
+R15-3. ATTENDEESSHEET LIST IS GROUPED BY RSVP WITH HOSTS PINNED ON TOP.
+       The visible attendee list is a single scrollable column with
+       section overlines in this fixed order:
+         HOSTS · GOING · MAYBE · NOT GOING · NO RESPONSE
+       Section overlines: mono 10/600 ink3 · letter-spacing 1.6 ·
+         12px top padding · 6px bottom padding · left-aligned · 14px
+         horizontal margin.
+       RSVP section overlines include "({N})" count, e.g., "GOING (32)".
+       HOSTS section overline does NOT show a count.
+       HOSTS section order: the event host's row first, then co-hosts
+         alphabetical by name (case-insensitive). The host row carries
+         a "HOST" chip in the same position as the existing CO-HOST
+         chip (R11-3) — anatomy: 10/600 mono · accentSoft fill ·
+         accent text · radius 999 · 6×10 padding · right-aligned ·
+         6px gap from RSVPBadge.
+       Each host and co-host ALSO appears in their RSVP section below.
+         The row appears twice in the list. The RSVPBadge and the
+         HOST/CO-HOST chip travel with the row in both appearances —
+         row anatomy is identical regardless of which section it sits in.
+         Tap behavior (R15-1) is identical in both appearances.
+       RSVP section counts include hosts (e.g., if the host RSVPed
+         Going, they count toward "GOING (N)").
+       Empty RSVP sections are OMITTED — never render an overline with
+         "(0)" below it.
+       The HOSTS section is OMITTED if no host/co-host matches the
+         active chip filter (R10-2 / R10-3).
+       This grouped structure applies to all three role views
+         (HOST · CO-HOST · INVITEE per R11-7) — the only difference
+         between views is which chip filter rows render (R10-3 /
+         R11-7) and which row-level affordances render (R11-7).
+       NEVER hide hosts from the RSVP sections — the double appearance
+         is intentional. NEVER merge HOSTS into GOING.
+
+R15-4. ATTENDEESSHEET SEARCH IS REVEALED FROM A HEADER MAGNIFIER.
+       The search affordance is a magnifying-glass icon-btn
+       (20px ink3 · 44pt hit) in the sheet header, immediately left
+       of the Close X (HOST/CO-HOST views: left of the "Invite more"
+       pill, which sits left of Close X).
+       Tap behavior:
+         Light haptic · sheet header's title row collapses upward
+         200ms easeStd · a SearchInputBar slides into its place:
+           Full-width pill · radius 12 · bgSunken · hair border ·
+           auto-focus · placeholder "Search attendees…" ·
+           clear × icon-btn inside right edge (only renders when
+           text present · light haptic on tap).
+         The magnifier becomes a "Cancel" text link (13/500 accent)
+           that exits search mode and restores the header.
+         "Invite more" pill (HOST/CO-HOST) is hidden during search.
+       While the search input has a non-empty query:
+         Section overlines (HOSTS · GOING · MAYBE · NOT GOING ·
+           NO RESPONSE) are HIDDEN entirely.
+         All matching rows render in a single flat alphabetical list,
+           sorted by name (case-insensitive).
+         Matching is case-insensitive against name AND @handle.
+         Hosts and co-hosts retain their HOST/CO-HOST chip but lose
+           pinned position — sorting is strictly alphabetical.
+         The viewer's own row, if matched, is included in the flat
+           list (still non-interactive per R15-1).
+       Clearing the query (tap × or empty input) restores the grouped
+         structure with HOSTS pinned (R15-3).
+       Exiting search mode (tap "Cancel") clears the query and
+         restores the header title row.
+       Search input filters compose with chip filters (R10-2 · R10-3):
+         the search input filters within whatever chip filter is active.
+       Search is purely local against the loaded list — NEVER fires
+         a network request (reaffirms R10-6).
+       NEVER render section overlines during an active search.
+       NEVER auto-clear the search input when scrolling.
+
+R15-5. ATTENDEESSHEET FILTER CHIPS ARE STICKY ON SCROLL. The chip
+       filter bar — 1 row for INVITEE/CO-HOST views (R11-7), 2 rows
+       for HOST view (R10-3) — is sticky to the top of the sheet body
+       as the list scrolls. The sheet header (title row OR search
+       input per R15-4) remains pinned above the chip bar.
+       Chips do not transform, fade, or compress on scroll — they
+         remain at full opacity and full height at every scroll
+         position.
+       During an active search (R15-4): chips remain sticky AND remain
+         interactive. Search and chip filters compose.
+       Reduced-motion: behavior unchanged (sticky positioning is not
+         an animation).
+       NEVER scroll the chip filter bar off-screen.
+       NEVER collapse the host's two-row chip stack into one row at
+         any scroll position.
+
+R15-6. ATTENDEESSHEET OFFLINE STATE MIRRORS NOTIFSHEET. When the
+       device loses network while AttendeesSheet is open, or it is
+       opened while offline:
+         OfflineBar (R5-7) renders immediately below the sheet header
+           and above the chip filter bar.
+         "SYNCED {T} AGO" sub-line renders below OfflineBar in mono
+           10/600 ink3. Omit if last sync time is unavailable.
+         The attendee list remains visible (stale data > blank state).
+       Network-dependent actions are disabled (opacity 0.4 · pointer-
+       events: none):
+         "Invite more" pill (R10-5 · R11-1a · HOST + CO-HOST views).
+         The host's ⋯ menu items (R11-2) — entire menu becomes
+           non-tappable; tapping the ⋯ icon is a no-op with light
+           haptic suppressed.
+         Any already-armed remove (R10-4 / R11-4) auto-cancels back
+           to default state if network drops mid-arm; no commit fires.
+       Local actions remain active: scroll · chip filter taps ·
+         search reveal/clear · row tap → QuickProfileSheet (profile
+         data fetch may fail and surface its own loading/error state
+         per R12-5).
+       On reconnect: OfflineBar slides out (su-slide-up 240ms easeStd)
+         · stale sub-line hides · list refreshes via React Query
+         invalidation · any newly added attendees animate in via
+         StaggerList.
+       NEVER show two OfflineBars simultaneously (E-1 unchanged).
+       NEVER blank the list while offline.
+
+R15-7. ONBOARDING FLOW ORDER IS LOCKED. The complete onboarding
+       sequence, in order, with no inserted screens or sub-routes:
+         Welcome →
+         Sign-Up Step 1 · Credential →
+         Sign-Up Step 2 · OTP Verify →
+         Sign-Up Step 3 · Name + Handle →
+         Sign-Up Step 4 · Password →
+         Sign-Up Step 5 · Profile Photo (skippable · R9-7) →
+         Sign-Up Step 6 · Availability (skippable · R9-7 · inline
+           editor) →
+         Native push notification permission modal (R15-9) →
+         Friend-Find (R15-10 · skippable) →
+         "You're In" Completion (R15-12) →
+         Tap "Go" → Home tab root (default) OR Event Detail (if
+           InviteContext is set · per R9-8).
+       Sign-In and Forgot-Password are SEPARATE flows reached from
+         the Welcome screen. They do NOT enter the 6-step sign-up
+         progression and have no 6-dot indicator.
+       The 6-dot indicator (R9-2) applies ONLY to Sign-Up Steps 1–6.
+         Friend-Find, "You're In", Sign-In, and Forgot-Password do
+         NOT show progress dots.
+       NEVER add a "Welcome to SyncUp" celebration screen between
+         sign-up steps and friend-find — "You're In" is the ONLY
+         celebratory beat.
+       NEVER reorder these screens. NEVER insert wrapper screens
+         around the push permission modal. NEVER move Friend-Find
+         after "You're In".
+
+R15-8. ONBOARDING SIGN-UP CREDENTIAL FIELD IS A SINGLE FORMAT-
+       AGNOSTIC INPUT. Sign-Up Step 1 uses ONE input that accepts
+       phone OR email — no tabs, no segmented control, no format
+       picker. Format detection mirrors R9-9 (Sign-In identifier):
+         Keyboard type adapts based on first character or accumulated
+         pattern: digit → numeric · letter or @ → default · letters
+         containing '.' → email.
+         Validation: input must match phone regex OR email regex (one
+         or the other) before "Continue" enables (R9-4).
+         Real-time visual: input border lights to accent the moment
+         a valid format is matched; reverts to hair when not matched.
+         Inline error appears ONLY after a failed submit attempt
+         (R9-4). Error copy: "Enter a phone number or email."
+       NEVER render a phone/email toggle on Step 1.
+       NEVER reject a format the user hasn't finished typing.
+       NEVER block submission until both formats validate (one is
+         enough).
+
+R15-9. PUSH NOTIFICATION PERMISSION USES THE NATIVE OS PROMPT WITH
+       NO WRAPPER. The push permission ask is the native iOS
+       Notifications system prompt, fired automatically immediately
+       after Sign-Up Step 6 completes OR is skipped — and before
+       Friend-Find renders. No SyncUp screen wraps the prompt; no
+       "Why we ask for notifications" pre-screen; no post-prompt
+       confirmation screen.
+       Outcome handling:
+         Granted: silently advance to Friend-Find. No haptic, no toast.
+         Denied: silently advance to Friend-Find. No haptic, no toast,
+           no in-app warning.
+       Re-prompt logic: SyncUp does NOT re-prompt during onboarding
+         regardless of outcome. iOS only allows the system prompt once;
+         further changes happen in Settings. A contextual deep-link to
+         Settings MAY appear later if the user interacts with a
+         notification preference (e.g., per-card mute) — that flow is
+         outside R15 scope and tracked separately.
+       NEVER wrap the system prompt in a SyncUp screen.
+       NEVER fire the prompt before Step 6 completes — the user has
+         not yet seen enough value to grant.
+       NEVER fire it twice in one onboarding session.
+
+R15-10. FRIEND-FIND IS A THREE-BRANCH STEP. Friend-Find renders
+        after the native push permission modal resolves and before
+        "You're In". A single Decision screen branches into one of
+        three paths:
+          "Find friends" tap → triggers native iOS Contacts permission
+            prompt:
+              System grants  → push Matches List.
+              System denies  → push "No worries" prompt.
+          "Not now" tap     → push "No worries" prompt directly
+            (does NOT trigger the system permission prompt).
+          "Skip" tap        → push "No worries" prompt directly
+            (does NOT trigger the system permission prompt).
+        The "No worries" prompt is the unified denial/skip
+          destination — all three "no" paths land in the same place
+          with the same copy and the same exit ("Got it" → "You're In").
+        The Matches List shows contacts who already have SyncUp
+          accounts. Match per row is a tap-to-add interaction (same
+          pattern as Search PEOPLE row · R8-7). Row body tap is a
+          no-op during onboarding — QuickProfileSheet is NOT opened
+          on this screen to keep the surface focused. The "Continue"
+          pill is always enabled (adding zero is permitted).
+        Zero-matches state (permission granted, no contacts matched):
+          Render an inline EmptyState (users glyph + "No one yet." +
+          "Friends will show up here once they join SyncUp.") with
+          "Continue" pill below.
+        NEVER show QuickProfileSheet during onboarding Friend-Find.
+        NEVER block "Continue" on selection count.
+        NEVER upload the user's contact book to the server — matching
+          is performed by hashing phone/email locally and querying a
+          server-side lookup endpoint (engineering pattern; preserves
+          the "Nothing is uploaded." copy).
+
+R15-11. CONTACTS-DENIED STATE IN FRIENDS TAB DEEP-LINKS TO SETTINGS.
+        When the user has denied iOS Contacts permission (either
+        during onboarding via "Find friends" → system Deny, or later
+        via Settings), the Friends tab renders a small persistent
+        affordance below the search bar:
+          "Find friends faster — Turn on contacts"
+          (12/500 ink3 · "Turn on contacts" in accent · left-aligned ·
+           8px below the search input · 14px horizontal margin).
+        Tap target is the "Turn on contacts" phrase only. Light
+          haptic on tap. Tap fires Linking.openSettings() — user is
+          taken directly to SyncUp's iOS Settings page where Contacts
+          toggle lives. App backgrounds; no in-app modal renders.
+        Render conditions:
+          Status = denied:        affordance renders.
+          Status = not_determined: affordance does NOT render. Friends
+                                   tab empty state uses the standard
+                                   "Find friends from contacts" CTA
+                                   that re-enters the R15-10 Decision
+                                   screen flow.
+          Status = granted:       affordance does NOT render.
+        NEVER deep-link to Settings without a prior failed permission
+          attempt (the user hasn't been asked yet — ask first).
+        NEVER render the affordance permanently — it disappears the
+          moment the user grants permission.
+
+R15-12. "YOU'RE IN" COMPLETION IS THE LAST PRE-APP BEAT. Anatomy:
+        96px RingAvatar centered · 96px below safe-area top.
+          If user uploaded a photo in Step 5: their photo · NO status
+            ring (status not displayed here even if Step 6 completed —
+            this is a celebratory moment, not a profile view).
+          If user skipped photo: default initials avatar (accentSoft
+            fill · accent text · 30/800 initials).
+          A 24×24 lime-fill circle with white checkmark glyph docks
+            on the avatar's bottom-right: offset 4px down · 4px right
+            · 2px white border for separation against the avatar edge.
+        Heading: "You're in, {FirstName}." stepTitle (24/800/-0.5) ·
+          centered · 24px below avatar · {FirstName} = first word of
+          the display name from Step 3, trimmed.
+        Sub: "Now go plan something." (15/500 ink2 · centered · 8px
+          below heading).
+        CTA: "Go" accent PillBtn (full-width · pinned 32px above
+          safe-area bottom).
+        Tap "Go" routing (per R9-8 · this rule generalizes the routing
+          decision):
+          InviteContext set → push Event Detail for InviteContext.eventId
+            and mount the main app shell.
+          No InviteContext     → push Home tab root and mount the main
+                                   app shell.
+        Success haptic fires WITH the "Go" tap (one haptic only — not
+          a sequence of light+success).
+        Entrance: avatar + checkmark animate via `flow-fade-up`
+          keyframe (320ms spring · token-defined). Reduced-motion
+          fallback per A-11 / A-21: 200ms easeOut translate, no
+          overshoot.
+        This screen has NO back arrow and NO 6-dot indicator.
+        NEVER add a "Maybe later" or "Explore" alternate CTA — "Go"
+          is the single exit.
+        NEVER auto-navigate from this screen — user must tap "Go".
+
+R15-13. FIRST-RUN EMPTY STATES SHOW TUNED COPY UNTIL THE USER TAKES
+        THEIR FIRST MEANINGFUL ACTION. A user is "first-run" when
+        all three of these counters are zero:
+          User.stats.hosted   === 0
+          User.stats.friends  === 0
+          User.stats.groups   === 0
+        The transition out of first-run is one-way and global. The
+        instant any counter becomes non-zero (creating an event ·
+        accepting a friend · creating or joining a group), standard
+        empty-state copy applies to every tab from that moment
+        forward. There is no manual dismiss, no time-based expiry,
+        no per-tab transition.
+
+        First-run state applies to FOUR tab-level surfaces only:
+          Home (Today / Week / Month views — single shared copy)
+          Friends tab → Friends segment
+          Friends tab → Groups segment
+          Activity tab → NotifSheet body
+        Each renders the existing empty-state component (EmptyHome,
+        EmptyFriends, EmptyGroups, EmptyNotifications) unchanged in
+        anatomy and CTAs — only the title and body strings differ
+        from standard.
+
+        First-run copy (LOCKED):
+          Home          Title: "Plan your first event."
+                        Body:  "Tap + to start."
+                        CTA:   "Plan something" (existing).
+          Friends seg.  Title: "Find your first friend."
+                        Body:  "Search by @handle or share your QR
+                                for them to scan."
+                        CTAs:  "Add one" + "Share QR" (existing).
+          Groups seg.   Title: "Start a group for your regulars."
+                        Body:  "Easier than tagging the same people
+                                every time."
+                        CTA:   "Create one" (existing).
+          Activity      Title: "Nothing yet."
+                        Body:  "Add friends or plan an event to
+                                start seeing activity."
+                        CTA:   none (EmptyNotifications NO-CTA lock
+                                unchanged).
+
+        Invite-context users (R9-8) land on Event Detail, not Home,
+        and therefore never see first-run Home as their first
+        impression. When they navigate to Friends, Groups, or
+        Activity tabs, first-run copy applies per the rules above.
+        The InviteContext event itself does NOT count toward
+        User.stats.hosted (the user is an attendee, not the host);
+        thus invite-context users remain first-run until they take
+        a creator action.
+
+        Composition with other affordances:
+          Friends-tab contacts-denied affordance (R15-11) sits above
+            the first-run EmptyFriends. Both render simultaneously
+            when the user is denied + first-run + has zero friends.
+          AudiencePickerSheet zero-friend state (R13-4) is a sheet-
+            level empty and is NOT first-run gated — it applies any
+            time the friend list is empty, regardless of first-run.
+
+        NEVER add a separate nudge card, coachmark, modal,
+          checklist, or overlay for first-run guidance.
+        NEVER modify the empty-state component anatomy — first-run
+          differs in copy only.
+        NEVER apply first-run copy to Broadcast (always populated
+          with the 3 Free/Maybe/Busy cards) or Profile (always
+          populated with the user's identity from onboarding).
+        NEVER apply first-run copy to non-tab surfaces (Search
+          overlay, AvailabilityEditor, AttendeesSheet, etc.).
+        NEVER persist a "first-run dismissed" flag — the state
+          ends only via the User.stats counter logic above, never
+          by user dismissal.
+================================================================
+## ATTENDEESSHEET SURFACE (LOCKED · Round 15)
+## Additions and revisions to the Round 10 / Round 11 surface spec.
+================================================================
+Header (revised to incorporate search reveal · R15-4):
+  Layout (default mode):
+    Title block (left-aligned per R10):
+      Title: "Attendees" 17/800.
+      Sub: "{N} invited" 12/500 ink3.
+    Trailing cluster (right-aligned, in this order left→right):
+      Search magnifier icon-btn · 44pt · 20px ink3.
+      "Invite more" accent pill · HOST + CO-HOST views only
+        (R10-5 · R11-1a). Hidden in INVITEE view per R11-7.
+      Close X icon-btn · top-right · 44pt · light haptic
+        (position unchanged from R10).
+  Layout (search mode · R15-4):
+    Title block collapses upward 200ms easeStd.
+    SearchInputBar · fills the freed title area · auto-focus ·
+      placeholder "Search attendees…".
+    Search magnifier swaps in-place to "Cancel" text link ·
+      13/500 accent · exits search mode (does NOT close the sheet).
+    "Invite more" pill is hidden.
+    Close X remains at top-right (sheet dismiss is still available).
+  Header is pinned to top of sheet — does NOT scroll with body.
+
+Filter bar (R15-5 sticky behavior):
+  HOST view (R10-3): 2 rows.
+    Row 1 — RSVP chips: All · Going · Maybe · Not going · No response.
+    Row 2 — Friend Type / Group chips: All + one chip per type/group.
+  CO-HOST / INVITEE views (R11-7): 1 row.
+    RSVP chips only (same 5 values).
+  Chips: 13/500 ink2 default · bgSunken fill · radius 999 · 8×14
+    padding · 6px gap. Active chip: accent fill · accentInk text.
+  Sticky to top of sheet body on scroll (R15-5).
+
+Body — grouped sections (R15-3):
+  Section overlines: mono 10/600 ink3 · letter-spacing 1.6 · 12px top
+    / 6px bottom padding · 14px horizontal margin · left-aligned.
+  RSVP section overlines: "{LABEL} ({N})" — count included.
+  HOSTS overline: "HOSTS" — no count.
+  Rows use AttendeeRow anatomy from R10-7 (unchanged).
+  Host row: "HOST" chip (10/600 mono · accentSoft fill · accent text ·
+    radius 999 · 6×10 padding · 6px gap from RSVPBadge · right-aligned).
+  Co-host rows: existing "CO-HOST" chip (R11-3 · same anatomy).
+  Empty RSVP sections are omitted entirely.
+
+Body — search mode (R15-4):
+  Section overlines hidden.
+  Flat alphabetical list of all matches.
+  HOST/CO-HOST chips retained on rows; pinned position lost.
+  Empty state on zero matches: EmptyAttendees pattern inline.
+
+Empty state (chip filter + search returns zero matches):
+  EmptyAttendees pattern (existing component) rendered inline below
+  chip bar / search input. Title: "No one matches." Sub: "Try a
+  different filter." (13/500 ink2 · centered).
+
+Offline state (R15-6):
+  OfflineBar between sheet header and chip filter bar.
+  "SYNCED {T} AGO" mono 10/600 ink3 line directly below OfflineBar.
+  Stale list remains visible.
+  "Invite more" pill: opacity 0.4 · pointer-events none.
+  Host ⋯ menu: tap is no-op (no haptic).
+
+Loading state (first open):
+  40px MD Spinner centered in sheet body · role="status" · R5-2.
+  Header and filter bar render immediately. Body fills with spinner
+  until data arrives. NO skeletons. NO shimmer.
+
+Pull-to-refresh: NOT IMPLEMENTED. Sheet's own drag gesture owns
+  vertical drag (R13-1 model applies if the sheet's drag is extended
+  in a future round). List refresh occurs on sheet open and via
+  React Query invalidation; no in-list pull gesture.
+
+Virtualization (engineering note): list is rendered via FlatList.
+  keyExtractor must combine row.id + section name to permit the same
+  person appearing under HOSTS AND their RSVP section without React
+  key collisions. Initial numToRenderInitially can default to 12.
+
+Haptics — AttendeesSheet additions:
+  Search reveal (magnifier tap)           light
+  Search exit (Cancel tap)                light
+  Search input clear (× tap)              light
+  Chip filter tap                          light
+  Row tap → open QuickProfileSheet         light  (sheet-open per R12-5)
+  Self-row tap                             NONE
+  HOSTS section overline tap               NONE  (non-interactive)
+  Offline action attempt (disabled tap)    NONE  (suppressed)
+================================================================
+## ONBOARDING SURFACE (LOCKED · Round 15)
+================================================================
+Stack: AuthStack — mounted by RootNavigator when currentUser is null
+  (unauthenticated). The main app shell mounts ONLY after successful
+  authentication AND completion of "You're In" (tap "Go").
+Navigation: native-stack (no bottom tabs · R9-1).
+Screen wrapper: every Sign-Up Step (1–6), Sign-In, Forgot-Password
+  Entry, and Forgot-Password Confirm compose against the existing
+  `AuthStep` component from R9 — it owns the back arrow row, 6-dot
+  indicator (when step/totalSteps are passed), heading/sub stack,
+  scrollable children area, and the bottom-pinned primary + secondary
+  CTA row. R15 screen specs that follow describe the contents of the
+  `children` slot and which AuthStep props each screen passes; they
+  do NOT reinvent the layout. Welcome, Friend-Find (all 3 branches),
+  and "You're In" do NOT use AuthStep — they are standalone screens
+  because their layouts diverge from the step pattern.
+Status bar: matches FLOW_TOKENS surface (light content over dark bg ·
+  dark content over light bg).
+Safe areas: respected top and bottom.
+Background: bg token across all screens · no gradient · no artwork.
+6-dot indicator (R9-2): rendered on Sign-Up Steps 1–6 ONLY.
+Back arrow (R9-3): 44pt · 24px ink3 · top-left · preserves form state.
+  Welcome has NO back arrow (R9-3 exception).
+  Forgot-Password Confirm has NO back arrow (R9-10).
+  "You're In" has NO back arrow (R15-12).
+
+────────────────────────────────────────────────────────────────
+WELCOME SCREEN
+────────────────────────────────────────────────────────────────
+Layout (top → bottom):
+  SyncUp logo · centered · 80px wide · 96px below safe-area top.
+  InviteContextBanner (R9 component · conditional · only when
+    InviteContext is set · R9-8) · 16px below logo · anatomy per R9
+    component spec (full-width accentSoft pill · radius 999 · padding
+    10×16 · 16px calendar icon accent leading · 8px gap · label
+    13/600 accent · single-line ellipsis).
+    Label string on Welcome: "You've been invited to {EventName}"
+      (longer-form context for first-run users; passed as the banner's
+      `eventName` slot value).
+    REPLACES the tagline when present — the tagline does NOT render.
+  Tagline (conditional · only when InviteContext is NOT set):
+    "The easy way to plan with friends." · 16/500 ink2 · centered ·
+    16px below logo.
+  Spacer (flex 1) pushes CTA block toward bottom.
+  CTA block (14px horizontal margin):
+    "Create account" accent PillBtn · full-width.
+    "Log in" ghost PillBtn · full-width · 12px below primary.
+  Legal microcopy:
+    "By continuing you agree to our Terms · Privacy"
+    11/500 ink3 · centered · 16px below ghost pill · 24px above safe-
+    area bottom.
+    "Terms" and "Privacy" are individual tap targets (each opens an
+    external WebView · light haptic on tap).
+Haptics: light on "Create account" · light on "Log in" · light on
+  legal links.
+
+────────────────────────────────────────────────────────────────
+SIGN-UP STEP 1 · CREDENTIAL
+────────────────────────────────────────────────────────────────
+6-dot indicator: position 1 active (R9-2).
+Back arrow (R9-3) returns to Welcome.
+Heading: "What's your phone or email?" stepTitle (24/800/-0.5) · 14px horizontal
+  margin · 24px below dot indicator.
+AuthInputField (single format-agnostic input · R15-8):
+  Label: "Phone or email"
+  Placeholder: "+1 555 123 4567 or you@email.com"
+  Keyboard adapts per R15-8.
+Primary CTA: "Continue" accent PillBtn · full-width · pinned above
+  safe-area bottom · disabled until input matches phone OR email
+  regex (R9-4 · R15-8).
+Below CTA: "Already have an account? Log in" · 13/500 ink3 · "Log in"
+  in accent · centered · 16px below primary · tap → push Sign-In.
+Inline error after failed submit (R9-4 · R15-8):
+  "Enter a phone number or email." · 12/500 danger · triangle-alert
+  leading (A-16) · 6px below input.
+Haptics: light on "Continue" · light on "Log in".
+
+────────────────────────────────────────────────────────────────
+SIGN-UP STEP 2 · OTP VERIFY
+────────────────────────────────────────────────────────────────
+6-dot indicator: position 2 active.
+Back arrow returns to Step 1 (form state preserved · R9-3).
+Heading: "Enter the code we sent." stepTitle (24/800/-0.5).
+Sub: "Sent to {masked phone or email}. Change" · 13/500 ink3 · 8px
+  below heading · "Change" in accent text link · tap → back to Step 1
+  · light haptic.
+OTPInput (R9 component · 6 cells · 44×52pt · radius 10 · bgSunken
+  fill · 1.5px hair border · accent border on focused cell · danger
+  border on error · horizontally centered group · 32px below sub):
+  Paste anywhere distributes digits across all 6 cells (existing
+    OTPInput paste support per R9 component spec).
+  Auto-submit on 6th digit (R9-5) · light haptic on submit fire.
+  ButtonLoading state on Verify pill during auto-submit.
+Resend link: "Didn't get it? Resend in 0:{30→0}" · 13/500 ink3 ·
+  countdown in mono · centered · 24px below input.
+  After countdown reaches 0: text becomes "Didn't get it? Resend code"
+  · whole "Resend code" in accent · light haptic on tap · restarts
+  countdown to 0:30.
+Fallback "Verify" accent PillBtn · full-width · pinned above safe-
+  area bottom · visible per R9-5 · disabled until 6 digits entered.
+Inline error on bad code: "That code didn't work. Try again." ·
+  12/500 danger · 6px below input.
+Haptics: light on OTP fire · light on resend · light on Change link.
+
+────────────────────────────────────────────────────────────────
+SIGN-UP STEP 3 · NAME + HANDLE
+────────────────────────────────────────────────────────────────
+6-dot indicator: position 3 active.
+Back arrow returns to Step 2.
+Heading: "Who are you?" stepTitle (24/800/-0.5).
+AuthInputField (name · 16px below heading):
+  Label: "Your name"
+  Placeholder: "First Last"
+  Single input — no first/last split · max 60 chars · trimmed on
+  submit. Display name shown verbatim to other users.
+AuthInputField (handle · 16px below name):
+  Label: "@handle"
+  Placeholder: "@yourhandle"
+  Leading mono "@" prefix · uneditable.
+  Max 24 chars (existing handle constraint).
+  Real-time availability check per R9-6 (400ms debounce):
+    During check: 18px spinner trailing.
+    Available: limeInk checkmark icon trailing.
+    Taken: danger × icon trailing + "Handle taken" inline error
+      (12/500 danger · triangle-alert leading · A-16) below input.
+CTA: "Continue" accent PillBtn · full-width · pinned above safe-area
+  bottom · disabled until name non-empty AND handle valid AND
+  available (R9-4 · R9-6).
+Haptics: light on "Continue".
+
+────────────────────────────────────────────────────────────────
+SIGN-UP STEP 4 · PASSWORD
+────────────────────────────────────────────────────────────────
+6-dot indicator: position 4 active.
+Back arrow returns to Step 3.
+Heading: "Set a password." stepTitle (24/800/-0.5).
+AuthInputField (password · type=password · 16px below heading):
+  Label: "Password"
+  Placeholder: "At least 8 characters"
+  Eye icon-btn trailing · 24px ink3 · 44pt hit · toggles show/hide ·
+    light haptic on tap.
+Inline requirements list · 12px below input · 12/500 ink3:
+  • At least 8 characters
+  • One number or symbol
+  Each item renders with a circle bullet at default. When the
+    requirement is satisfied, the bullet becomes a filled lime
+    checkmark and the text color shifts to limeInk. Live evaluation
+    on every keystroke · NO debounce · NO haptic (visual only).
+NO "confirm password" second field — the show/hide eye toggle is the
+  confirmation affordance.
+CTA: "Continue" accent PillBtn · full-width · pinned above safe-area
+  bottom · disabled until BOTH requirements are met (R9-4).
+Haptics: light on "Continue" · light on eye toggle.
+
+────────────────────────────────────────────────────────────────
+SIGN-UP STEP 5 · PROFILE PHOTO (skippable · R9-7)
+────────────────────────────────────────────────────────────────
+6-dot indicator: position 5 active.
+Back arrow returns to Step 4.
+Heading: "Add a photo." stepTitle (24/800/-0.5).
+Sub: "So friends know it's you." 13/500 ink2 · 8px below heading.
+AvatarUploadWell (R9 component · 120px size per the R15 supersession
+  in Superseded Clauses) · centered · 32px below sub:
+  bgSunken fill · 1px hair border · default state shows the 32px camera
+    icon ink3 centered (overriding the R9 24px camera badge for the
+    larger size).
+  Tap fires native iOS action sheet (UIAlertController · .actionSheet):
+    "Take photo"          → camera with square crop UI.
+    "Choose from library" → photo picker with square crop UI.
+    "Cancel"
+  After selection: target shows the photo cropped to 1:1 with
+    matching circular mask.
+  "Replace photo" 13/500 accent text link · centered · 12px below
+    target · only renders after a photo is selected.
+Primary CTA: "Continue" accent PillBtn · full-width · pinned above
+  safe-area bottom · enabled only after a photo is selected.
+Skip CTA: "Skip for now" ghost PillBtn · full-width · 12px below
+  primary · always enabled (R9-7).
+Haptics: light on photo selected (once) · light on "Continue" · light
+  on "Skip for now" · light on "Replace photo".
+
+────────────────────────────────────────────────────────────────
+SIGN-UP STEP 6 · AVAILABILITY (skippable · R9-7 · inline editor)
+────────────────────────────────────────────────────────────────
+6-dot indicator: position 6 active.
+Back arrow returns to Step 5.
+InviteContextBanner (R9 component · conditional · only when
+  InviteContext is set · per R9 Step 6 surface spec) · 16px below dot
+  indicator · above heading. Label string: "{EventName}" (default
+  short form — the longer-form Welcome string is not reused here).
+Heading: "When are you free?" stepTitle (24/800/-0.5) · 24px below banner (or 24px
+  below dot indicator when banner is absent).
+Sub: "So friends know when to invite you." 13/500 ink2 · 8px below
+  heading.
+Inline Availability Editor · 24px below sub:
+  Reuses the existing Availability Editor component (QuicksetGrid +
+  7-day picker) from src/components/profile/.
+  ONE behavioral difference during onboarding:
+    "Save as Quickset" pill (R12-2) is DISABLED on this screen —
+    custom quicksets are a post-auth flow only.
+Primary CTA: "Continue" accent PillBtn · full-width · pinned above
+  safe-area bottom · enabled when AvailabilityEntry map is non-empty.
+Skip CTA (R9-7):
+  Default: "Skip for now" ghost PillBtn · full-width · 12px below
+    primary.
+  InviteContext is set: "Skip for now" accent ghost PillBtn (more
+    prominent placement per R9-7) · same 12px gap.
+After "Continue" OR "Skip for now": triggers native iOS push
+  notification permission (R15-9) before Friend-Find renders.
+Haptics: light on day-cell taps (existing editor behavior unchanged) ·
+  light on "Continue" · light on "Skip for now".
+
+────────────────────────────────────────────────────────────────
+PUSH NOTIFICATION PERMISSION (R15-9 · system-only · no SyncUp screen)
+────────────────────────────────────────────────────────────────
+Fires automatically when Sign-Up Step 6 advances (either via
+"Continue" or "Skip for now"). The system iOS prompt is the entire
+experience. No screen mounts between Step 6 and Friend-Find for this.
+On dismiss (grant or deny): silently push Friend-Find Decision screen.
+
+────────────────────────────────────────────────────────────────
+FRIEND-FIND · DECISION (R15-10)
+────────────────────────────────────────────────────────────────
+No 6-dot indicator (post-sign-up).
+Back arrow returns to Step 6 with form state preserved.
+Hero icon · 56×56 · accentSoft fill · radius 16 · users glyph 24px
+  accent · centered · 64px below safe-area top.
+Heading: "Find friends from your contacts." h2 (22/800/-0.5) · centered · 24px
+  below hero · max-width 320px.
+Sub: "We'll match contacts who already have SyncUp. Nothing is
+  uploaded." 13/500 ink2 · centered · max-width 300px · 12px below
+  heading.
+Spacer (flex 1).
+CTA stack (14px horizontal margin · pinned above safe-area bottom):
+  "Find friends" accent PillBtn · full-width.
+  "Not now" ghost PillBtn · full-width · 12px below primary.
+  "Skip" 13/500 ink3 text link · centered · 16px below ghost pill.
+Branch behavior per R15-10:
+  "Find friends" → triggers iOS Contacts permission prompt.
+    Grants  → push Matches List.
+    Denies  → push "No worries" prompt.
+  "Not now"     → push "No worries" prompt directly.
+  "Skip"        → push "No worries" prompt directly.
+Haptics: light on each CTA tap.
+
+────────────────────────────────────────────────────────────────
+FRIEND-FIND · "NO WORRIES" PROMPT (R15-10)
+────────────────────────────────────────────────────────────────
+Back arrow is hidden (this is the natural skip-exit; back would
+  re-enter the Decision and confuse the user).
+Lime checkmark badge · 56×56 · lime fill · radius 999 · white
+  checkmark glyph 24px · centered · 64px below safe-area top.
+Heading: "No worries." h2 (22/800/-0.5) · centered · 16px below badge.
+Body: "You can add contacts permission anytime in Settings. For now,
+  you can find friends by searching their @handle." 13/500 ink2 ·
+  centered · max-width 320px · 12px below heading.
+Spacer (flex 1).
+CTA: "Got it" ghost PillBtn · full-width · pinned above safe-area
+  bottom.
+Tap "Got it" → push "You're In" · light haptic.
+
+────────────────────────────────────────────────────────────────
+FRIEND-FIND · MATCHES LIST (R15-10)
+────────────────────────────────────────────────────────────────
+Back arrow is hidden (Decision screen has been resolved).
+Heading: "Friends already on SyncUp." h2 (22/800/-0.5) · left-aligned · 14px
+  horizontal margin · 24px below safe-area top.
+Sub: "{N} of your contacts." 13/500 ink3 · left-aligned · 4px below
+  heading. Omitted if N=0 (zero-matches state below).
+Scrollable list · 16px below sub:
+  Row anatomy (per R15-10):
+    RingAvatar 40px · NO status ring (not friends yet · per R12-6
+      logic for non-friends).
+    Name 15/600 ink · 1-line ellipsis.
+    @handle mono 12/500 ink3 · 1-line ellipsis · 2px below name.
+    "Add" accent PillBtn trailing · radius 999 · 6×10 padding ·
+      12/600 accentInk.
+    Row min-height 64px · 14px horizontal margin · 1px hair divider
+      below each row.
+  Add interaction (mirrors R8-7 / R8-3):
+    Tap "Add" → request sent in-place · pill swaps to "Sent" ghost
+      pill (bgSunken fill · ink3 text · non-interactive) · success
+      haptic · NO navigation · NO sheet open.
+    Failure: ErrorToast (kind: friend · existing component) · pill
+      reverts to "Add".
+  Row body tap: NO-OP (no haptic · no nav · QuickProfileSheet is NOT
+    opened during onboarding · R15-10 explicit).
+Bottom: "Continue" accent PillBtn · full-width · 14px horizontal
+  margin · pinned above safe-area bottom · always enabled (adding
+  zero is permitted).
+Tap "Continue" → push "You're In" · light haptic.
+List sort order: alphabetical by name (case-insensitive). See OPEN
+  QUESTIONS for confirmation.
+
+Zero-matches state (permission granted, no contacts on SyncUp):
+  Replace sub-line and scrollable list with inline EmptyState:
+    56×56 bgSunken tile · radius 16 · users glyph 24px ink3 ·
+      centered · 96px below heading.
+    "No one yet." 15/700 ink · centered · 12px below tile.
+    "Friends will show up here once they join SyncUp." 13/500 ink2 ·
+      centered · max-width 260px · 6px below title.
+  "Continue" accent PillBtn at bottom (unchanged from populated state).
+
+────────────────────────────────────────────────────────────────
+"YOU'RE IN" COMPLETION (R15-12)
+────────────────────────────────────────────────────────────────
+No back arrow · no 6-dot indicator.
+96px RingAvatar · centered · 96px below safe-area top:
+  Photo source: user's Step 5 photo if uploaded, else default initials
+    avatar (accentSoft fill · accent text · 30/800 initials).
+  NO status ring (not displayed here even if Step 6 completed).
+  Checkmark badge · 24×24 lime fill · radius 999 · white checkmark
+    glyph · 2px white border · docked bottom-right of avatar · offset
+    4px down · 4px right.
+Heading: "You're in, {FirstName}." stepTitle (24/800/-0.5) · centered · 24px
+  below avatar.
+  {FirstName} = first word of the display name (Step 3), trimmed.
+Sub: "Now go plan something." 15/500 ink2 · centered · 8px below
+  heading.
+Spacer (flex 1).
+CTA: "Go" accent PillBtn · full-width · 14px horizontal margin ·
+  pinned 32px above safe-area bottom.
+Tap "Go" routing (per R9-8 · R15-12):
+  InviteContext set → push Event Detail for InviteContext.eventId ·
+    mount main app shell · clear InviteContext after navigation.
+  No InviteContext     → push Home tab root · mount main app shell.
+Entrance animation: avatar + checkmark use the `flow-fade-up`
+  keyframe (320ms spring · token-defined in the anchor motion table).
+  Reduced-motion fallback per A-11 / A-21: 200ms easeOut translate,
+  no overshoot.
+Haptic: success WITH "Go" tap (one haptic only).
+
+────────────────────────────────────────────────────────────────
+SIGN-IN SCREEN
+────────────────────────────────────────────────────────────────
+No 6-dot indicator.
+Back arrow returns to Welcome (preserves form per R9-3).
+Heading: "Welcome back." stepTitle (24/800/-0.5) · 14px horizontal margin · 24px
+  below safe-area top.
+Sub: "Phone, email, or @handle to sign in." 13/500 ink2 · 8px below
+  heading.
+AuthInputField (identifier · single input · format-agnostic · R9-9):
+  Label: "Phone, email, or @handle"
+  Placeholder: "you@email.com"
+  Keyboard type adapts per R9-9.
+AuthInputField (password · type=password · 12px below identifier):
+  Label: "Password"
+  Eye icon-btn trailing · toggles show/hide · light haptic.
+Primary CTA: "Log in" accent PillBtn · full-width · pinned above
+  safe-area bottom · disabled until both fields non-empty.
+"Forgot password?" 13/500 accent text link · centered · 16px below
+  primary · light haptic on tap → push Forgot-Password Entry.
+Inline error on bad credentials (after failed submit):
+  "That didn't work. Check and try again." · 12/500 danger ·
+  triangle-alert leading (A-16) · 6px below password field.
+Haptics: light on "Log in" · light on "Forgot password?" · light on
+  eye toggle.
+
+────────────────────────────────────────────────────────────────
+FORGOT-PASSWORD · ENTRY
+────────────────────────────────────────────────────────────────
+No 6-dot indicator.
+Back arrow returns to Sign-In (preserves form per R9-3).
+Heading: "Reset your password." stepTitle (24/800/-0.5).
+Sub: "Enter your phone or email and we'll send you a reset link."
+  13/500 ink2 · 8px below heading.
+AuthInputField (single input · phone OR email · format-agnostic):
+  Label: "Phone or email"
+  Placeholder: "+1 555 123 4567 or you@email.com"
+Primary CTA: "Send reset link" accent PillBtn · full-width · pinned
+  above safe-area bottom · disabled until input matches phone OR
+  email regex (R9-4 · R15-8 logic).
+ButtonLoading during submit.
+Inline error on failure: "We couldn't send that. Try again."
+  12/500 danger · triangle-alert leading · 6px below input.
+Haptics: light on "Send reset link".
+
+────────────────────────────────────────────────────────────────
+FORGOT-PASSWORD · CONFIRM (R9-10)
+────────────────────────────────────────────────────────────────
+No back arrow · no 6-dot indicator (R9-10).
+Lime checkmark badge · 56×56 · lime fill · radius 999 · white
+  checkmark glyph 24px · centered · 96px below safe-area top.
+Heading: "Check your {phone/email}." stepTitle (24/800/-0.5) · centered · 16px
+  below badge. The token displays "phone" or "email" based on the
+  identifier the user submitted.
+Sub: "We sent a link to reset your password. It expires in 30
+  minutes." 13/500 ink2 · centered · max-width 320px · 12px below
+  heading.
+Spacer (flex 1).
+CTA: "Back to sign in" accent PillBtn · full-width · pinned above
+  safe-area bottom · sole exit per R9-10.
+Tap "Back to sign in" → pop to Sign-In · light haptic.
+No auto-navigate. No resend on this screen — user must "Back to
+  sign in" and re-enter the Forgot-Password Entry flow if needed.
+
+────────────────────────────────────────────────────────────────
+ONBOARDING HAPTICS — CONSOLIDATED
+────────────────────────────────────────────────────────────────
+  Welcome "Create account" / "Log in"           light
+  Welcome legal link tap (Terms · Privacy)      light
+  Primary CTA tap on Sign-Up Steps 1–6          light
+  Ghost / Skip / text link tap on any screen    light
+  OTP auto-submit fire (R9-5)                   light
+  OTP "Change" link tap                         light
+  Handle availability check (taken or free)     NONE  (visual only)
+  Password requirement bullet checkmark fires   NONE  (visual only)
+  Photo selected                                light
+  "Find friends" CTA tap (before system prompt) light
+  "Not now" / "Skip" CTA tap                    light
+  "Got it" on "No worries"                      light
+  Add friend on Matches List                    success
+  "Continue" on Matches List                    light
+  "Go" on "You're In"                           success
+  Sign-In "Log in" tap                          light
+  Sign-In "Forgot password?" tap                light
+  Forgot-Password "Send reset link"             light
+  Forgot-Password "Back to sign in"             light
+================================================================
+## OPEN QUESTIONS
+================================================================
+The following are deliberately NOT locked in R15 and need follow-up
+before build. Each is flagged inline above; consolidated here for the
+build team.
+
+1. PASSWORD REQUIREMENTS — R15 surfaces "8+ chars AND one number or
+   symbol" as the visible UX bar. Confirm Clerk's enforced minimum
+   matches; if Clerk requires stricter (e.g., length 10, banned-
+   password list), the visible requirement list and inline checkmark
+   logic must be updated.
+
+2. OTP RESEND COUNTDOWN — locked at 0:30 in R15. Confirm with
+   engineering / SMS provider whether 30 seconds is the appropriate
+   throttle window.
+
+3. PHOTO CROPPING — R15 locks square 1:1 crop on both camera capture
+   and library pick. Confirm whether iOS's built-in crop UI satisfies
+   this or an in-app cropper is needed. Image upload size /
+   compression pipeline is implementation detail (not specified here).
+
+4. CONTACT-MATCHING MECHANISM — R15-10 specifies "hashing phone/email
+   locally" so the privacy copy "Nothing is uploaded." is honest.
+   Engineering must confirm the matching endpoint accepts hashes, not
+   raw values.
+
+5. APPLE SIGN-IN / GOOGLE OAUTH — explicitly NOT in R15 scope. If
+   added later, Welcome and Sign-In need a separate "Or continue with"
+   block above the legal microcopy. Apple's App Store rules require
+   "Sign in with Apple" if any other third-party OAuth is offered.
+
+6. TOS / PRIVACY LINK BEHAVIOR — opening the Welcome screen legal
+   links uses an external WebView. Whether this is SFSafariViewController,
+   custom WKWebView, or external Safari is engineering choice and not
+   locked here.
+
+7. RE-PROMPT FOR CONTACTS PERMISSION — R15-11 deep-links to Settings
+   from Friends tab. Whether the app should also offer a contextual
+   re-prompt elsewhere (e.g., AudiencePickerSheet zero-friend state ·
+   R13-4) is NOT addressed here. Recommend a follow-up round.
+
+8. HANDLE TERMINOLOGY — R15 uses "@handle" throughout. Whether the
+   user-facing label should be "Username," "Handle," or "@handle" is
+   not fully consistent across the spec. Lock once a single term is
+   chosen app-wide.
+
+9. INVITECONTEXT EXPIRY — R9-8 captures InviteContext before auth
+   renders. R15 doesn't specify whether the context expires if
+   onboarding is paused for hours/days (e.g., user backgrounds the
+   app on Step 3 and returns the next morning). Recommend a product
+   decision: 24h expiry? Never expire?
+
+10. MATCHES LIST SORT ORDER — R15-10 surface spec defaults to
+    alphabetical by name (case-insensitive) for predictability.
+    Confirm before build. Alternative: friends-of-friends weighted
+    first, then alphabetical.
+
+11. RINGAVATAR DEFAULT INITIALS — the "default initials avatar"
+    referenced in R15-12 ("You're In") assumes an existing default
+    avatar component pattern. Confirm the component exists in
+    src/components/foundation/ or src/components/social/; if not,
+    a small spec follow-up is needed for initials extraction
+    (first letter of first word? first letters of first two words?)
+    and color assignment.
+
+12. STANDARD (NON-FIRST-RUN) EmptyNotifications BODY LINE — R15-13
+    locks the first-run body for EmptyNotifications ("Add friends or
+    plan an event to start seeing activity.") but the existing
+    EmptyNotifications spec defines the 13/500 ink2 body slot
+    without quoting text for the standard (post-first-run) state.
+    Lock the standard body line in a future round. Candidates that
+    came up during R15-13 design: "Quiet for now." (short idle) or
+    reusing the first-run body verbatim.
+================================================================
+## SUPERSEDED CLAUSES
+================================================================
+The following clauses from prior rounds are superseded by R15 rules
+and should be marked accordingly when merging into ANCHOR-DESIGN.txt:
+
+  R10-7 — "Invitee view: no trailing action. Tap row → Friend Profile."
+    SUPERSEDED by R15-1. Replace with: "Invitee view: no trailing
+    action. Tap row → QuickProfileSheet (R15-1)."
+
+  R12-5 — "PUBLIC MINI-PROFILE IS A SHEET OVER SEARCH."
+    EXTENDED by R15-1. QuickProfileSheet now stacks over Search
+    overlay OR AttendeesSheet. The 30% backdrop rule in R12-5 applies
+    when stacked over Search (opaque underneath); when stacked over
+    AttendeesSheet, use the standard 42% black backdrop since the
+    sheet sits at less-than-full coverage.
+
+  R12-6 — "PUBLIC MINI-PROFILE SHOWS LIMITED DATA ONLY."
+    EXTENDED by R15-2 (friend variant). R12-6's NEVER list (no
+    availability · no friend count · no group membership) applies to
+    the NON-FRIEND variant only. The friend variant shows the status
+    ring on the avatar (availability hint) and the Friend Type chip
+    (replaces CTA). It still does NOT show friend count or group
+    membership.
+
+  R9-1 / R9 "Permissions are contextual, not onboarding steps."
+    SUPERSEDED by R15-9 for the native push permission prompt only.
+    The push prompt fires automatically after Sign-Up Step 6 and
+    before Friend-Find. iOS Contacts permission remains contextual
+    (R15-10 fires it from the Friend-Find Decision screen).
+
+  R9 Welcome CTA copy — "Get started" / "Sign in"
+    SUPERSEDED by R15 Welcome. Updated to "Create account" / "Log in"
+    to align with industry-standard credential vocabulary.
+
+  R9 InviteContextBanner Welcome label — "{eventName}" (short form)
+    EXTENDED by R15 Welcome to accept a longer-form label string:
+    "You've been invited to {EventName}". The R9 component anatomy
+    (accentSoft pill · radius 999 · 16px calendar icon · 13/600 accent
+    · single-line ellipsis) is unchanged — only the label slot value
+    differs on the Welcome screen. R9 Step 6 continues to pass the
+    short "{EventName}" form.
+
+  R9 AvatarUploadWell — "80×80 circle."
+    SUPERSEDED by R15 Sign-Up Step 5. The well's documented size is
+    now 120×120 (bgSunken fill · 1px hair border · 32px camera icon
+    ink3 centered when empty · 1:1 cropped photo with circular mask
+    when set). 80×80 is no longer a valid size; component spec and
+    any prior references in the anchor must be updated. Camera
+    badge / "Replace photo" link spec from R15 Step 5 applies.
+
+  TYPE scale — h1 / h2 / h3 / title set
+    EXTENDED by R15. Adds a new heading size used across all onboarding
+    sign-up step headings and re-used on Sign-In / Forgot-Password
+    Entry / OTP / Step 1–6 / "You're In":
+      stepTitle  24 / 800 / -0.5
+    Insert into FLOW_FONTS scale between h2 (22/800/-0.5) and h3
+    (17/700/-0.2). Onboarding sub-headings (Friend-Find · "No worries"
+    · Matches List · "You're In") use h2 (22/800/-0.5) per the
+    existing scale — no new size added for sub-headings.
+
+  RingAvatar size set — 24 · 32 · 40 · 64
+    EXTENDED by R15-12. Adds 96 as a valid size for the "You're In"
+    completion screen. The component's documented size set is now
+    24 · 32 · 40 · 64 · 96. 96 has no status ring by default on the
+    "You're In" screen (R15-12 explicit) but the ring slot remains
+    available at this size for future use.
+
+  R15-3 — AttendeesSheet section overlines.
+    R15-3 originally specified letter-spacing 0.5. CORRECTED in the
+    R15 surface spec and rule body to letter-spacing 1.6, matching
+    NotifGroupHeader (R6 component) and the type-scale overline rule
+    (1.5–1.8). No further supersession needed — this was a transcription
+    error in the original R15 draft.
+================================================================
+## END OF ROUND 15 EXTENSION
+================================================================

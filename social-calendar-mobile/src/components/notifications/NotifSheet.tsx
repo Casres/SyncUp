@@ -19,18 +19,17 @@
  * separately in HomeScreen — this component only handles inter-detent.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
-  Extrapolation,
 } from 'react-native-reanimated';
+import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 
 import { A11yLive } from '../polish/A11yLive';
@@ -39,7 +38,7 @@ import { Spinner } from '../polish/Spinner';
 import { StaggerList } from '../polish/StaggerList';
 import { PillBtn } from '../foundation/PillBtn';
 import { colors, durations, easings, radii, spacing, springs, typography, useHaptic } from '../../theme';
-import { useNotifications } from '../../api';
+import { queryKeys, useNotifications } from '../../api';
 import type {
   CoHostNotif,
   CoHostRevokedNotif,
@@ -112,7 +111,27 @@ export function NotifSheet({
 }: NotifSheetProps): React.JSX.Element {
   const fire = useHaptic();
   const sheet = useNotifSheet();
-  const { translateY, screenHeight, detent, dismiss, openPeek, openFull, reducedMotion } = sheet;
+  const queryClient = useQueryClient();
+  const {
+    translateY,
+    backdropOpacity,
+    screenHeight,
+    detent,
+    dismiss,
+    openPeek,
+    openFull,
+  } = sheet;
+  // ANCHOR R13-2 — on offline → online transition, invalidate the notifications
+  // query so the stale feed auto-refreshes via React Query (state-management
+  // rule: API data lives in React Query, never copied elsewhere). Using a ref
+  // for the prior value keeps this effect transition-aware without churn.
+  const wasOfflineRef = useRef(offline);
+  useEffect(() => {
+    if (wasOfflineRef.current && !offline) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() });
+    }
+    wasOfflineRef.current = offline;
+  }, [offline, queryClient]);
 
   const targets: SnapTargets = useMemo(
     () => ({
@@ -236,11 +255,16 @@ export function NotifSheet({
   // Velocity-first @ ≥0.7 px/ms; displacement fallback otherwise.
   // ────────────────────────────────────────────────────────────────────────
 
+  // R13-1: haptic fires at the snap moment, NOT at pointer-up. We pass the
+  // light-haptic firing to animateTo()'s `onSettled` callback so it lands when
+  // the spring settles (or, under reduced-motion, when the 200ms easeOut
+  // finishes). The withSpring/withTiming completion flag protects against
+  // mid-animation interruption — partial settles won't double-fire.
+  const fireSnapHaptic = useCallback(() => fire('light'), [fire]);
   function snapTo(target: 'closed' | 'peek' | 'full') {
-    fire('light');
-    if (target === 'closed') dismiss();
-    else if (target === 'peek') openPeek();
-    else openFull();
+    if (target === 'closed') dismiss(fireSnapHaptic);
+    else if (target === 'peek') openPeek(fireSnapHaptic);
+    else openFull(fireSnapHaptic);
   }
 
   const closedY = targets.closedY;
@@ -311,14 +335,11 @@ export function NotifSheet({
   // ────────────────────────────────────────────────────────────────────────
 
   const backdropStyle = useAnimatedStyle(() => {
-    // Closed → 0, peek → 0.30, full → 0.42 (per spec).
-    const opacity = interpolate(
-      translateY.value,
-      [closedY, peekY, fullY],
-      [0, 0.3, 0.42],
-      Extrapolation.CLAMP,
-    );
-    return { opacity };
+    // R13-1 reduced-motion: backdrop opacity is driven directly by the
+    // provider (instant set on the reduced-motion path; 280ms easeStd
+    // crossfade otherwise) — no interpolation from translateY here, so the
+    // reduced-motion "instant switch at release" requirement holds.
+    return { opacity: backdropOpacity.value };
   });
 
   const sheetStyle = useAnimatedStyle(() => ({

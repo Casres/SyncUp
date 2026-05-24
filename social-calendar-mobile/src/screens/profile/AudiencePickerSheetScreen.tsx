@@ -10,12 +10,18 @@
  *     - mode='types' → friend-type rows (PrivateBadge + label + N members + check)
  *     - mode='friends' → friend rows (RingAvatar + name + handle + CategoryBadge)
  *
- * Empty state: friends list empty → EmptyFriends; types empty →
- * EmptyStateBlock "No friend types · Create one".
+ * Empty states:
+ *  - mode='friends' with zero friends (R13-4) → rendered INSIDE the sheet by
+ *    AudiencePickerSheet itself (Done pill disabled, Close X stays active,
+ *    no navigation-away CTA). Do NOT short-circuit to a separate empty
+ *    screen — that would lose the user's broadcast context.
+ *  - mode='types' with zero types → EmptyStateBlock "No friend types · Create one"
+ *    is still rendered at the screen level (types can legitimately be empty
+ *    and the spec does not lock that empty state into the sheet body).
  *
  * Hard rules: Hard Rule 11 (PrivateBadge appears on type rows because the
  * sheet doesn't title-state privacy), Hard Rule 8 (Friend Type vs Social
- * Group never confused).
+ * Group never confused), R13-4 (zero-friend empty state lives in-sheet).
  *
  * Haptics: row toggle → light (fired by AudiencePickerSheet); Done → medium.
  */
@@ -25,7 +31,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   AudiencePickerSheet,
-  EmptyFriends,
   EmptyStateBlock,
   FlowHeader,
   LoadingOverlay,
@@ -56,9 +61,11 @@ export default function AudiencePickerSheetScreen({
     navigation.goBack();
   };
 
-  const empty =
-    (mode === 'friends' && (friends ?? []).length === 0) ||
-    (mode === 'types' && MOCK_FRIEND_TYPES.length === 0);
+  // R13-4: the zero-friend case for mode='friends' is handled INSIDE the
+  // sheet itself (inline empty state + disabled Done). Only mode='types'
+  // with zero types gets its own screen-level empty state, since types
+  // empty is not covered by R13-4.
+  const typesEmpty = mode === 'types' && MOCK_FRIEND_TYPES.length === 0;
 
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
@@ -70,22 +77,18 @@ export default function AudiencePickerSheetScreen({
 
       {isLoading && mode === 'friends' ? (
         <LoadingOverlay T={T} caption="LOADING ·" />
-      ) : empty ? (
+      ) : typesEmpty ? (
         <View style={styles.emptyWrap}>
-          {mode === 'friends' ? (
-            <EmptyFriends T={T} />
-          ) : (
-            <EmptyStateBlock
-              T={T}
-              icon={<View />}
-              headline="No friend types"
-              body="Create one to use as a broadcast audience."
-              secondary={{
-                label: 'Create one',
-                onPress: () => navigation.goBack(),
-              }}
-            />
-          )}
+          <EmptyStateBlock
+            T={T}
+            icon={<View />}
+            headline="No friend types"
+            body="Create one to use as a broadcast audience."
+            secondary={{
+              label: 'Create one',
+              onPress: () => navigation.goBack(),
+            }}
+          />
         </View>
       ) : (
         <View style={styles.fill}>

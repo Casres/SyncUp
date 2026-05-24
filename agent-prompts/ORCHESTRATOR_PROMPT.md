@@ -61,8 +61,13 @@ These are all the agents and where to find their prompts. The dependency column 
 | Friends Domain | `agent-prompts/FRIENDS_AGENT_PROMPT.md` | Backend Cleanup complete | `social-calendar-api/src/routes/FRIENDS_HANDOFF.md` |
 | Groups Domain | `agent-prompts/GROUPS_DOMAIN_AGENT_PROMPT.md` | Backend Cleanup complete | `social-calendar-api/src/routes/GROUPS_HANDOFF.md` |
 | Socket.io Layer | `agent-prompts/SOCKETIO_AGENT_PROMPT.md` | Friends Domain + Groups Domain both COMPLETE | `social-calendar-api/src/sockets/SOCKETIO_HANDOFF.md` |
+| Seed Rebuild | `agent-prompts/SEED_REBUILD_AGENT_PROMPT.md` | Schema/Migrations + Events Domain + Friends Domain + Groups Domain all COMPLETE | `social-calendar-api/prisma/SEED_HANDOFF.md` |
+| EXPLORE Cache + Rate-Limit (Phase B) | `agent-prompts/EXPLORE_BACKEND_AGENT_PROMPT.md` (Phase B section — REDESIGNED 2026-05-23; Phase A section is SUPERSEDED, do not spawn) | EXPLORE Gateway (Phase A) COMPLETE (already shipped in `bb9a7e6`) | `social-calendar-api/src/middleware/EXPLORE_CACHE_RATELIMIT_HANDOFF.md` |
+| EXPLORE Cron + Billing (Phase C) | `agent-prompts/EXPLORE_BACKEND_AGENT_PROMPT.md` (Phase C section) | EXPLORE Gateway (Phase A) + EXPLORE Cache + Rate-Limit (Phase B) both COMPLETE | `social-calendar-api/src/workers/EXPLORE_CRON_BILLING_HANDOFF.md` |
 
-> **Note on current progress:** Schema/Migrations, Auth (Clerk), Events Domain, and all DevOps agents are already COMPLETE. Check the progress tracker in LEAD_MANAGER.md for current status before spawning.
+> **Note on current progress:** Schema/Migrations, Auth (Clerk), Events Domain, Backend Cleanup, Friends Domain, Groups Domain, Socket.io Layer, EXPLORE Phase A, Seed Rebuild, and all DevOps agents are already COMPLETE as of 2026-05-23. Genuinely pending backend work: EXPLORE Phase B (redesigned prompt) and EXPLORE Phase C. Check the progress tracker in LEAD_MANAGER.md for the most current status before spawning.
+>
+> **EXPLORE Phase A warning:** The Phase A section of `EXPLORE_BACKEND_AGENT_PROMPT.md` is SUPERSEDED — the gateway already shipped on disk using `ExploreCategory` / `ExploreSource` / `ExploreVenue` types (NOT the `ExploreEvent`/`ExplorePlace`/`ExploreFeed` model the original Phase A section described). Spawning Phase A would produce a parallel rewrite. The PARTIAL SUPERSESSION header at the top of that file explains the on-disk state. Spawn only Phase B and Phase C.
 
 ### Design
 
@@ -82,8 +87,12 @@ These are all the agents and where to find their prompts. The dependency column 
 | Mock Data Layer | `agent-prompts/FRONTEND_MOCK_DATA_AGENT_PROMPT.md` | Design Handoff Export COMPLETE | `social-calendar-mobile/src/mocks/MOCKS_HANDOFF.md` |
 | API Stub Layer | `agent-prompts/FRONTEND_API_STUB_AGENT_PROMPT.md` | Mock Data Layer COMPLETE | `social-calendar-mobile/src/api/API_STUB_HANDOFF.md` |
 | Screens | `agent-prompts/FRONTEND_SCREENS_AGENT_PROMPT.md` | All above Frontend agents COMPLETE | `social-calendar-mobile/src/screens/SCREENS_HANDOFF.md` |
+| Onboarding (R15-7..R15-13) | `agent-prompts/ONBOARDING_AGENT_PROMPT.md` | Screens COMPLETE (Welcome + Sign-Up Steps 1–6 + Sign-In + Forgot-Password already on disk) | `social-calendar-mobile/src/screens/auth/AUTH_ONBOARDING_HANDOFF.md` |
+| AttendeesSheet R15 extension (R15-1..R15-6) | `agent-prompts/ATTENDEES_SHEET_AGENT_PROMPT.md` | Component Library + Screens COMPLETE (AttendeesSheet, AttendeeRow, QuickProfileSheet, SearchOverlay already on disk) | `social-calendar-mobile/src/components/social/ATTENDEES_SHEET_R15_HANDOFF.md` |
 
-> **Note:** All Frontend prompt files exist. Spawn these agents once Design Handoff Export is COMPLETE.
+> **Note:** All Frontend prompt files exist. Spawn the original six (Theme through Screens) once Design Handoff Export is COMPLETE. The two R15 extension agents (Onboarding, AttendeesSheet R15) are independent of each other and can run in parallel once Screens is COMPLETE — they touch different files and have no shared state.
+>
+> **Search Overlay (GAP 2) note:** `agent-prompts/SEARCH_OVERLAY_AGENT_PROMPT.md` exists on disk but is SUPERSEDED — the overlay shipped on 2026-05-21 in commit `966e846`. Do not spawn. The one remaining stub (PEOPLE-row body tap → QuickProfileSheet non-friend variant) is now owned by the AttendeesSheet R15 agent.
 
 ### DevOps
 

@@ -29,3 +29,7 @@ npm-debug.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Claude Code / Cowork — machine-specific local settings (allowlists, etc.)
+.claude/settings.local.json
+**/.claude/settings.local.json

@@ -4,7 +4,7 @@
 
 Read these two files before touching any code:
 
-1. `ANCHOR-DESIGN.txt` — the complete design spec (v3.4). Every locked rule lives here. All component anatomy, interaction behavior, animation curves, haptics, nav graph, and edge cases.
+1. `ANCHOR-DESIGN.txt` — the complete design spec (v3.5). Every locked rule lives here. All component anatomy, interaction behavior, animation curves, haptics, nav graph, and edge cases.
 2. `FRONTEND-HANDOFF.txt` — maps the spec to code. Lists the 10 build gaps in priority order with exact file paths, rule references, and implementation notes.
 
 Do not start building until you have read both in full.

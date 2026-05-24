@@ -123,11 +123,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
     atTop.value = e.nativeEvent.contentOffset.y <= 0;
   }
 
+  // R13-1: snap haptic fires when the snap visually settles, not at pointer
+  // up. The shared provider exposes `onSettled` on each open/close so the
+  // haptic is dispatched from the spring/timing completion callback.
   function snapPhaseA(target: 'closed' | 'peek' | 'full') {
-    fire('light');
-    if (target === 'closed') dismiss();
-    else if (target === 'peek') openPeek();
-    else openFull();
+    const onSettled = () => fire('light');
+    if (target === 'closed') dismiss(onSettled);
+    else if (target === 'peek') openPeek(onSettled);
+    else openFull(onSettled);
   }
 
   const phaseA = Gesture.Pan()

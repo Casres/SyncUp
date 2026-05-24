@@ -1,109 +1,90 @@
-# Mock Data Layer — Handoff
+# Mock Data Layer — Handoff (TOMBSTONE)
 
-**Status:** COMPLETE (2026-05-04)
+**Status:** EVACUATED (2026-05-21) — was COMPLETE (2026-05-04)
 **Owner:** Frontend / Mock Data Layer agent
-**Next agent:** API Stub Layer (`src/api/`)
+**Next agent:** Whichever Frontend agent rewires `src/api/*` to real backend endpoints.
 
 ---
 
-## 1. What was built
+## ⚠️ This directory has been evacuated
 
-8 files under `social-calendar-mobile/src/mocks/`:
+Per the project's production rule (CLAUDE.md → "Seed data reminder"), the seed
+data that previously lived here has been removed. All 8 prior data files
+(`users.ts`, `friendships.ts`, `friendTypes.ts`, `events.ts`, `groups.ts`,
+`availability.ts`, `notifications.ts`, `explore.ts`) are deleted.
 
-| File | Exports |
+Only `index.ts` remains. It is a **tombstone** that re-exports the same
+symbol names as empty / safe-default values so that:
+
+1. The API stub layer in `src/api/*` still compiles (`tsc --noEmit` clean).
+2. The 8 screens / components that still import from `../mocks` still compile.
+3. **No mock data ships** — every array is empty, every record is `{}`,
+   singular records are minimal empty shells with zero PII.
+
+The app now renders its zero-data empty states everywhere — exactly what
+production wiring will surface until the backend domains are reached.
+
+---
+
+## What was deleted
+
+| File | Symbols evacuated |
 |---|---|
-| `users.ts` | `MOCK_ME`, `MOCK_USERS`, `MOCK_USERS_BY_ID` |
-| `friendships.ts` | `MOCK_FRIENDS`, `MOCK_PENDING_REQUESTS`, `MOCK_FRIEND_LABELS`, `MOCK_AVAILABILITY_BLOCKS` |
-| `friendTypes.ts` | `MOCK_FRIEND_TYPES` |
-| `events.ts` | `MOCK_EVENT_UPCOMING`, `MOCK_EVENT_PAST`, `MOCK_EVENT_RECURRING`, `MOCK_EVENT_COHOST`, `MOCK_EVENTS`, `MOCK_EVENT_ORGANISERS`, `MOCK_EVENT_RECURRENCE`, `MOCK_RSVPS` (+ `EventOrganiser`, `EventRecurrence`, `EventExceptionEntry`, `EventOrganiserRole` types) |
-| `groups.ts` | `MOCK_GROUP_ADMIN`, `MOCK_GROUP_MEMBER`, `MOCK_SOCIAL_GROUPS`, `MOCK_GROUP_MEMBERS`, `MOCK_POLL_CLOSED`, `MOCK_POLL_ACTIVE`, `MOCK_POLLS`, `MOCK_POLLS_BY_GROUP`, `MOCK_SUGGESTIONS`, `MOCK_SUGGESTIONS_BY_GROUP` |
-| `availability.ts` | `isoOffset`, `MOCK_MY_AVAILABILITY`, `MOCK_SASHA_AVAILABILITY`, `MOCK_MARCUS_AVAILABILITY`, `MOCK_PRIYA_AVAILABILITY`, `MOCK_JORDAN_AVAILABILITY`, `MOCK_TOMAS_AVAILABILITY`, `MOCK_AVAILABILITY`, `MOCK_BROADCAST_SETTINGS` |
-| `notifications.ts` | `MOCK_NOTIFICATIONS` (placeholder — Round 6) |
-| `index.ts` | Barrel export of all of the above |
+| `users.ts` | MOCK_ME (kept as `{ id: 'me', name: '', … }` shell), MOCK_USERS, MOCK_USERS_BY_ID |
+| `friendships.ts` | MOCK_FRIENDS, MOCK_PENDING_REQUESTS, MOCK_FRIEND_LABELS, MOCK_AVAILABILITY_BLOCKS |
+| `friendTypes.ts` | MOCK_FRIEND_TYPES |
+| `events.ts` | MOCK_EVENT_UPCOMING/PAST/RECURRING/COHOST (kept as empty Event shells), MOCK_EVENTS, MOCK_EVENT_ORGANISERS, MOCK_EVENT_RECURRENCE, MOCK_RSVPS, type exports preserved |
+| `groups.ts` | MOCK_GROUP_ADMIN/MEMBER (kept as empty SocialGroup shells), MOCK_SOCIAL_GROUPS, MOCK_GROUP_MEMBERS, MOCK_POLL_CLOSED/ACTIVE, MOCK_POLLS, MOCK_POLLS_BY_GROUP, MOCK_SUGGESTIONS, MOCK_SUGGESTIONS_BY_GROUP |
+| `availability.ts` | MOCK_MY/SASHA/MARCUS/PRIYA/JORDAN/TOMAS_AVAILABILITY, MOCK_AVAILABILITY, MOCK_BROADCAST_SETTINGS (all-off defaults), `isoOffset()` date helper kept |
+| `notifications.ts` | MOCK_NOTIFICATIONS |
+| `explore.ts` | MOCK_EXPLORE_VENUES, MOCK_EXPLORE_FEATURED |
 
-`npx tsc --noEmit` passes with **zero errors**.
-
-All records are typed against the `TYPES.ts` shapes (no `as` widening; explicit `User[]`, `Friend[]`, `Event[]`, etc. annotations or per-row `satisfies`).
-
----
-
-## 2. User reference table
-
-| id | name | handle | role in seed |
-|---|---|---|---|
-| `me` | Ben Rivera | `@ben` | Logged-in user. Host on event-1 / event-2 / event-3, co-host on event-4. Admin of group-1, member of group-2. |
-| `user-2` | Sasha Kim | `@sasha` | **Has NO availability set** — absent from `MOCK_AVAILABILITY` entirely (tests "unknown" state on Step 3). BFF (`ft-1`). |
-| `user-3` | Marcus Chen | `@marcus` | **Availability blocked from 'me'** — has data in `MOCK_MARCUS_AVAILABILITY` but `MOCK_AVAILABILITY_BLOCKS` lists `{ blockerId: 'user-3', blockedId: 'me' }`. Coworker label. |
-| `user-4` | Priya Osei | `@priya` | Family label. **Creator of event-4**, with 'me' as co-host. Admin of group-2. |
-| `user-5` | Jordan Lake | `@jordan` | **Pending incoming friend request to 'me'** — present in `MOCK_PENDING_REQUESTS`, NOT in `MOCK_FRIENDS`. |
-| `user-6` | Tomás Reyes | `@tomas` | BFF (`ft-1`). Used to round out the RSVP roster on event-1. |
+The `EventOrganiser`, `EventOrganiserRole`, `EventRecurrence`, and
+`EventExceptionEntry` type exports are preserved (they describe runtime
+shapes the backend will own; they are stable contract surface, not seed
+data).
 
 ---
 
-## 3. Event reference table
+## How to finish the cleanup
 
-| id | title | iso (vs today) | host | special properties |
-|---|---|---|---|---|
-| `event-1` | Rooftop Dinner | `isoOffset(7)` | `me` | **Upcoming.** Day is `'busy'` in `MOCK_MY_AVAILABILITY` → triggers Step 3 wire-back danger banner. **Full RSVP spread:** me=yes, user-2=maybe, user-3=no, user-4=null (no response), user-6=yes. |
-| `event-2` | Birthday Karaoke | `isoOffset(-21)` | `me` | **Past.** All attendees responded; closed. |
-| `event-3` | Tuesday Run Club | `isoOffset(2)` | `me` | **Recurring** (WEEKLY). `MOCK_EVENT_RECURRENCE['event-3'].exceptions` contains: cancelled @ today+9, rescheduled @ today+16 → today+17 7:30am. |
-| `event-4` | Sunday Long Brunch | `isoOffset(12)` | `user-4` | **'me' is co-host, not host.** `MOCK_EVENT_ORGANISERS` has `{ eventId: 'event-4', userId: 'me', role: 'COHOST' }`. |
+For each `src/api/*.ts` stub that still imports from `../mocks`, replace the
+stub body with a real `authedFetch` call to the backend endpoint and remove
+its mock import. Once every consumer is rewired:
 
----
+1. Delete `src/mocks/index.ts`.
+2. Delete this `MOCKS_HANDOFF.md`.
+3. The `src/mocks/` directory then disappears.
 
-## 4. Wire-back dependency (Step 3 danger banner)
+Consumers still importing from `../mocks` as of 2026-05-21:
 
-Confirmed:
+- `src/api/notifications.ts`
+- `src/api/availability.ts`
+- `src/api/profile.ts`
+- `src/api/groups.ts`
+- `src/api/friends.ts`
+- `src/api/events.ts`
+- `src/api/explore.ts`
+- `src/components/social/SearchOverlay.tsx`
+- `src/screens/profile/AudiencePickerSheetScreen.tsx`
+- `src/screens/profile/AvailabilityEditorScreen.tsx`
+- `src/screens/profile/BroadcastSettingsScreen.tsx`
+- `src/screens/friends/FriendsListScreen.tsx`
+- `src/screens/friends/FriendProfileScreen.tsx`
+- `src/screens/friends/FriendTypesManagerScreen.tsx`
+- `src/screens/groups/GroupDetailScreen.tsx`
+- `src/screens/events/EventDetailScreen.tsx`
+- `src/screens/create/Step3Screen.tsx`
 
-```
-MOCK_EVENT_UPCOMING.id              === 'event-1'
-MOCK_EVENT_UPCOMING.iso             === isoOffset(7)
-MOCK_MY_AVAILABILITY[isoOffset(7)]  === 'busy'
-∴ MOCK_MY_AVAILABILITY[MOCK_EVENT_UPCOMING.iso] === 'busy'
-```
-
-Both sides use the same `isoOffset()` helper, so the equality is invariant under "what day is today" — the wire-back fires regardless of when the agent runs. The API Stub Layer should pass this state straight through; Step 3 of the Create Event flow consults `AvailabilityEntry[eventIso]` and renders the dangerSoft banner on `'busy'` (Hard Rule 17).
-
----
-
-## 5. Assumptions / inferred shapes the API Stub Layer should know about
-
-`TYPES.ts` is the source of truth, but a few runtime concepts surface in mock data without a corresponding TYPES.ts shape. The Stub Layer should adopt these shapes verbatim (they are exported from `events.ts` and `friendships.ts`):
-
-1. **`EventOrganiser`** — `{ eventId; userId; role: 'CREATOR' | 'COHOST' }`. TYPES.ts only carries `Event.hostId`; co-host membership requires a join. Mirrors the backend's `EventOrganiser` table (see Backend Events Domain handoff at `social-calendar-api/src/routes/EVENTS_HANDOFF.md`). Exposed as `MOCK_EVENT_ORGANISERS`.
-
-2. **`EventRecurrence`** — `{ rule: 'DAILY' | 'WEEKLY' | 'MONTHLY'; until?; exceptions: EventExceptionEntry[] }`. TYPES.ts has no recurrence field. `EventExceptionEntry` is a discriminated union of `{ type: 'cancelled' }` and `{ type: 'rescheduled', newDate, newStartAt?, newEndAt? }`. Exposed as `MOCK_EVENT_RECURRENCE`, keyed by event id.
-
-3. **`AvailabilityBlock`** — `{ blockerId: string; blockedId: string }`. There is no shape for this in TYPES.ts. The API Stub Layer should treat the presence of a row in `MOCK_AVAILABILITY_BLOCKS` as authoritative: a `getAvailability(blockedId)` call from `blockerId`'s perspective must return forbidden / empty regardless of what `MOCK_AVAILABILITY[blockedId]` contains.
-
-4. **Poll closed-ness derived from `closesAt`** — TYPES.ts `Poll` has no `closed` boolean. `MOCK_POLL_CLOSED.closesAt` is `today−2 18:00`; `MOCK_POLL_ACTIVE.closesAt` is `today+5 23:59`. The Stub Layer should derive `closed = closesAt != null && new Date(closesAt) < new Date()`.
-
-5. **Friend label catalog** — `MOCK_FRIEND_LABELS` is exported as a `[{ id, label }]` table. `Friend.category` stores the `id`. This catalog is mock-only — it isn't in TYPES.ts and isn't a backend entity (the backend stores the label directly on `Friendship` per its schema). Treat it as a UI hint table.
-
-6. **`EventOrganiser` for events 1–3 lists 'me' as CREATOR explicitly** — the Stub Layer should NOT also derive a CREATOR row from `Event.hostId` to avoid duplicates. Always source organisers from `MOCK_EVENT_ORGANISERS`.
-
-7. **`MOCK_RSVPS` duplicates `Event.rsvps`** — the array form is a convenience for screens that iterate (Attendees, RSVP sheet). The map form on `Event.rsvps` is the canonical write target; if the Stub Layer mutates one it must mirror to the other.
+DO NOT add new seed data to `index.ts`. If a screen needs deterministic
+fixture data during development, generate it inside that screen / test file
+(or behind a `__DEV__` guard) — not here.
 
 ---
 
-## 6. Final-checklist trace
+## Original handoff (preserved for archaeology)
 
-- [x] `npx tsc --noEmit` passes with zero errors
-- [x] All mock records satisfy their corresponding TYPES.ts type
-- [x] `MOCK_MY_AVAILABILITY[isoOffset(7)] === 'busy'` — confirmed (matches `MOCK_EVENT_UPCOMING.iso`)
-- [x] Sasha (user-2) has no entry in `MOCK_AVAILABILITY` (empty/unknown state)
-- [x] `MOCK_AVAILABILITY_BLOCKS` includes `{ blockerId: 'user-3', blockedId: 'me' }`
-- [x] One pending friend request — `MOCK_PENDING_REQUESTS[0]` is user-5 with `status: 'pending'`
-- [x] One event where 'me' is co-host — `event-4`, with explicit `MOCK_EVENT_ORGANISERS` row
-- [x] One recurring event with cancelled + rescheduled exceptions — `event-3` via `MOCK_EVENT_RECURRENCE`
-- [x] RSVP spread on `event-1`: yes / maybe / no / null across me / user-2 / user-3 / user-4 (+ a fifth: user-6=yes)
-- [x] One closed poll (`poll-1`, `closesAt = today-2`) and one active poll (`poll-2`)
-- [x] One group where 'me' is admin (`group-1`) and one where 'me' is member (`group-2`)
-- [x] All date values use `isoOffset()` — no hardcoded calendar dates
-- [x] `src/mocks/index.ts` barrel exports everything
-
----
-
-## 7. Suggested next agent
-
-**API Stub Layer** (`src/api/`). Wraps these constants in async functions (200–500ms simulated delay) that match the eventual REST contract from `social-calendar-api/`. Read this file plus `src/mocks/index.ts` exports.
+The original "what was built (2026-05-04)" reference table — user reference,
+event reference, wire-back invariant, inferred-shape notes — is preserved
+in git history. Read `git log src/mocks/users.ts` if you need to know what
+each seed user looked like; the data is gone but the history isn't.
