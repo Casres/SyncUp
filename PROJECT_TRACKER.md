@@ -1,8 +1,8 @@
 # SyncUp — Project Tracker
 
-_Last updated: 2026-05-02_
+_Last updated: 2026-05-24_
 
-A cross-platform social calendar app (iOS & Android). This file tracks what has been built, what is pending, and decisions that are still open.
+A cross-platform social calendar app (iOS & Android). High-level summary of build state. **For the agent-by-agent ground truth see `LEAD_MANAGER.md`.**
 
 ---
 
@@ -10,20 +10,20 @@ A cross-platform social calendar app (iOS & Android). This file tracks what has 
 
 | Layer | Technology |
 |---|---|
-| Mobile frontend | React Native + Expo + TypeScript |
-| Navigation | React Navigation |
-| Animations | Reanimated 2 + Gesture Handler |
-| Server state | React Query |
-| Local state | Zustand |
+| Mobile frontend | React Native 0.83.6 + Expo ~55.0.20 + TypeScript 5.9.2 |
+| Navigation | React Navigation v7 (native-stack + bottom-tabs) |
+| Animations | Reanimated 4.2.1 + Gesture Handler ~2.30.0 |
+| Server state | @tanstack/react-query v5 |
+| Local state | React local state (useState/useReducer) + draftStore for create-event flow |
 | Backend | Node.js + Fastify 5.x + TypeScript |
-| Database | PostgreSQL + Prisma |
-| Cache / Presence | Redis |
-| Real-time | Socket.io |
-| Auth | Clerk |
-| Media | Cloudinary |
+| Database | PostgreSQL + Prisma 5.22 |
+| Cache / Presence | Redis (ioredis 5.10) |
+| Real-time | Socket.io 4.8 |
+| Auth | Clerk (@clerk/clerk-expo on mobile, @clerk/backend on api) |
+| Media | Cloudinary (not yet wired) |
 | Testing | Jest + Supertest |
 | CI/CD | GitHub Actions |
-| Hosting | Railway / Render |
+| Hosting | Railway |
 | Mobile builds | EAS Build |
 
 ---
@@ -31,205 +31,131 @@ A cross-platform social calendar app (iOS & Android). This file tracks what has 
 ## Architecture Rules (Locked)
 
 - **React Query** owns all server data. No exceptions.
-- **Zustand** owns local UI state only. Never holds API response data.
+- **No Zustand.** Local UI state uses `useState`/`useReducer`; create-event flow uses `draftStore` (a single local context, not a global store). Never copy API response data into any global store.
 - Backend layers flow one direction only: **Routes → Controllers → Services → Repositories → Database**
 - Business logic lives exclusively in Services. Controllers handle HTTP only.
-- Socket handlers may call Services. They do not contain business logic themselves.
+- Socket handlers may call Services; they do not contain business logic themselves.
 - Presence tracking writes directly to Redis — not through the repository layer.
-- `socket.types.ts` must be kept in sync between frontend and backend.
-- Any Clerk-authenticated HTTP endpoint must use `authenticateClerkRequest` from `src/lib/clerk.ts`. The lower-level primitives (`extractBearerToken`, `verifyClerkToken`, `replyWithClerkVerificationFailure`) are exported as escape hatches but must not be combined ad-hoc — that's what the orchestrator exists to prevent.
+- `src/types/socket.types.ts` is the source of truth — mobile mirrors it.
+- Per-request Prisma transaction with `set_config('app.current_user_id', …)` engages Postgres RLS on every authenticated request via `prismaApp` (the restricted-role client). The migration-owner client `prisma` is reserved for auth upsert and the Clerk webhook.
 
 ---
 
-## Completed ✅
+## Build State Summary (2026-05-24)
 
-### Planning & Architecture
-- [x] Tech stack confirmed
-- [x] Folder structure mapped for both frontend and backend
-- [x] State management rules decided and locked into project instructions
-- [x] Build order decided (frontend and backend in parallel)
-- [x] Monorepo vs separate repos discussed (monorepo recommended, not yet finalized)
+### Backend — Done ✅
 
-### Database Schema
-- [x] Full Prisma schema designed (v2) — `social-calendar-api/prisma/schema.prisma`
-- [x] All 18 models defined: `User`, `Friendship`, `FriendshipLabel`, `AvailabilityBlock`, `FriendGroup`, `FriendGroupMember`, `SocialGroup`, `SocialGroupMember`, `Event`, `EventOrganiser`, `EventException`, `EventInvite`, `UserAvailability`, `GroupPoll`, `PollOption`, `PollVote`, `EventSuggestion`, `SuggestionVote`
-- [x] All enums defined: `FriendshipStatus`, `SocialGroupRole`, `EventOrganiserRole`, `EventExceptionType`, `InviteStatus`, `NotifChannel`, `Recurrence`, `AvailabilityGranularity`, `SuggestionVoteValue`
+| Domain | Status |
+|---|---|
+| Schema / Migrations | All 18 entities + soft-delete on User/Event/Friendship/SocialGroup + RLS migration |
+| Auth (Clerk) | Global preHandler, per-request Prisma transaction, webhook sync |
+| Events Domain | 5 endpoints, atomic CREATOR organiser write, soft-delete |
+| Friends Domain | 18 endpoints (friendships, labels, availability blocks, friend-groups) |
+| Groups Domain | 20 endpoints (groups, members, polls, suggestions, votes) |
+| Backend Cleanup | Dual Prisma client, `GET /health`, `DATABASE_URL_APP` |
+| Socket.io Layer | 14 socket events across presence/events/friends/groups/availability |
+| EXPLORE Gateway (Phase A) | `/explore/*` routes + Eventbrite + Google Places clients, behind auth |
+| Seed Rebuild | Full Decision #4 extended seed (5 users, 4 events, RSVP spread, closed poll) — **must be deleted before production** |
 
-### Product Decisions Made (Schema Phase)
-- [x] Friendship labels are per-user and independent (A can label B "coworker" while B labels A "friend")
-- [x] Overlapping availability windows allowed — service resolves by specificity: DAY > WEEK > MONTH
-- [x] Recurring events use one `Event` row as template + `EventException` rows for per-instance overrides
-- [x] Co-hosts supported via `EventOrganiser` table (`CREATOR` / `CO_HOST` roles)
-- [x] Availability visibility blocking is one-directional and separate from friendship blocking
-- [x] Suggestion voting is opt-in per event via `allowSuggestionVoting` boolean; service layer enforces
-- [x] Any group member can create a poll
-- [x] Guest list visible to any accepted invitee; enforced at service layer, no schema change needed
+### Backend — Pending 📋
 
-### Backend — Infrastructure
-- [x] Project scaffolded (`social-calendar-api/`)
-- [x] TypeScript + Fastify 5.x configured (`tsconfig.json`)
-- [x] Environment config with validation (`src/config/env.ts`)
-- [x] Prisma singleton client (`src/config/prisma.ts`)
-- [x] Clerk auth helper module (`src/lib/clerk.ts`) — singleton Clerk client, `extractBearerToken`, `verifyClerkToken` (pure, returns discriminated result), `replyWithClerkVerificationFailure` (centralizes status code + error messages + log levels), and the `authenticateClerkRequest` orchestrator that bundles all three for the canonical authenticated-endpoint flow
-- [x] Auth plugin — uses `authenticateClerkRequest` orchestrator, then performs the local Prisma user lookup specific to `requireAuth` (`src/plugins/auth.ts`)
-- [x] Fastify type augmentation for `request.user` (`src/types/fastify.d.ts`)
-- [x] App factory (`src/app.ts`)
-- [x] Server entry point (`src/server.ts`)
+| Domain | Status | Prompt |
+|---|---|---|
+| EXPLORE Cache + Rate-Limit (Phase B) | PARTIAL — rate-limit middleware wired but with deviations (default 30 not 20, no burst budget, no X-RateLimit-* headers); cache is inline, not modular | `agent-prompts/EXPLORE_BACKEND_AGENT_PROMPT.md` (Phase B section — REDESIGNED 2026-05-23 to fit on-disk types) |
+| EXPLORE Cron + Billing (Phase C) | PENDING — pre-warmer cron, GCP billing alerts ($25/$50/$100 notify-only), Featured-listings hook stub | `agent-prompts/EXPLORE_BACKEND_AGENT_PROMPT.md` (Phase C section) |
+| Availability Domain | Not yet specced — pending socket TODO at `src/sockets/availability.socket.ts` | — |
+| Invites Domain (incremental) | Pending socket TODOs at `src/sockets/events.socket.ts` | — |
+| Notifications service | Not yet built | — |
 
-### Backend — Users Domain
-- [x] `users.repository.ts` — findById, findByClerkId, findPublicByUsername, create, update
-- [x] `users.service.ts` — provision, getById, getByClerkId, getPublicByUsername, updateProfile
-- [x] `users.controller.ts` — provision, getMe, updateMe, getByUsername (with Zod validation)
-- [x] `users.routes.ts` — `POST /users`, `GET /users/me`, `PATCH /users/me`, `GET /users/:username`
+### Frontend — Done ✅
 
-### Backend — Events Domain (Stub)
-- [x] `events.repository.ts` — findById
-- [x] `events.service.ts` — getById
-- [x] `events.controller.ts` — getById
-- [x] `events.routes.ts` — `GET /events/:id` (protected by `requireAuth` preHandler)
+| Layer | Status |
+|---|---|
+| Theme / Tokens | Colors, typography, spacing, radii, motion, haptics |
+| Component Library | 63 components across foundation/polish/eventFlow/social/profile/emptyStates |
+| Navigation | Root native-stack + Tabs + CreateEventModal sibling, custom TabBar with Ionicons |
+| Mock Data Layer | **Tombstoned 2026-05-21** — 8 seed files deleted, `index.ts` empty exports for compile-time compat; app renders zero-data empty states everywhere |
+| API Stub Layer | 9 files, React Query 5.100.9, Clerk wiring via `_client.ts` `useApiFetch()` |
+| Screens | 16 screens / 7 flows |
+| GAP 6 — NotifSheet nav wiring (R12-1) | COMPLETE |
+| GAP 7 — NotifSheet velocity gesture (R13-1) | COMPLETE |
+| GAP 8 — NotifSheet offline state (R13-2) | COMPLETE |
+| GAP 9 — BroadcastToast queued prop (R13-3) | COMPLETE |
+| GAP 10 — AudiencePickerSheet zero-friend state (R13-4) | COMPLETE |
+| GAP 2 — Search overlay (R8-1..R8-7) | COMPLETE |
+| GAP 1 — Onboarding stack (R9-1..R9-10) | COMPLETE (Welcome + Sign-Up Steps 1–6 + Sign-In + Forgot-Password) |
+| TweaksPanel absence audit (R14-1) | Verified — zero refs in mobile codebase |
 
-### Local Dev
-- [x] Seed data — two test users + one event (`prisma/seed.ts`)
-- [x] `.env` file with placeholder values for local dev (`DATABASE_URL`, `REDIS_URL`, `CLERK_SECRET_KEY`, `PORT`, `NODE_ENV`)
-- [x] Dev script auto-loads `.env` via `--env-file` flag in `package.json` (`tsx watch --env-file=.env src/server.ts`)
-- [x] Smoke-tested unauthenticated 401 path on `GET /events/:id` end to end (server boots, `requireAuth` fires, returns `401 Missing or malformed Authorization header`)
-- [x] `REMINDERS.md` at project root — quick-paste context block for future chats
+### Frontend — Pending 📋
+
+| Surface | Status | Prompt |
+|---|---|---|
+| Onboarding R15-7..R15-13 | PENDING — post-Step-6 tail (PushPermissionGate · FriendFind Decision/Matches/NoWorries · YoureIn), R15-11 ContactsDeniedAffordance, R15-13 first-run empty-state copy gating; needs `expo-notifications` + `expo-contacts` | `agent-prompts/ONBOARDING_AGENT_PROMPT.md` |
+| AttendeesSheet R15-1..R15-6 | PENDING — R15-1 row-tap → QuickProfileSheet, R15-2 friend variant, R15-3 RSVP grouping w/ HOSTS pinned, R15-4 magnifier reveal, R15-5 sticky chip filter bar, R15-6 offline state mirroring NotifSheet; wires SearchOverlay PEOPLE row tap | `agent-prompts/ATTENDEES_SHEET_AGENT_PROMPT.md` |
+
+### DevOps — Done ✅
+
+| Item | Status |
+|---|---|
+| Docker / docker-compose | Multi-stage Dockerfile + api/postgres/redis services + two-role DB init via `docker/postgres/init.sql` |
+| GitHub Actions | Lint, type-check, test with postgres + redis service containers + `prisma migrate deploy` |
+| EAS Build Config | dev/preview/prod profiles, bundle ID `tech.casillas.syncup` |
+| Railway Deploy | `railway.toml` + `DEPLOY_CHECKLIST.md` — pending Christian connecting Railway project |
+| Jest / Supertest | Infra + 3 domain test suites + 8 `test.todo` items |
 
 ---
 
-## In Progress 🔄
+## Step Status
 
-_Nothing currently marked as actively in progress._
+| Step | What | Status |
+|---|---|---|
+| Step 1 | Initial scaffolding + schema | DONE |
+| Step 2 | Backend domains + frontend scaffold + screens | DONE |
+| Step 3 | Wave 1 orchestration (Seed Rebuild, EXPLORE Phase A, GAPs, Mocks tombstone, R15 prep) | DONE — partial in-flight when prior session hit usage limit; recovery cleanup committed 2026-05-23 in `90972f9` |
+| **Step 4** | **Orchestrator chat (NEW Claude Code terminal) spawns the remaining four agents: EXPLORE Phase B → EXPLORE Phase C → Onboarding R15 + AttendeesSheet R15 in parallel** | **READY TO START** |
+
+**Step 4 ground state:** working tree clean, tracker accurate, orchestrator prompt indexed with all five remaining prompt files + their dependencies + HANDOFF locations. See `agent-prompts/ORCHESTRATOR_PROMPT.md`.
 
 ---
 
-## To Do 📋
+## Open Decisions Log
 
-### Open Decisions (resolve before implementing affected areas)
-- [ ] **Soft delete strategy** — do Users, Events, or Friendships need `deletedAt` instead of hard deletes?
-- [ ] **Row-level security** — Postgres RLS policies, or auth enforced purely at the service layer via Clerk?
-- [ ] **Migration strategy** — `prisma migrate dev` locally + `prisma migrate deploy` in CI, or different flow?
-- [ ] **Monorepo** — finalize monorepo vs separate repos; if monorepo, set up `packages/shared` for shared types
+All previously-open decisions are now locked. See `LEAD_MANAGER.md` → Open Decisions Log (#1–#11) for full history. Summary:
 
-### Backend — Events Domain (full implementation)
-- [ ] Create event (with atomic `EventOrganiser` CREATOR row)
-- [ ] Update event
-- [ ] Delete event
-- [ ] List events (by creator, by invitee)
-- [ ] Recurring event expansion (RRULE parsing via `rrule.js`)
-- [ ] Event exceptions — create, modify, cancel a single instance
-- [ ] Co-host management — add / remove co-hosts
+- Monorepo (#1) — locked monorepo
+- Soft deletes (#2) — locked on Users/Events/Friendships/SocialGroups
+- Row-level security (#3) — locked Postgres RLS via `set_config` per request
+- Seed data scope (#4) — locked, extended spec, **deletion before prod required**
+- Migration strategy (#5) — `prisma migrate dev` locally, `prisma migrate deploy` in CI/Railway
+- Availability Hub layout (#6) — Option C inline collapse
+- Quicksets (#7) — user-extensible, 4 built-ins permanent
+- BroadcastToast review action (#8) — no
+- Friend Types nesting (#9) — no, disjoint membership
+- AdminBar scroll collapse (#10) — no, pinned
+- Stale notifications (#11) — auto-purge at 30 days + Clear all + swipe Dismiss
 
-### Backend — Friendships Domain
-- [ ] Send friend request
-- [ ] Accept / decline friend request
-- [ ] Block a user (friendship-level)
-- [ ] Remove friend
-- [ ] List friends (with status filtering)
-- [ ] Friendship labels — create, update, delete label
+---
 
-### Backend — Friend Groups Domain
-- [ ] Create friend group
-- [ ] Add / remove members
-- [ ] Delete friend group
-- [ ] List own friend groups
+## Production Deletion Gate
 
-### Backend — Social Groups Domain
-- [ ] Create social group
-- [ ] Invite members / join group
-- [ ] Update group (admin only)
-- [ ] Remove member / leave group
-- [ ] Delete group (admin only)
-- [ ] List groups for a user
+Before any production deploy:
 
-### Backend — Availability Domain
-- [ ] Set availability window
-- [ ] Update availability window
-- [ ] Delete availability window
-- [ ] List own availability
-- [ ] View a friend's availability (with `AvailabilityBlock` check)
-- [ ] Block / unblock a friend's view of your availability
+1. Delete `social-calendar-api/prisma/seed.ts`
+2. Remove the `"seed"` entry from `social-calendar-api/package.json` `prisma` block
+3. Delete `social-calendar-mobile/src/mocks/index.ts` once every consumer in `src/api/*` is rewired to a live backend endpoint
+4. Verify no `TweaksPanel` references in `social-calendar-mobile/`
+5. Provide Railway env vars per `social-calendar-api/DEPLOY_CHECKLIST.md`
 
-### Backend — Event Invites Domain
-- [ ] Send individual invite
-- [ ] Bulk invite via FriendGroup (expand to individual `EventInvite` rows — idempotent upsert)
-- [ ] Respond to invite (accept / decline / maybe)
-- [ ] List invites for an event (guest list — restricted to accepted invitees)
-- [ ] List invites for a user (inbox)
-- [ ] Notification channel override per invite
-
-### Backend — Group Polls Domain
-- [ ] Create poll (any group member)
-- [ ] Add poll options
-- [ ] Vote on a poll option
-- [ ] Close / delete a poll (creator only)
-- [ ] List polls for a group
-
-### Backend — Event Suggestions Domain
-- [ ] Create suggestion in a group
-- [ ] Up/down vote a suggestion (check `allowSuggestionVoting` at service layer)
-- [ ] Convert suggestion to event
-- [ ] List suggestions for a group
-
-### Backend — Real-Time (Socket.io)
-- [ ] Socket.io server setup
-- [ ] Clerk JWT auth handshake for socket connections
-- [ ] Presence tracking (write to Redis, not through repository layer)
-- [ ] Real-time invite notifications
-- [ ] Availability change push + React Query cache invalidation events
-- [ ] Group poll update events
-- [ ] `socket.types.ts` shared type definitions
-
-### Backend — Infrastructure
-- [ ] Redis client singleton (`src/config/redis.ts`)
-- [ ] Cloudinary client singleton (`src/config/cloudinary.ts`)
-- [ ] Media upload endpoint (avatar images)
-- [ ] Rate limiting middleware
-- [ ] Global error handling middleware
-- [ ] Docker + `docker-compose.yml` for local dev (Postgres + Redis)
-- [ ] `prisma/seed.ts` — **delete before production** (also remove `prisma.seed` from `package.json`)
-
-### Backend — Testing
-- [ ] Jest + Supertest setup
-- [ ] Integration tests for Users domain
-- [ ] Integration tests for Events domain
-- [ ] Integration tests for Friendships domain
-- [ ] Integration tests for remaining domains
-
-### Frontend (React Native + Expo) — Not Started
-- [ ] Project scaffold (`social-calendar-app/`)
-- [ ] Expo Router file-based routing setup
-- [ ] React Navigation configuration
-- [ ] React Query + Zustand setup
-- [ ] Clerk auth integration (sign-up, sign-in, session)
-- [ ] User provisioning flow (username + display name on first login)
-- [ ] Calendar screen
-- [ ] Event detail screen
-- [ ] Create / edit event screen
-- [ ] Friends list screen
-- [ ] Friend profile screen
-- [ ] Social groups screen
-- [ ] Group detail screen
-- [ ] Availability screen (set / edit windows)
-- [ ] Invite inbox
-- [ ] Notifications
-- [ ] Socket.io client + presence hooks
-- [ ] Push notification registration (Expo push tokens)
-- [ ] Animations (Reanimated 2 + Gesture Handler)
-- [ ] Avatar upload (Cloudinary)
-
-### DevOps
-- [ ] GitHub Actions CI pipeline (lint, type-check, test)
-- [ ] EAS Build configuration for iOS + Android
-- [ ] Railway / Render deployment setup
-- [ ] Environment variable management for staging + production
+These are tracked as gates in DEPLOY_CHECKLIST.md.
 
 ---
 
 ## Reminders
 
-- **Seed data** (`prisma/seed.ts` + `prisma.seed` entry in `package.json`) must be deleted before production deployment.
-- Any change to `socket.types.ts` must be reflected on both frontend and backend immediately.
+- **Seed file (`prisma/seed.ts`) + `prisma.seed` in `package.json`** must be deleted before production.
+- **`src/mocks/index.ts`** tombstone can be deleted once all `src/api/*.ts` stubs hit a real backend endpoint.
+- Any change to `src/types/socket.types.ts` (backend) must be mirrored in `social-calendar-mobile/src/types/`.
 - Every service method that fetches availability for a viewer must check `AvailabilityBlock` first.
-- Overlapping availability windows are resolved in code (DAY > WEEK > MONTH) — there is no DB constraint.
-- `creatorId` on `Event` is denormalized intentionally — always write the corresponding `EventOrganiser` CREATOR row atomically at creation time.
+- Overlapping availability windows are resolved in code (DAY > WEEK > MONTH) — no DB constraint.
+- `creatorId` on `Event` is denormalized — always write the corresponding `EventOrganiser` CREATOR row atomically at creation time.
+- `_types.ts` (publicProfileSelect) is triplicated across Events/Friends/Groups repos — Lead-managed consolidation PR still pending.
