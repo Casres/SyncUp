@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { PillBtn } from '../../components/foundation/PillBtn';
 import { RingAvatar } from '../../components/foundation/RingAvatar';
+import { ErrorToast, TOAST_POSITION_DEFAULTS } from '../../components/polish/ErrorToast';
 import { Spinner } from '../../components/polish/Spinner';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
 import { useContactsMatches } from './onboarding/useContactsMatches';
@@ -34,6 +35,8 @@ export default function FriendFindMatchesScreen({
   const { data: matches = [], isLoading } = useContactsMatches();
   const mutation = useSendFriendRequestFromMatches();
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+  const [errorToastVisible, setErrorToastVisible] = useState(false);
+  const [lastFailed, setLastFailed] = useState<ContactsMatch | null>(null);
 
   // Sort alphabetical, case-insensitive.
   const sorted = [...matches].sort((a, b) =>
@@ -45,9 +48,18 @@ export default function FriendFindMatchesScreen({
     mutation.mutate(match.id, {
       onSuccess: () => setSentIds((prev) => new Set([...prev, match.id])),
       onError: () => {
-        // TODO: wire error toast from onboarding
+        // Mirror FriendProfileScreen pattern: capture which row failed so the
+        // toast's Retry can re-fire the same mutation. ErrorToast itself fires
+        // the H-5 error haptic, so we don't fire one here.
+        setLastFailed(match);
+        setErrorToastVisible(true);
       },
     });
+  }
+
+  function onRetryAdd() {
+    setErrorToastVisible(false);
+    if (lastFailed) onAdd(lastFailed);
   }
 
   function onContinue() {
@@ -94,6 +106,18 @@ export default function FriendFindMatchesScreen({
 
       <View style={styles.ctas}>
         <PillBtn T={T} label="Continue" variant="primary" size="lg" onPress={onContinue} />
+      </View>
+
+      {/* Friend-request mutation failure (R15-10). Retry re-fires the same
+          add against the last failed row. Local UI state only — no Zustand. */}
+      <View pointerEvents="box-none" style={TOAST_POSITION_DEFAULTS}>
+        <ErrorToast
+          T={T}
+          kind="friend"
+          visible={errorToastVisible}
+          onRetry={onRetryAdd}
+          onClose={() => setErrorToastVisible(false)}
+        />
       </View>
     </SafeAreaView>
   );
