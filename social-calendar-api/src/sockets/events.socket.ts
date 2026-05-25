@@ -49,14 +49,24 @@ export function registerEventsHandlers(_io: IoServer, _socket: IoSocket) {
   //                                          user:{co-host id} +
   //                                          user:{accepted invitee id}
   //
-  // TODO (Invites agent): when POST /events/:id/invites lands, emit
-  //   'event:invite:received' to user:{recipientId}. Service signature:
+  //   - eventsService.sendInvites(...)    → emits 'event:invite:received'
+  //                                          to user:{recipientId} for each
+  //                                          NEW invite (idempotent
+  //                                          re-sends don't re-emit).
+  //                                          Also dispatches a GROUP_INVITE
+  //                                          notification via
+  //                                          notificationsService.dispatch.
   //
-  //     invitesService.create(db, io, eventId, recipientIds[]) → InvitePayload[]
+  //   - eventsService.respondToInvite(...) → emits 'event:invite:rsvp'
+  //                                          to user:{organiserId} for each
+  //                                          organiser. Also dispatches an
+  //                                          RSVP notification to each
+  //                                          organiser (excluding the
+  //                                          responding recipient).
   //
-  // TODO (Invites agent): when PATCH /events/:id/invites/:inviteId (RSVP)
-  //   lands, emit 'event:invite:rsvp' to user:{organiserId} for each
-  //   organiser of the event. Service signature:
-  //
-  //     invitesService.respond(db, io, inviteId, status) → void
+  //   - eventsService.rescindInvite(...)   → no socket emission today.
+  //                                          The invited user re-fetches
+  //                                          on the next event:updated
+  //                                          push. Open item if mobile
+  //                                          needs immediate notification.
 }

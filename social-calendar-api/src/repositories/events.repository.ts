@@ -1,4 +1,5 @@
-import { EventOrganiserRole, Prisma } from '@prisma/client';
+import { EventOrganiserRole, InviteStatus, Prisma } from '@prisma/client';
+import type { NotifChannel } from '@prisma/client';
 import type { Db } from './_types.js';
 
 // Re-exported for any consumer that imported `Db` from this module
@@ -185,5 +186,106 @@ export const eventsRepository = {
     return db.eventOrganiser.findUnique({
       where: { eventId_userId: { eventId, userId } },
     });
+  },
+
+  // ─── Invites ─────────────────────────────────────────────────────────
+
+  /**
+   * Bulk-create invites for an event. Uses `createMany` with
+   * `skipDuplicates: true` so re-running the request with overlapping
+   * recipients is idempotent against the `@@unique([eventId,
+   * recipientId])` constraint. Returns the resulting full set of
+   * invites (including any that already existed) so the controller can
+   * echo back a complete picture.
+   *
+   * `friendGroupId` is an audit-trail field: when a creator blasts a
+   * FriendGroup, the same FriendGroup id is stamped onto every
+   * resulting EventInvite. The service is responsible for expanding
+   * the group into individual recipient ids.
+   */
+  async createInvitesIncremental(
+    db: Db,
+    eventId: string,
+    recipientIds: string[],
+    friendGroupId: string | null,
+    notifChannel: NotifChannel | null,
+  ) {
+    if (recipientIds.length === 0) return [];
+    await db.eventInvite.createMany({
+      data: recipientIds.map((recipientId) => ({
+        eventId,
+        recipientId,
+        status: InviteStatus.PENDING,
+        friendGroupId,
+        notifChannel,
+      })),
+      skipDuplicates: true,
+    });
+    return db.eventInvite.findMany({
+      where: { eventId, recipientId: { in: recipientIds } },
+      include: {
+        recipient: {
+          select: publicProfileSelect,
+        },
+      },
+    });
+  },
+
+  /**
+   * Pre-fetch existing invites for the given recipient list so the
+   * service can detect which recipients are NEW vs duplicate (used to
+   * skip notification fan-out on idempotent re-sends).
+   */
+  findInvitesForRecipients(
+    db: Db,
+    eventId: string,
+    recipientIds: string[],
+  ) {
+    if (recipientIds.length === 0) return Promise.resolve([]);
+    return db.eventInvite.findMany({
+      where: { eventId, recipientId: { in: recipientIds } },
+      select: { id: true, recipientId: true },
+    });
+  },
+
+  /**
+   * Find a single invite, gated to a specific event for safety. RLS
+   * keeps non-participants from reading invites they shouldn't see.
+   */
+  findInvite(db: Db, eventId: string, inviteId: string) {
+    return db.eventInvite.findFirst({
+      where: { id: inviteId, eventId },
+      include: { recipient: { select: publicProfileSelect } },
+    });
+  },
+
+  /**
+   * Update invite status (RSVP). Returns null if no row matched
+   * (already deleted, or RLS hid it). The service should re-check the
+   * recipient identity to enforce "only the recipient can RSVP".
+   */
+  async updateInviteStatus(
+    db: Db,
+    eventId: string,
+    inviteId: string,
+    status: InviteStatus,
+  ) {
+    const result = await db.eventInvite.updateMany({
+      where: { id: inviteId, eventId },
+      data: { status },
+    });
+    if (result.count === 0) return null;
+    return this.findInvite(db, eventId, inviteId);
+  },
+
+  /**
+   * Hard-delete an invite. Used by the organiser to rescind. Returns
+   * the row count so the controller can pick 204 vs 404.
+   */
+  async deleteInvite(db: Db, eventId: string, inviteId: string) {
+    const result = await db.eventInvite.deleteMany({
+      where: { id: inviteId, eventId },
+    });
+    return result.count;
   },
 };

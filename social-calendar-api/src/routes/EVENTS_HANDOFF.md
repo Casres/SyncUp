@@ -27,6 +27,9 @@
 | `POST` | `/events` | `title*, description?, location?, startsAt*, endsAt*, recurrence?, recurrenceRuleRaw?, allowSuggestionVoting?` | 201, 400 | Creator becomes `EventOrganiser` with role `CREATOR` atomically. RLS pins `creatorId = current user`. |
 | `PATCH` | `/events/:id` | any subset of create body (nullable for description / location / recurrenceRuleRaw) | 200, 400, 403, 404 | Caller must be an organiser (creator or co-host). Date-range invariant enforced post-merge. |
 | `DELETE` | `/events/:id` | — | 204, 403, 404 | Soft delete (`deletedAt = now()`). Organisers (creator + co-hosts) only — see "Decision: who can delete". |
+| `POST` | `/events/:id/invites` | `recipientIds: string[]`, `friendGroupId?: string \| null`, `notifChannel?: NotifChannel \| null` | 201, 400, 403, 404 | **Added 2026-05-25.** Organiser-only. Idempotent via the `@@unique([eventId, recipientId])` constraint — re-sending invites is a no-op. Emits `event:invite:received` + dispatches a `GROUP_INVITE` notification ONLY to recipients that didn't already have an invite. Body cap: 500 recipients. Response: `{ invites: InvitePayload[] }`. |
+| `PATCH` | `/events/:id/invites/:inviteId` | `status: 'PENDING' \| 'ACCEPTED' \| 'DECLINED' \| 'MAYBE'` | 200, 400, 403, 404 | **Added 2026-05-25.** RSVP. Only the invite recipient may call; everyone else gets 403. Emits `event:invite:rsvp` to every event organiser + dispatches an `RSVP` notification to organisers (excluding the recipient). Response: `InvitePayload`. |
+| `DELETE` | `/events/:id/invites/:inviteId` | — | 204, 403, 404 | **Added 2026-05-25.** Organiser-only. Hard-deletes the invite row. |
 
 Response shape for GET/POST/PATCH:
 
@@ -77,7 +80,7 @@ The user fields exposed in event responses (`id`, `username`, `displayName`, `av
 
 ## Open items the Lead Manager should track
 
-1. **No invite management endpoints.** A creator can make an event but can't invite anyone yet — `EventInvite` rows are read-only in this slice (visible in GET responses). The Friends agent or a dedicated Invites agent should add `POST /events/:id/invites`, `PATCH /events/:id/invites/:inviteId` (RSVP), `DELETE …`. RLS policies for `EventInvite` are already in place (`eventinvite_insert_organiser`, `eventinvite_update_recipient_or_organiser`, etc.).
+1. ~~**No invite management endpoints.**~~ **RESOLVED 2026-05-25** — Invites added to the Events domain (option (a) from the Invites agent prompt). `POST /events/:id/invites`, `PATCH /events/:id/invites/:inviteId`, `DELETE /events/:id/invites/:inviteId` now ship. Decision rationale (recorded in commit body): EventInvite is event-scoped (unique `(eventId, recipientId)`), the existing `src/sockets/events.socket.ts` TODO blocks already anticipated this placement, and a standalone `/invites` module would duplicate event-id resolution + organiser-gating logic. Notifications fan out via `notificationsService.dispatch` after the transaction commits.
 2. **No co-host management endpoints.** Similarly, the creator can't promote anyone to `CO_HOST` yet. `EventOrganiser` writes are gated by `eventorganiser_modify_creator` (creator-only) — the Events agent could add this, but it's a separate concern from the core CRUD slice.
 3. **`EventException` deferred.** The schema supports cancelled / rescheduled / modified instances of recurring events but no controller exists. Calendar UI will see only the master Event until this lands.
 4. **No pagination beyond `limit`.** The list endpoint has `from`/`to`/`limit` but no cursor. For a calendar view (date-bounded queries), this is fine. If we add a "show me everything" view, add cursor pagination.

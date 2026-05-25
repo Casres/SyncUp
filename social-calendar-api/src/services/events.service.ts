@@ -11,10 +11,13 @@ import type {
   ClientToServerEvents,
   EventPayload,
   InterServerEvents,
+  InvitePayload,
   ServerToClientEvents,
   SocketData,
 } from '../types/socket.types.js';
-import { InviteStatus } from '@prisma/client';
+import { InviteStatus, NotifType } from '@prisma/client';
+import type { NotifChannel } from '@prisma/client';
+import { notificationsService } from './notifications.service.js';
 
 export class EventNotFoundError extends Error {
   constructor(id: string) {
@@ -34,6 +37,20 @@ export class EventDateRangeError extends Error {
   constructor() {
     super('Event endsAt must be greater than or equal to startsAt');
     this.name = 'EventDateRangeError';
+  }
+}
+
+export class InviteNotFoundError extends Error {
+  constructor(id: string) {
+    super(`Invite ${id} not found`);
+    this.name = 'InviteNotFoundError';
+  }
+}
+
+export class InviteForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InviteForbiddenError';
   }
 }
 
@@ -168,5 +185,205 @@ export const eventsService = {
     if (!organiser) throw new EventForbiddenError(id);
 
     await eventsRepository.softDelete(db, id);
+  },
+
+  // ─── Invites (incremental endpoints) ───────────────────────────────────
+
+  /**
+   * Send invites for an event. Organiser-only (creator + co-hosts).
+   * Idempotent: if any of `recipientIds` already has an invite, that
+   * row is left untouched and the response still contains it. Pushes
+   * an `event:invite:received` socket event AND a notification to each
+   * NEW recipient.
+   *
+   * Spec: see EVENTS_HANDOFF.md "Open items §1" and the matching socket
+   * TODO block in src/sockets/events.socket.ts.
+   */
+  async sendInvites(
+    db: Db,
+    eventId: string,
+    userId: string,
+    recipientIds: string[],
+    options: {
+      friendGroupId?: string | null;
+      notifChannel?: NotifChannel | null;
+    } = {},
+    io?: IoServer,
+  ): Promise<InvitePayload[]> {
+    // Event must exist + be visible.
+    const event = await eventsRepository.findById(db, eventId);
+    if (!event) throw new EventNotFoundError(eventId);
+
+    // Organiser gate.
+    const organiser = await eventsRepository.findOrganiser(db, eventId, userId);
+    if (!organiser) throw new EventForbiddenError(eventId);
+
+    // No-op early-out for empty lists; saves a SELECT.
+    if (recipientIds.length === 0) return [];
+
+    // Determine which recipients are NEW so we don't notify on
+    // idempotent re-sends.
+    const existing = await eventsRepository.findInvitesForRecipients(
+      db,
+      eventId,
+      recipientIds,
+    );
+    const existingIds = new Set(existing.map((i) => i.recipientId));
+
+    const created = await eventsRepository.createInvitesIncremental(
+      db,
+      eventId,
+      recipientIds,
+      options.friendGroupId ?? null,
+      options.notifChannel ?? null,
+    );
+
+    // Shape to wire form once; we'll need it for both the response and
+    // the socket fan-out.
+    const wire: InvitePayload[] = created.map((row) => ({
+      id: row.id,
+      eventId: row.eventId,
+      recipientId: row.recipientId,
+      status: row.status,
+      friendGroupId: row.friendGroupId,
+      notifChannel: row.notifChannel,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      recipient: row.recipient,
+    }));
+
+    if (io) {
+      for (const invite of wire) {
+        // Only fan out for NEW invites — re-sending the same invite is
+        // a no-op for the recipient.
+        if (existingIds.has(invite.recipientId)) continue;
+        io.to(`user:${invite.recipientId}`).emit('event:invite:received', {
+          invite,
+        });
+      }
+    }
+
+    // Dispatch a notification for each new recipient. Failures here
+    // are non-fatal — the invite has already committed via the
+    // transaction context Prisma passed through.
+    for (const invite of wire) {
+      if (existingIds.has(invite.recipientId)) continue;
+      try {
+        await notificationsService.dispatch(db, io, {
+          userId: invite.recipientId,
+          type: NotifType.GROUP_INVITE,
+          payload: {
+            eventId: invite.eventId,
+            eventName: event.title,
+            actorId: userId,
+          },
+          groupKey: `invite:${invite.eventId}`,
+        });
+      } catch {
+        // Notification fan-out is best-effort.
+      }
+    }
+
+    return wire;
+  },
+
+  /**
+   * RSVP — the invite recipient updates their status. Only the
+   * recipient is allowed to call this; everyone else gets a 403.
+   * Pushes `event:invite:rsvp` to each organiser of the event so
+   * their UIs refresh in real time.
+   */
+  async respondToInvite(
+    db: Db,
+    eventId: string,
+    inviteId: string,
+    userId: string,
+    status: InviteStatus,
+    io?: IoServer,
+  ): Promise<InvitePayload> {
+    const event = await eventsRepository.findById(db, eventId);
+    if (!event) throw new EventNotFoundError(eventId);
+
+    const invite = await eventsRepository.findInvite(db, eventId, inviteId);
+    if (!invite) throw new InviteNotFoundError(inviteId);
+
+    if (invite.recipientId !== userId) {
+      throw new InviteForbiddenError(
+        'Only the invite recipient can change the RSVP',
+      );
+    }
+
+    const updated = await eventsRepository.updateInviteStatus(
+      db,
+      eventId,
+      inviteId,
+      status,
+    );
+    if (!updated) throw new InviteNotFoundError(inviteId);
+
+    const wire: InvitePayload = {
+      id: updated.id,
+      eventId: updated.eventId,
+      recipientId: updated.recipientId,
+      status: updated.status,
+      friendGroupId: updated.friendGroupId,
+      notifChannel: updated.notifChannel,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
+      recipient: updated.recipient,
+    };
+
+    if (io) {
+      for (const o of event.organisers) {
+        io.to(`user:${o.user.id}`).emit('event:invite:rsvp', {
+          eventId,
+          inviteId,
+          status,
+        });
+      }
+      // Dispatch an RSVP notification to organisers so they see "Sam
+      // said yes to Dinner Friday" on their NotifSheet.
+      if (status !== InviteStatus.PENDING) {
+        for (const o of event.organisers) {
+          if (o.user.id === userId) continue;
+          try {
+            await notificationsService.dispatch(db, io, {
+              userId: o.user.id,
+              type: NotifType.RSVP,
+              payload: {
+                eventId,
+                eventName: event.title,
+                actorId: userId,
+                rsvpStatus: status,
+              },
+              groupKey: `rsvp:${eventId}`,
+            });
+          } catch {
+            // best-effort
+          }
+        }
+      }
+    }
+
+    return wire;
+  },
+
+  /**
+   * Rescind an invite. Organiser-only. Hard-deletes the invite row.
+   */
+  async rescindInvite(
+    db: Db,
+    eventId: string,
+    inviteId: string,
+    userId: string,
+  ): Promise<void> {
+    const event = await eventsRepository.findById(db, eventId);
+    if (!event) throw new EventNotFoundError(eventId);
+
+    const organiser = await eventsRepository.findOrganiser(db, eventId, userId);
+    if (!organiser) throw new EventForbiddenError(eventId);
+
+    const count = await eventsRepository.deleteInvite(db, eventId, inviteId);
+    if (count === 0) throw new InviteNotFoundError(inviteId);
   },
 };
