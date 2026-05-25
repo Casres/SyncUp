@@ -1,11 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import authPlugin from './middleware/auth.middleware.js';
+import { availabilityRoutes } from './routes/availability.routes.js';
 import { eventsRoutes } from './routes/events.routes.js';
 import { exploreRoutes } from './routes/explore.routes.js';
 import { friendGroupsRoutes } from './routes/friendGroups.routes.js';
 import { friendsRoutes } from './routes/friends.routes.js';
 import { groupsRoutes } from './routes/groups.routes.js';
 import { healthRoutes } from './routes/health.routes.js';
+import { notificationsRoutes } from './routes/notifications.routes.js';
 import { webhooksRoutes } from './routes/webhooks.routes.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -35,6 +37,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(friendsRoutes, { prefix: '/friends' });
   await app.register(friendGroupsRoutes, { prefix: '/friend-groups' });
   await app.register(groupsRoutes, { prefix: '/groups' });
+  await app.register(notificationsRoutes, { prefix: '/notifications' });
+  await app.register(availabilityRoutes, { prefix: '/availability' });
 
   return app;
 }

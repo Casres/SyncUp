@@ -32,7 +32,7 @@ const prisma = new PrismaClient({
   datasources: { db: { url: process.env.DATABASE_URL } },
 });
 
-// All 14 Prisma models that map to writable Postgres tables.
+// All 16 Prisma models that map to writable Postgres tables.
 // Children listed before parents as defence in depth (CASCADE handles it).
 const TRUNCATE_TABLES = [
   'PollVote',
@@ -51,6 +51,8 @@ const TRUNCATE_TABLES = [
   'EventOrganiser',
   'EventException',
   'UserAvailability',
+  'Notification',
+  'BroadcastSettings',
   'Event',
   'User',
 ] as const;

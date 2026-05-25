@@ -8,6 +8,7 @@ import { registerAvailabilityHandlers } from './availability.socket.js';
 import { registerEventsHandlers } from './events.socket.js';
 import { registerFriendsHandlers } from './friends.socket.js';
 import { registerGroupsHandlers } from './groups.socket.js';
+import { registerNotificationsHandlers } from './notifications.socket.js';
 import { registerPresenceHandlers } from './presence.socket.js';
 import type {
   ClientToServerEvents,
@@ -98,6 +99,7 @@ export function initSocketServer(
     registerFriendsHandlers(io, socket);
     registerGroupsHandlers(io, socket);
     registerAvailabilityHandlers(io, socket);
+    registerNotificationsHandlers(io, socket);
 
     socket.on('disconnect', (reason) => {
       fastify.log.debug(
