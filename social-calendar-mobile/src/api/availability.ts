@@ -7,11 +7,11 @@
  *   / MOCK_BROADCAST_SETTINGS / MOCK_MY_AVAILABILITY / MOCK_SASHA_AVAILABILITY.
  *
  * REAL BACKEND ENDPOINTS
- *   GET  /me/availability                → AvailabilityEntry
- *   PUT  /me/availability                → 204                (body: AvailabilityEntry)
- *   GET  /users/:id/availability         → AvailabilityEntry  (403 if blocked)
- *   GET  /me/broadcasts                  → BroadcastSettings
- *   PUT  /me/broadcasts                  → 204                (body: BroadcastSettings)
+ *   GET  /availability/me                → AvailabilityEntry
+ *   PUT  /availability/me                → 204                (body: AvailabilityEntry)
+ *   GET  /availability/:id               → AvailabilityEntry  (403 if blocked)
+ *   GET  /availability/broadcasts        → BroadcastSettings
+ *   PUT  /availability/broadcasts        → 204                (body: BroadcastSettings)
  *
  * CRITICAL behaviour (per MOCKS_HANDOFF inferred-shape #3 — mock path only):
  *
@@ -84,7 +84,7 @@ export async function getMyAvailability(
     await simulateLatency();
     return { ...MOCK_MY_AVAILABILITY };
   }
-  return authedFetch<AvailabilityEntry>('/me/availability');
+  return authedFetch<AvailabilityEntry>('/availability/me');
 }
 
 export async function getFriendAvailability(
@@ -106,7 +106,7 @@ export async function getFriendAvailability(
     return entry ? { ...entry } : {};
   }
   return authedFetch<AvailabilityEntry>(
-    `/users/${encodeURIComponent(userId)}/availability`,
+    `/availability/${encodeURIComponent(userId)}`,
   );
 }
 
@@ -119,7 +119,7 @@ export async function updateAvailability(
     void entry;
     return;
   }
-  await authedMutate<void>('PUT', '/me/availability', entry);
+  await authedMutate<void>('PUT', '/availability/me', entry);
 }
 
 export async function getBroadcastSettings(
@@ -133,7 +133,7 @@ export async function getBroadcastSettings(
       busy: { ...MOCK_BROADCAST_SETTINGS.busy, targets: [...MOCK_BROADCAST_SETTINGS.busy.targets] },
     };
   }
-  return authedFetch<BroadcastSettings>('/me/broadcasts');
+  return authedFetch<BroadcastSettings>('/availability/broadcasts');
 }
 
 export async function updateBroadcastSettings(
@@ -145,7 +145,7 @@ export async function updateBroadcastSettings(
     void settings;
     return;
   }
-  await authedMutate<void>('PUT', '/me/broadcasts', settings);
+  await authedMutate<void>('PUT', '/availability/broadcasts', settings);
 }
 
 // ---------------------------------------------------------------------------
