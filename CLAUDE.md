@@ -73,6 +73,15 @@ See FRONTEND-HANDOFF.txt for full implementation detail on each gap.
 
 ⚠️ `src/mocks/` seed file must be deleted before production. Do not ship mock data.
 
-## Deferred — do not build yet
+## Round 16 (Friend Profile · QuickProfileSheet drill) — LOCKED 2026-05-25
 
-QuickProfileSheet mutual friend avatar tap → Friend Profile. Spec is incomplete. Stub as a no-op (no haptic, no navigation) until Friend Profile is fully designed.
+Friend Profile is now fully specced (R16-1 through R16-11 in ANCHOR-DESIGN.txt). The previously deferred mutual-friend-avatar tap resolves to a STACKED QuickProfileSheet (depth-1 cap per R16-3), not a deep push to Friend Profile.
+
+If you're picking up where this round left off, the relevant code lives in:
+- `src/screens/friends/FriendProfileScreen.tsx` — overflow trigger, action row, mutation wiring
+- `src/components/social/FriendProfileOverflowMenu.tsx` — Remove / Block / Report
+- `src/components/social/QuickProfileSheet.tsx` — `depth`, `onMutualFriendTap`, `currentUserId` props
+- `src/components/polish/InfoToast.tsx` — DM + Report stub feedback
+- `src/api/friends.ts` — `useRemoveFriend`, `useBlockUser`
+
+DM and Report ship as stubs (toast-only) per R16-9. Promote or remove the buttons within one major round; do not leave "coming soon" copy in production longer than that.

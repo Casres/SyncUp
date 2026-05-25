@@ -91,10 +91,12 @@ behavior has not yet been designed or prototyped.
                specced; reduced-motion fallback (200ms easeOut, instant
                backdrop) added. Gesture is now authoritative path.
 
-[-] QuickProfileSheet mutual friend avatar tap → Friend Profile
-    Component | Deferred | Stub no-op for now. Needs: Friend Profile surface
-               spec to be defined first, then wire the tap through.
-               Do not design this until Friend Profile is fully specced.
+[x] QuickProfileSheet mutual friend avatar tap → resolved as STACKED sheet
+    Component | R16-3 | Resolved 2026-05-25. Tap opens a depth-1
+               QuickProfileSheet over the current one (capped at 1 level).
+               Friend Profile remains reachable from FriendsList /
+               FriendTypesManager / GroupDetail only (R16-2 entry-point
+               whitelist). Self-view guard formalised in R16-4.
 ================================================================
 ## PROTOTYPE / VISUAL GAPS
 ================================================================

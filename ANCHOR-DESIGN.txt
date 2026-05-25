@@ -1,8 +1,250 @@
-# SyncUp — Design System Anchor Document v3.5 (Claude Design working copy)
+# SyncUp — Design System Anchor Document v3.6 (Claude Design working copy)
 # Paste this at the top of a new Claude Design chat to maintain consistency.
-# Updated: 2026-05-22
+# Updated: 2026-05-25
 # This is a trimmed working copy. Full source of truth: ANCHOR.txt
 # Removed: changelog, build notes, component refinements, file map.
+================================================================
+## HARD RULES — Round 16 additions (Friend Profile · QuickProfileSheet drill)
+================================================================
+R16-1. FRIEND PROFILE IS A FULL SCREEN, NOT A SHEET. The Friend Profile
+       surface is a routed screen inside FriendsStack
+       (route: `FriendProfile`, params: { friendId: string }). It is
+       NEVER presented as a sheet, modal, or transient overlay. The
+       anatomy is fixed (SCREENS.md → Friend Profile):
+         1. FlowHeader · back · title "Profile" · trailing overflow
+            (⋯) icon (R16-6).
+         2. Profile hero card · 72px RingAvatar paired with AvailDot +
+            text per R5-1 · h2 name · mono ink3 @handle · CategoryBadge.
+         3. StatTile row (4-up) · HOSTED · ATTENDED · FRIENDS · GROUPS.
+         4. FRIEND TYPES section · chips · display-only per R16-10.
+         5. MUTUAL EVENTS section · read-only list per R16-11.
+         6. Action row · Make Plans + DM (two equal primary pills) per
+            R16-5. Remove friend, Block, and Report all live in the
+            header overflow (R16-6) — NOT in this row.
+       Friend Profile is the ONLY surface that may display friends-only
+       fields (availability ring, friend count, group count, friend
+       type assignments). QuickProfileSheet (R12-6, R15-2) remains the
+       public limited-data surface and is unaffected by this round.
+       NEVER render Friend Profile for a non-friend. Entry resolution
+         is the caller's responsibility (R16-2).
+
+R16-2. FRIEND PROFILE ENTRY POINTS ARE EXPLICITLY ENUMERATED. The only
+       routes that may push `FriendProfile` are:
+         (a) FriendsListScreen · row tap on a confirmed friend.
+         (b) FriendTypesManager · type-member row tap on a confirmed
+             friend (existing behavior · SCREENS.md).
+         (c) GroupDetailScreen · Members row tap on a confirmed friend
+             (SCREENS.md → "Members row → push FriendProfile (if
+             non-self)").
+       The following surfaces explicitly do NOT push Friend Profile:
+         · AttendeesSheet rows (SUPERSEDED by R15-1 · sheet is terminal).
+         · QuickProfileSheet itself · the sheet's primary subject (R15-1
+             friend variant is terminal).
+         · QuickProfileSheet mutual-friend avatars (RESOLVED to a stacked
+             QuickProfileSheet per R16-3 · NOT a deep push to Friend
+             Profile).
+         · InboundBroadcastCard row body · prior intent (DESIGN-BACKLOG
+             line 281) is DEFERRED to a future round and remains stubbed.
+       NEVER add a Friend Profile entry point from any sheet surface in
+         this round. NEVER allow a deep link or push notification to
+         route to Friend Profile for a non-friend target — the route
+         handler must reject with NOT_FRIEND and surface an ErrorState.
+
+R16-3. QUICKPROFILESHEET MUTUAL-FRIEND AVATAR TAP STACKS A SECOND
+       QUICKPROFILESHEET (DEPTH-1 CAP). Tapping a mutual-friend avatar
+       inside the mutual-friends row of any QuickProfileSheet opens a
+       new QuickProfileSheet for the tapped user, layered above the
+       current sheet. The new sheet's variant (friend vs. non-friend)
+       resolves per R15-2 at tap time.
+       Stacking behavior:
+         · The previously open sheet remains mounted underneath; its
+           backdrop opacity is NOT re-applied (the existing 30% backdrop
+           from R12-5 covers both sheets).
+         · The new sheet animates in using the same entrance motion as a
+           first-level QuickProfileSheet (durations.sheetUp · spring per
+           R12-5).
+         · Dismissal of the top sheet (swipe-down per R13-1 OR tap-X)
+           reveals the underlying sheet in place. The underlying sheet's
+           scroll position, expanded-bio state, and optimistic
+           friend-request state are preserved.
+         · Dismissal of the underlying sheet (only reachable after the
+           top sheet is closed) returns to the host surface (Search
+           overlay or AttendeesSheet).
+       Depth cap: exactly ONE level of nesting is permitted. Inside the
+         depth-1 sheet, mutual-friend avatars render but tap is a no-op
+         (no haptic, no navigation, accessibilityState.disabled = true).
+         This prevents runaway nesting and memory bloat.
+       Haptic: depth-0 → depth-1 transition fires `light` (same as
+         QuickProfileSheet open). No haptic on depth-1 mutual taps.
+       NEVER stack a third sheet. NEVER dismiss the underlying sheet
+         while the top sheet is open. NEVER carry optimistic state across
+         sheet levels — each sheet owns its own friendRequest local state.
+
+R16-4. SELF-VIEW GUARD ON MUTUAL-FRIEND AVATARS. If the userId on any
+       mutual-friend avatar (in any QuickProfileSheet at any depth)
+       matches currentUser.id, the avatar is rendered NON-INTERACTIVE:
+         · Pressable is replaced by a plain View (or
+           accessibilityState.disabled = true).
+         · No haptic, no navigation, no visual hover/press state.
+         · The avatar still renders with its status ring (per R15-2) so
+           the user can verify their own appearance in someone else's
+           mutual list — this is informational only.
+       The same guard applies to Friend Profile's MUTUAL EVENTS section
+         row taps (which are read-only per R16-11 regardless, but the
+         guard formalises the rule for any future drill-through).
+       NEVER push FriendProfile with friendId === currentUser.id. The
+         route handler must reject with NOT_FRIEND.
+
+R16-5. FRIEND PROFILE ACTION ROW IS TWO EQUAL PRIMARY PILLS. The bottom
+       of FriendProfileScreen renders a single row of two equal-flex
+       PillBtns side-by-side:
+         · "Make Plans" · variant=primary · size=md · leading icon
+             calendar-plus (16px) · onPress → opens CreateEventStack
+             with `prefilledInviteeIds: [friendId]` · medium haptic.
+         · "DM" · variant=primary · size=md · leading icon message
+             (16px) · onPress → DM stub per R16-9 · light haptic.
+       8px horizontal gap between pills. No destructive action sits in
+         the action row — Remove friend, Block, and Report all live in
+         the header overflow per R16-6.
+       Make Plans and DM share equal visual weight (both primary). This
+         is intentional pending R16-9; revisit if DM has not been
+         promoted to a real system within the next major round.
+       The action row sits below all other sections (R16-1 step 6) and
+         is the LAST element before bottom safe-area inset. It is NOT
+         pinned; it scrolls with the body content.
+       NEVER place Remove friend, Block, or Report in the action row in
+         this round — all three live in the header overflow (R16-6).
+         NEVER show a single full-width primary pill in the action row
+         (would reintroduce the "Plan together" only layout).
+
+R16-6. FRIEND PROFILE HEADER OVERFLOW HOSTS REMOVE FRIEND + BLOCK +
+       REPORT. The FlowHeader trailing slot on FriendProfileScreen
+       renders a ⋯ overflow icon (Ionicons "ellipsis-horizontal" or
+       equivalent Tabler icon, 20px ink2). Tap opens a sheet-style
+       overflow menu (re-use RowOverflowMenu pattern from
+       src/components/social/) with exactly three rows, in this order:
+         (a) "Remove friend" · destructive row · onPress →
+             TwoTapDestructive confirm → useRemoveFriend mutation per
+             R16-7.
+         (b) "Block {firstName}" · destructive row · onPress →
+             TwoTapDestructive confirm → useBlockUser mutation per
+             R16-8.
+         (c) "Report {firstName}" · neutral row · onPress → Report stub
+             per R16-9.
+       Order rationale: rows are ordered by escalation gradient.
+         Remove friend is the lightest and most common action
+         (reversible — friend request can be sent again). Block is the
+         heavier consequence (severs the relationship and hides content
+         system-wide). Report is a separate concern (about behavior,
+         not relationship status) and sits last.
+       The overflow opens with a `light` haptic. Each row tap fires its
+         own haptic per the action's spec (heavy on Remove and Block
+         arms via TwoTapDestructive; success on Report confirm per
+         R16-9). Dismiss tap on backdrop closes the menu without action.
+       Both destructive rows (Remove friend, Block) use the SAME visual
+         treatment — destructive row anatomy (red ink). The escalation
+         is communicated by order, not by color weight.
+       NEVER expose Remove friend or Block as a one-tap action — both
+         must pass through TwoTapDestructive (Hard Rule 7). NEVER add a
+         fourth row in this round (no Mute, no Hide events, no Share
+         profile).
+
+R16-7. REMOVE FRIEND IS A REAL MUTATION WITH SILENT RETURN. The Remove
+       friend row in the header overflow (R16-6 row (a)) opens a
+       TwoTapDestructive confirm, then on confirm invokes
+       `useRemoveFriend(friendId)`. On success:
+         · Cache invalidates `friends.all()` and `friends.profile(id)`.
+         · The overflow menu closes if still open. `navigation.popToTop()`
+           returns the user to FriendsList.
+         · NO toast renders. NO confirmation banner renders. The removed
+           friend simply disappears from the list — the absence is the
+           confirmation. This matches the rest of SyncUp's destructive-
+           action language (TwoTapDestructive is itself the confirmation
+           gesture; a post-success toast would be redundant).
+       On error:
+         · Show ErrorToast `kind='generic'`. Stay on FriendProfileScreen
+           (overflow remains closed; the user can re-open it to retry).
+         · The TwoTapDestructive in the overflow row re-arms on next open.
+       Haptics: TwoTapDestructive handles arm (heavy) and commit (success)
+         internally — no additional firing from the screen.
+       NEVER show a "Removed {name}" toast in this round. NEVER auto-
+         navigate before the mutation resolves (no optimistic pop).
+         NEVER allow Remove friend to be a one-tap action — must always
+         pass through TwoTapDestructive (Hard Rule 7).
+
+R16-8. BLOCK USER IS A REAL MUTATION WITH SILENT RETURN. The Block row
+       in the overflow (R16-6) opens TwoTapDestructive confirm, then on
+       confirm invokes `useBlockUser(friendId)`. On success:
+         · Cache invalidates `friends.all()`, `friends.profile(id)`,
+           and any feed query that surfaces user-authored content
+           (events, broadcasts). A new query key family
+           `blockedUsers.list()` is introduced.
+         · `navigation.popToTop()` returns to FriendsList.
+         · NO toast. Same silent-return language as R16-7.
+       On error: same as R16-7 (ErrorToast generic, stay on screen).
+       Block implicitly removes the friendship — the backend treats Block
+         as a superset of Remove. The UI does NOT call useRemoveFriend
+         separately.
+       Haptics: TwoTapDestructive handles arm + commit internally.
+       NEVER expose Block without TwoTapDestructive. NEVER show an
+         explicit "blocked" affordance on Friend Profile (the screen is
+         no longer reachable for blocked users — they're filtered out of
+         friends list).
+
+R16-9. DM AND REPORT ARE STUBS UNTIL THEIR BACKING SYSTEMS LAND. In
+       this round, DM and Report are intentionally shipped as stubs:
+         · DM tap → fires `light` haptic + renders a transient toast:
+             "Direct messaging is coming soon."
+             Toast variant: standard info · 2200ms duration · no Undo.
+         · Report tap → opens TwoTapDestructive confirm (single confirm
+             step, "Tap again to report"). On confirm: fires `success`
+             haptic + renders a transient toast:
+             "Thanks — we'll review this report."
+             No mutation is called. No server roundtrip. The user-facing
+             affordance exists; the backend wiring does not.
+       Both stubs are documented in DESIGN-BACKLOG.txt with their
+         follow-up systems (DM = full messaging surface; Report = real
+         moderation pipeline). When either real system lands, this rule
+         is superseded for that affordance.
+       The visual treatment of DM in the action row (R16-5) is FULL
+         PRIMARY pill weight despite being a stub. This is a known
+         tradeoff: equal visual weight may set user expectations the
+         feature cannot meet in this round. Flagged for revisit if DM
+         is not promoted to a real system in the next major round.
+       NEVER ship a "Coming soon" toast for more than one major round
+         without either promoting the feature or removing the button.
+         NEVER call any DM or Report endpoint in this round — both are
+         pure client-side stubs.
+
+R16-10. FRIENDTYPE CHIPS ON FRIEND PROFILE ARE DISPLAY-ONLY. The FRIEND
+       TYPES section on FriendProfileScreen renders zero-or-more chips,
+       one per FriendType containing this friend. Chip anatomy is
+       identical to existing screen (caption text, accentSoft fill,
+       hair border, radius pill).
+       Tap on a chip is a NO-OP — no haptic, no navigation. Editing
+         FriendType membership lives entirely in FriendTypesManager
+         (route: FriendTypesManager). To change which types a friend
+         belongs to, the user must navigate there.
+       The "Friend type assigned (chip toggle here) → medium" haptic
+         documented in SCREENS.md is RESCINDED in this round — that
+         haptic only applies inside FriendTypesManager.
+       NEVER allow inline toggle of FriendType membership on Friend
+         Profile in this round.
+
+R16-11. MUTUAL EVENTS ON FRIEND PROFILE ARE READ-ONLY. The MUTUAL EVENTS
+       section on FriendProfileScreen renders past + upcoming events
+       where both currentUser and friendId are invitees.
+       Each event renders as a stacked row with:
+         · Event title · bodyMed ink · 1-line clamp.
+         · Event ISO timestamp · caption ink2.
+       Tap on an event row is a NO-OP — no haptic, no navigation. The
+         list is informational only.
+       Empty state renders EmptyMutualEvents per existing screen.
+       Future round may add tap-to-EventDetail; until that is specced
+         explicitly, the list remains read-only to keep Friend Profile
+         minimal and the navigation graph predictable.
+       NEVER push EventDetail from Friend Profile in this round.
+
 ================================================================
 ## HARD RULES — Round 15 additions (AttendeesSheet row-tap + scale · Onboarding stack)
 ================================================================
@@ -1786,7 +2028,10 @@ R6-5. UNREAD ARBITRATION. Activity tab dot = silent affordance (icon
       copy). They share state. Never communicate the same thing in the
       same modality at the same time.
 R6-6. PROFILE TAB ROUTES TO PROFILE & SETTINGS. Tab order is fixed:
-      Home · Broadcast · Activity · Friends · Profile.
+      Home · Explore · Create(+) · Friends · Profile. (Locked 2026-05-25
+      — see "TAB BAR IA (LOCKED)" section below for the canonical spec.
+      The earlier Broadcast/Activity proposal was retired when Activity
+      moved off-tab to NotifSheet via the Home FlowHeader bell.)
 R6-7. NOTIFICATIONS GROUPING. Day overlines only — TODAY · YESTERDAY ·
       named-day ("TUE APR 22") for ≤7 days back · "EARLIER" beyond.
       No grouping by kind, sender, or event. Recency is the index.
@@ -1843,7 +2088,11 @@ R5-8. HAPTICS — 6 types only (light/medium/heavy/success/warning/error).
 21. Stack inbound broadcasts per sender within 60-minute window.
 22. Unread arbitration: Activity tab dot is silent; Home pull pill carries
     words. Both clear in lockstep.
-23. Tab IA is LOCKED: Home · Broadcast · Activity · Friends · Profile.
+23. Tab IA is LOCKED: Home · Explore · Create(+) · Friends · Profile.
+    (Updated 2026-05-25. GroupsTab registered in RootNavigator for
+    cross-tab navigation but hidden from the bar — groups reached via
+    the Friends tab. Activity surface lives in NotifSheet, opened from
+    the Home FlowHeader bell, not a tab slot.)
 24. Notifications grouping is BY DAY only — TODAY · YESTERDAY ·
     named-day (≤7d) · EARLIER.
 ================================================================
@@ -2368,18 +2617,30 @@ Dark mode notes (tokens only — no hardcoded color values in components):
 ================================================================
 ## TAB BAR IA (LOCKED)
 ================================================================
-5 tabs LEFT → RIGHT:
-  1. Home       calendar glyph
-  2. Broadcast  radio-wave glyph
-  3. Activity   bell glyph → opens NotifSheet at full detent
-  4. Friends    users glyph (Friends + Groups via SegmentedSwitcher)
-  5. Profile    person glyph → Profile & Settings
-Bar: 64pt + 24pt safe-area · bgElevated · 1px hair top.
-Each tab: 44×44 hit area · 24px glyph · 10/700 mono label.
-Active: filled glyph · accent color · 4px dot under label (200ms easeOut).
-Inactive: stroke glyph · ink3.
-Activity unread dot: 8px T.pop, 1.5px bg-colored stroke, top-right of glyph.
-FGTabBar (4-tab) retained ONLY in Friends & Groups.html prototype. Deprecated elsewhere.
+5 slots LEFT → RIGHT:
+  1. Home     Ionicons `home` (active) / `home-outline` (inactive)
+  2. Explore  Ionicons `compass` / `compass-outline`
+  3. Create   Center 48×48 accent pill with white "+" — NOT a tab screen.
+              Intercepts `tabPress`, fires `medium` haptic, opens
+              CreateEventModal at the root stack via getParent().
+  4. Friends  Ionicons `people` / `people-outline` (Friends + Groups via
+              SegmentedSwitcher inside the Friends screen)
+  5. Profile  Ionicons `person-circle` / `person-circle-outline` →
+              Profile & Settings
+Bar: TAB_BAR_HEIGHT = 83pt total (49pt content + 34pt iPhone safe-area
+inset) · bgElevated · StyleSheet.hairlineWidth top border in `hair`.
+Tab slots: flex:1, 8px hitSlop, 24px glyph, caption-token mono label
+(see typography.caption), `light` haptic on tab change.
+Active: filled glyph · accent color · accent label.
+Inactive: outline glyph · ink3 · ink3 label.
+Create slot: 48×48 accent circle (radii.pill), shadowAccent soft shadow,
+28px "+" icon rendered in bgElevated color, no label, `medium` haptic.
+Icons: Ionicons exclusively. Do not mix icon sets.
+GroupsTab is registered in RootNavigator for cross-tab navigation but
+hidden from the tab bar by design — groups are reached via the Friends
+tab's SegmentedSwitcher.
+FGTabBar (4-tab) retained ONLY in Friends & Groups.html prototype.
+Deprecated elsewhere.
 ================================================================
 ## SCREENS — Round 4 inventory
 ================================================================
@@ -2835,11 +3096,32 @@ Resolved in Round 15 (AttendeesSheet scale · Onboarding stack):
   ✓ First-run empty states show tuned copy on Home, Friends segment,
       Groups segment, and Activity until any User.stats counter
       becomes non-zero (R15-13). One-way global transition.
+Resolved in Round 16 (Friend Profile · QuickProfileSheet drill):
+  ✓ Friend Profile is a full screen with locked anatomy and an enumerated
+      entry-point list (R16-1, R16-2). Replaces the prior deferred-spec
+      state — the screen now has authoritative rules instead of a
+      SCREENS.md sketch.
+  ✓ QuickProfileSheet mutual-friend avatar tap stacks a second
+      QuickProfileSheet (depth-1 cap · R16-3). Resolves the prior
+      "stub no-op for now" item. Self-view guard formalised (R16-4).
+  ✓ Friend Profile action row simplified to two equal primary pills
+      (Make Plans + DM · R16-5). Destructive actions moved to the header
+      overflow.
+  ✓ Header overflow hosts Remove friend / Block / Report in escalation
+      order (R16-6). Both destructive rows route through
+      TwoTapDestructive (Hard Rule 7).
+  ✓ Remove friend (R16-7) and Block (R16-8) wired to real mutations
+      with silent return to FriendsList. Block invalidates friends +
+      events + notifications + blocks caches.
+  ✓ DM and Report are intentional stubs in this round (R16-9). DM fires
+      a "coming soon" InfoToast; Report fires a success toast after a
+      TwoTap confirm. One-round expiry clause attached.
+  ✓ FriendType chips on Friend Profile are display-only (R16-10).
+      Inline-toggle haptic from SCREENS.md is rescinded.
+  ✓ Mutual events on Friend Profile are read-only (R16-11).
 Still open:
   - Search overlay wiring into SyncUp Prototype.html app shell — pending
       (separate Claude Code pass, not a design task).
-  - QuickProfileSheet mutual friend avatar tap → Friend Profile path
-      not yet specced; stub no-op for now.
   - PASSWORD REQUIREMENTS (R15) — confirm Clerk's enforced minimum
       matches the visible UX bar ("8+ chars AND one number or symbol").
       If Clerk requires stricter (length 10, banned-password list),

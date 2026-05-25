@@ -46,12 +46,12 @@ import {
 } from '../components/notifications';
 import { SearchProvider } from '../components/social/SearchContext';
 
-// DESIGN DISCREPANCY (2026-05-10): ANCHOR R6-6 specifies tab order
-// Home·Broadcast·Activity·Friends·Profile. Current impl has
-// Home·Explore·Create·Friends·Profile. The ActivityTab (bell → NotifSheet)
-// is not wired to a tab yet. NotifSheet is currently accessible via
-// HomeScreen FlowHeader bell icon (pull-from-home + bell tap). Reconciling
-// the tab order is a separate task — do not combine with GAP 6.
+// TAB BAR IA (LOCKED 2026-05-25): Home · Explore · Create(+) · Friends ·
+// Profile. ANCHOR R6-6 + Hard Rule 23 updated to match. NotifSheet is a
+// root-level overlay (mounted below) opened from the Home FlowHeader bell
+// — it is intentionally NOT a tab. GroupsTab is registered for cross-tab
+// navigation but hidden from the bar; groups are reached via the Friends
+// tab's SegmentedSwitcher.
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<RootTabParamList>();

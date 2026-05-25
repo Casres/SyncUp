@@ -35,9 +35,9 @@
 // the app factory). `setupFilesAfterEnv` runs in the test file's
 // module-load phase, before the test body's dynamic import of the app.
 process.env.DATABASE_URL ??=
-  'postgresql://syncup_owner:syncup_owner_password@localhost:5432/syncup';
+  'postgresql://syncup_migrate:syncup_migrate_dev@localhost:5432/syncup';
 process.env.DATABASE_URL_APP ??=
-  'postgresql://syncup_app:syncup_app_password@localhost:5432/syncup';
+  'postgresql://syncup_app:syncup_app_dev@localhost:5432/syncup';
 process.env.REDIS_URL ??= 'redis://localhost:6379';
 process.env.CLERK_SECRET_KEY ??= 'sk_test_jest_placeholder';
 process.env.CLERK_WEBHOOK_SECRET ??= 'whsec_jest_placeholder';

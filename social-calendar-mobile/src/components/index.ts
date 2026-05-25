@@ -78,6 +78,9 @@ export { ErrorState } from './polish/ErrorState';
 export { ErrorToast, TOAST_POSITION_DEFAULTS } from './polish/ErrorToast';
 export type { ErrorToastProps } from './polish/ErrorToast';
 
+export { InfoToast } from './polish/InfoToast';
+export type { InfoToastProps } from './polish/InfoToast';
+
 export { LoadingOverlay } from './polish/LoadingOverlay';
 
 export { OfflineBar } from './polish/OfflineBar';
@@ -191,6 +194,10 @@ export type {
   RowOverflowMenuProps,
   OverflowMenuItem,
 } from './social/RowOverflowMenu';
+
+// ── R16-6 — Friend Profile header overflow menu ────────────────────────────
+export { FriendProfileOverflowMenu } from './social/FriendProfileOverflowMenu';
+export type { FriendProfileOverflowMenuProps } from './social/FriendProfileOverflowMenu';
 
 export { CoHostBadge } from './social/CoHostBadge';
 export type { CoHostBadgeProps } from './social/CoHostBadge';

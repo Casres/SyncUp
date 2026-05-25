@@ -1,5 +1,6 @@
 /**
- * QuickProfileSheet — public mini-profile bottom sheet (R12-5, R12-6).
+ * QuickProfileSheet — public mini-profile bottom sheet (R12-5, R12-6, R15-2,
+ * R16-3, R16-4).
  *
  * TODO (GAP 2): Trigger from PEOPLE row body tap in SearchOverlay.
  *   This sheet is built fully self-contained; the search overlay wiring
@@ -11,9 +12,23 @@
  *   ✗ NEVER show: availability · friend count · group membership ·
  *     friend type data. These are friends-only fields.
  *
- * Stacking (R12-5): the sheet sits on TOP of the Search overlay. The
- * overlay stays mounted behind it and is already opaque, so the backdrop
- * here is intentionally 30% black (not the usual 42%).
+ * Stacking — depth=0 (R12-5):
+ *   The sheet sits on TOP of the Search overlay or AttendeesSheet. The
+ *   underlying surface stays mounted; the sheet's backdrop is 30% black
+ *   (intentionally lower than the standard 42%).
+ *
+ * Stacking — depth=1 (R16-3):
+ *   A second QuickProfileSheet may be stacked above a depth-0 sheet when
+ *   the user taps a mutual-friend avatar. The depth-1 sheet renders with
+ *   a transparent backdrop — the depth-0 backdrop already covers the
+ *   surface beneath, and stacking two 30% alpha layers would double-
+ *   darken the screen. Mutual-friend taps inside a depth-1 sheet are
+ *   no-ops (R16-3 depth cap = 1).
+ *
+ * Self-view guard (R16-4):
+ *   If a mutual-friend avatar's userId equals `currentUserId`, the
+ *   avatar renders as a non-interactive View (no Pressable, no haptic,
+ *   no navigation). The avatar still shows its status ring per R15-2.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -109,6 +124,30 @@ export interface QuickProfileSheetProps {
   onAccept: () => void;
   onDecline: () => void;
   onClose: () => void;
+  /**
+   * R16-3 — Stacking depth.
+   *   depth=0: standard sheet with 30% backdrop. Mutual-friend taps fire
+   *            `onMutualFriendTap` if provided.
+   *   depth=1: stacked sheet (sits above a depth-0 sheet). Backdrop is
+   *            transparent so the existing depth-0 backdrop covers the
+   *            surface beneath. Mutual-friend taps are NO-OPS (depth cap).
+   * Defaults to 0.
+   */
+  depth?: 0 | 1;
+  /**
+   * R16-3 — Called when the user taps a mutual-friend avatar at depth 0.
+   * Receives the tapped userId; the caller is responsible for opening the
+   * stacked depth-1 sheet (with the new userId resolved into props).
+   * Omitted/undefined at depth 1, or when the host surface chooses not to
+   * support drilling (e.g. SearchOverlay before GAP 2 is wired).
+   */
+  onMutualFriendTap?: (userId: string) => void;
+  /**
+   * R16-4 — Self-view guard. Mutual-friend avatars whose `id` matches this
+   * value render as non-interactive (no Pressable, no haptic). Optional;
+   * when undefined the guard is skipped.
+   */
+  currentUserId?: string;
 }
 
 const SHEET_MAX_HEIGHT_PCT = 0.72;
@@ -130,6 +169,9 @@ export function QuickProfileSheet({
   onAccept,
   onDecline,
   onClose,
+  depth = 0,
+  onMutualFriendTap,
+  currentUserId,
 }: QuickProfileSheetProps): React.JSX.Element | null {
   const fire = useHaptic();
 
@@ -197,10 +239,18 @@ export function QuickProfileSheet({
 
   const showLoading = loading || person === null;
 
+  // R16-3 — depth-1 sheets render with a transparent backdrop. The depth-0
+  // sheet beneath already supplies the 30% layer (R12-5); stacking two would
+  // double-darken the screen.
+  const backdropColor =
+    depth === 1
+      ? 'transparent'
+      : `rgba(0,0,0,${BACKDROP_OPACITY})`;
+
   return (
     <Modal transparent visible animationType="none" onRequestClose={dismiss}>
       <Pressable
-        style={[styles.backdrop, { backgroundColor: `rgba(0,0,0,${BACKDROP_OPACITY})` }]}
+        style={[styles.backdrop, { backgroundColor: backdropColor }]}
         accessibilityRole="none"
         accessibilityLabel="Dismiss profile sheet"
         onPress={dismiss}
@@ -299,24 +349,48 @@ export function QuickProfileSheet({
                         {`${mutualFriends.length} MUTUAL FRIEND${mutualFriends.length === 1 ? '' : 'S'}`}
                       </Overline>
                       <View style={styles.mutualRow}>
-                        {limitedMutuals.map((mf) => (
-                          <Pressable
-                            key={mf.id}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Mutual friend ${mf.name}`}
-                            onPress={() => {
-                              // TODO: navigate to Friend Profile (deferred per CLAUDE.md).
-                              // No haptic per spec — pure stub.
-                            }}
-                          >
+                        {limitedMutuals.map((mf) => {
+                          // R16-4 — self-view guard.
+                          const isSelf = currentUserId !== undefined && mf.id === currentUserId;
+                          // R16-3 — at depth=1 the mutual tap is a no-op (depth cap).
+                          // At depth=0, a tap fires `light` haptic and asks the
+                          // caller to open a stacked sheet.
+                          const interactive = !isSelf && depth === 0 && onMutualFriendTap !== undefined;
+                          const avatar = (
                             <RingAvatar
                               T={T}
                               letter={mf.letter}
                               size={24}
                               status={mf.availState ?? null}
                             />
-                          </Pressable>
-                        ))}
+                          );
+                          if (!interactive) {
+                            return (
+                              <View
+                                key={mf.id}
+                                accessibilityRole="image"
+                                accessibilityLabel={`Mutual friend ${mf.name}`}
+                                accessibilityState={{ disabled: true }}
+                              >
+                                {avatar}
+                              </View>
+                            );
+                          }
+                          return (
+                            <Pressable
+                              key={mf.id}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Open profile for ${mf.name}`}
+                              hitSlop={4}
+                              onPress={() => {
+                                fire('light');
+                                onMutualFriendTap?.(mf.id);
+                              }}
+                            >
+                              {avatar}
+                            </Pressable>
+                          );
+                        })}
                       </View>
                     </View>
                   ) : null}

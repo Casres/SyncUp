@@ -887,7 +887,9 @@ R6-5. UNREAD ARBITRATION. Activity tab dot = silent affordance (icon
       copy). They share state. Never communicate the same thing in the
       same modality at the same time.
 R6-6. PROFILE TAB ROUTES TO PROFILE & SETTINGS. Tab order is fixed:
-      Home · Broadcast · Activity · Friends · Profile.
+      Home · Explore · Create(+) · Friends · Profile. (Locked 2026-05-25.
+      Canonical source is ANCHOR-DESIGN.txt v3.5 — this file is a v3.4
+      working copy.)
 R6-7. NOTIFICATIONS GROUPING. Day overlines only — TODAY · YESTERDAY ·
       named-day ("TUE APR 22") for ≤7 days back · "EARLIER" beyond.
       No grouping by kind, sender, or event. Recency is the index.
@@ -944,7 +946,8 @@ R5-8. HAPTICS — 6 types only (light/medium/heavy/success/warning/error).
 21. Stack inbound broadcasts per sender within 60-minute window.
 22. Unread arbitration: Activity tab dot is silent; Home pull pill carries
     words. Both clear in lockstep.
-23. Tab IA is LOCKED: Home · Broadcast · Activity · Friends · Profile.
+23. Tab IA is LOCKED: Home · Explore · Create(+) · Friends · Profile.
+    (Updated 2026-05-25 — canonical source is ANCHOR-DESIGN.txt v3.5.)
 24. Notifications grouping is BY DAY only — TODAY · YESTERDAY ·
     named-day (≤7d) · EARLIER.
 ================================================================

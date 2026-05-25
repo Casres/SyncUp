@@ -65,11 +65,11 @@ open Claude Code → paste the file contents → let it run.
 ## Key architectural facts
 
 - **NotifSheet** is a root-level overlay, not a nav screen. Controlled via `NotifSheetContext` (openPeek / openFull / dismiss).
-- **Tab bar discrepancy:** spec says `Home · Broadcast · Activity · Friends · Profile`, code has `Home · Explore · Create+ · Friends · Profile`. Documented in RootNavigator.tsx with a TODO. Do not reconcile during feature builds.
+- **Tab bar (LOCKED 2026-05-25):** `Home · Explore · Create(+) · Friends · Profile`. Spec rewritten to match shipped code; the earlier Broadcast/Activity proposal is dead. NotifSheet stays a root-level overlay opened from the Home FlowHeader bell — it is intentionally NOT a tab. See ANCHOR-DESIGN.txt → "TAB BAR IA (LOCKED)" + R6-6 + Hard Rule 23.
 - **Haptics:** `useHaptic()` only — never call expo-haptics directly. 6 types: light · medium · heavy · success · warning · error.
 - **Destructive actions:** always TwoTapDestructive — no confirmation modals, no single-tap deletes.
 - **Loading states:** Spinner only — no skeletons, no shimmer.
-- **Friend Profile nav:** stub as no-op everywhere until Friend Profile is fully designed (per CLAUDE.md).
+- **Friend Profile (LOCKED 2026-05-25):** FriendProfileScreen.tsx is shipped per Round 16 (R16-1..R16-11). Route `FriendProfile` lives in FriendsStack with `{ friendId: string }` params. QuickProfileSheet mutual-friend avatar tap stacks a depth-1 QuickProfileSheet (NOT a deep push to Friend Profile, per R16-3). DM and Report are toast-only stubs per R16-9 — promote or remove within one major round.
 - **`coHostIds: string[]`** was missing from the Event type in TYPES.ts — added as part of GAP 3 build.
 
 ---

@@ -92,18 +92,27 @@ social-calendar-mobile/
 │       ├── profile/
 │       └── SCREENS_HANDOFF.md
 ================================================================
-## TAB BAR (LOCKED — R6-6, Hard Rule 23)
+## TAB BAR (LOCKED — R6-6, Hard Rule 23 · updated 2026-05-25)
 ================================================================
 Tab order is fixed and must never change:
-  1. Home        (house icon)
-  2. Broadcast   (megaphone / antenna icon)
-  3. Activity    (bell icon)  ← opens NotifSheet at full detent
-  4. Friends     (people icon)
-  5. Profile     (person icon)
+  1. Home        (home icon)
+  2. Explore     (compass icon)
+  3. Create (+)  (center accent pill — NOT a tab screen; intercepts
+                  tabPress and opens CreateEventModal at the root)
+  4. Friends     (people icon; Friends + Groups via SegmentedSwitcher)
+  5. Profile     (person-circle icon)
 
-Unread dot on Activity tab = silent icon dot only (no copy).
-Home pull-to-reveal pill = "N NEW" verbal affordance.
-Both share unread count state and clear in lockstep (R6-5).
+GroupsTab is registered in RootNavigator for cross-tab navigation but
+hidden from the bar — groups are reached via the Friends tab's
+SegmentedSwitcher.
+
+Activity surface (NotifSheet) is NOT a tab. It is a root-level overlay
+opened from the Home FlowHeader bell or via pull-from-home. NotifSheet
+has two detents — peek (44%) and full (88%) — per R12-1 / Hard Rule 19.
+
+Unread arbitration (R6-5): Home pull-to-reveal pill carries "N NEW"
+copy; bell icon carries a silent pop-dot. Both share unread count
+state and clear in lockstep.
 ================================================================
 ## BUILD GAPS — WHAT NEEDS TO BE BUILT
 ================================================================

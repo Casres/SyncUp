@@ -562,7 +562,15 @@ export function AttendeesSheet({
         </Animated.View>
       </Pressable>
 
-      {/* R15-1: QuickProfileSheet stacked above AttendeesSheet */}
+      {/* R15-1: QuickProfileSheet stacked above AttendeesSheet.
+          R16-4: pass `currentUserId` so the (currently-empty) mutual-friend
+          list applies the self-view guard once GAP 2 / SearchOverlay starts
+          populating real mutuals.
+          R16-3: AttendeesSheet does not yet supply mutualFriends for this
+          surface (mutual computation belongs to SearchOverlay's data layer).
+          Until that lands, mutual-friend taps are no-ops by construction
+          (empty list). Stacking machinery is ready in QuickProfileSheet
+          regardless — pass `onMutualFriendTap` to opt into depth-1 here. */}
       {quickTarget ? (
         <QuickProfileSheet
           T={T}
@@ -583,6 +591,8 @@ export function AttendeesSheet({
           onAccept={() => {}}
           onDecline={() => {}}
           onClose={() => setQuickProfileTargetId(null)}
+          depth={0}
+          currentUserId={currentUserId}
         />
       ) : null}
     </Modal>

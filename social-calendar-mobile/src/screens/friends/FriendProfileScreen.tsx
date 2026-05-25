@@ -1,54 +1,77 @@
 /**
  * FriendProfileScreen — Friend's profile + shared availability + actions.
  *
- * SCREENS.md Friend Profile layout:
- *  1. FlowHeader back + title "Profile"
+ * Anatomy (R16-1):
+ *  1. FlowHeader · back · title "Profile" · trailing overflow (⋯) per R16-6
  *  2. Profile card: 72px RingAvatar (paired AvailDot for R5-1) + name (h2)
  *     + handle (mono ink3) + CategoryBadge
  *  3. StatTile row — HOSTED · ATTENDED · FRIENDS · GROUPS
- *  4. Friend types — chips listing FriendType buckets this friend is in
- *  5. Mutual events
- *  6. Shared availability (handles FORBIDDEN gracefully — "Availability private")
- *  7. Action row: "Plan together" primary + "Remove friend" TwoTapDestructive
+ *  4. Friend types — chips listing FriendType buckets this friend is in.
+ *     R16-10: display-only on this screen. Tap is a no-op.
+ *  5. Mutual events. R16-11: read-only list. Tap is a no-op.
+ *  6. Action row: two equal primary pills — Make Plans + DM (R16-5).
+ *     Remove friend / Block / Report all live in the header overflow.
  *
  * FORBIDDEN handling: useFriendAvailability returns ApiError('FORBIDDEN', …)
- * for user-3 (Marcus). Render "Availability private" — DO NOT show ErrorToast.
+ * for friends who haven't shared their availability. Render "Availability
+ * private" — DO NOT show ErrorToast.
  *
  * Empty state: Mutual events empty → EmptyMutualEvents.
  *
- * Hard rules: Hard Rule 7 (TwoTapDestructive — only destructive pattern),
- * R5-1 (paired dot + label), R5-6 (truncation).
+ * Hard rules: Hard Rule 7 (TwoTapDestructive — handled inside the overflow
+ * rows per R16-6), R5-1 (paired dot + label), R5-6 (truncation).
  *
- * Haptics: Friend type assigned (chip toggle) → medium; Remove friend arm →
- * heavy + commit success — fired internally by TwoTapDestructive.
+ * Haptics:
+ *  - Make Plans → medium
+ *  - DM stub → light (R16-9)
+ *  - Overflow open → light
+ *  - Remove/Block arm → heavy; commit → success (fired by overflow rows)
+ *  - Report arm → light; commit → success (fired by overflow row, R16-9)
+ *
+ * State-management note (per project CLAUDE.md):
+ *  - Server data lives in React Query only — useFriendProfile, useFriends,
+ *    useFriendAvailability, useEvents, useRemoveFriend, useBlockUser.
+ *  - Transient UI state (overflow open, toast visibility) is local React
+ *    state. No Zustand.
  */
-import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   AvailDot,
   CategoryBadge,
   EmptyMutualEvents,
   ErrorState,
+  ErrorToast,
   FlowHeader,
+  FriendProfileOverflowMenu,
+  InfoToast,
   LoadingOverlay,
   Overline,
   PillBtn,
   RingAvatar,
   StatTile,
-  TwoTapDestructive,
+  TOAST_POSITION_DEFAULTS,
 } from '../../components';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
 import {
+  useBlockUser,
   useEvents,
   useFriendAvailability,
   useFriendProfile,
   useFriends,
+  useRemoveFriend,
 } from '../../api';
 import { MOCK_FRIEND_LABELS, MOCK_FRIEND_TYPES } from '../../mocks';
 import type { FriendProfileScreenProps } from '../../navigation/types';
 import type { AvailState, Event } from '../../../../TYPES';
+
+// R16-9 stub copy. Centralized so future rounds can promote either string
+// without grepping for it.
+const DM_STUB_COPY = 'Direct messaging is coming soon.';
+const REPORT_CONFIRM_COPY = "Thanks — we'll review this report.";
 
 export default function FriendProfileScreen({
   navigation,
@@ -62,6 +85,15 @@ export default function FriendProfileScreen({
   const { data: friends } = useFriends();
   const { data: friendAvail, error: availError } = useFriendAvailability(friendId);
   const { data: events } = useEvents();
+
+  // ── R16-7 / R16-8 mutations ────────────────────────────────────────────────
+  const removeFriend = useRemoveFriend();
+  const blockUser = useBlockUser();
+
+  // ── Transient UI state (R16-6 overflow + R16-9 toasts + error toast) ──────
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [infoToast, setInfoToast] = useState<string | null>(null);
+  const [errorToastVisible, setErrorToastVisible] = useState(false);
 
   const friend = friends?.find((f) => f.id === friendId);
   const labelLookup = useMemo(() => {
@@ -82,6 +114,82 @@ export default function FriendProfileScreen({
   }, [events, friendId]);
 
   const availabilityBlocked = availError?.code === 'FORBIDDEN';
+
+  // ── Handlers (R16-5 / R16-6 / R16-7 / R16-8 / R16-9) ──────────────────────
+  const handleMakePlans = useCallback(() => {
+    fire('medium');
+    navigation.navigate('CreateEventModal', {
+      screen: 'Step1',
+      params: { prefilledInviteeIds: [friendId] },
+    });
+  }, [fire, friendId, navigation]);
+
+  const handleDmStub = useCallback(() => {
+    // R16-9 — DM is intentionally a stub in this round. No network roundtrip.
+    fire('light');
+    setInfoToast(DM_STUB_COPY);
+  }, [fire]);
+
+  const handleOpenOverflow = useCallback(() => {
+    fire('light');
+    setOverflowOpen(true);
+  }, [fire]);
+
+  const handleCloseOverflow = useCallback(() => {
+    setOverflowOpen(false);
+  }, []);
+
+  const handleRemoveConfirm = useCallback(() => {
+    // R16-7 — silent return on success; ErrorToast on failure.
+    removeFriend.mutate(friendId, {
+      onSuccess: () => {
+        setOverflowOpen(false);
+        navigation.popToTop();
+      },
+      onError: () => {
+        setOverflowOpen(false);
+        setErrorToastVisible(true);
+      },
+    });
+  }, [friendId, navigation, removeFriend]);
+
+  const handleBlockConfirm = useCallback(() => {
+    // R16-8 — silent return on success; ErrorToast on failure. Block is a
+    // superset of Remove on the backend; the mutation itself handles cache
+    // invalidation across friends, events, notifications, and blocks.
+    blockUser.mutate(friendId, {
+      onSuccess: () => {
+        setOverflowOpen(false);
+        navigation.popToTop();
+      },
+      onError: () => {
+        setOverflowOpen(false);
+        setErrorToastVisible(true);
+      },
+    });
+  }, [blockUser, friendId, navigation]);
+
+  const handleReportConfirm = useCallback(() => {
+    // R16-9 — Report is a client-side stub. No mutation, no roundtrip.
+    setOverflowOpen(false);
+    setInfoToast(REPORT_CONFIRM_COPY);
+  }, []);
+
+  // ── Header trailing slot: ⋯ overflow trigger ──────────────────────────────
+  const headerRight = useMemo(
+    () => (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="More options"
+        hitSlop={8}
+        onPress={handleOpenOverflow}
+        style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
+      >
+        <Ionicons name="ellipsis-horizontal" size={20} color={T.ink2} />
+      </Pressable>
+    ),
+    [T.ink2, handleOpenOverflow],
+  );
 
   if (isLoading) {
     return (
@@ -108,10 +216,16 @@ export default function FriendProfileScreen({
   }
 
   const friendTypes = MOCK_FRIEND_TYPES.filter((t) => t.members.includes(friendId));
+  const friendFirstName = profile.name.split(' ')[0] ?? profile.name;
 
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
-      <FlowHeader T={T} title="Profile" onBack={() => navigation.goBack()} />
+      <FlowHeader
+        T={T}
+        title="Profile"
+        onBack={() => navigation.goBack()}
+        right={headerRight}
+      />
 
       <ScrollView contentContainerStyle={styles.body}>
         {/* Profile card */}
@@ -211,31 +325,70 @@ export default function FriendProfileScreen({
           )}
         </View>
 
-        {/* Action row */}
-        <View style={styles.actionsCol}>
-          <PillBtn
-            T={T}
-            label="Plan together"
-            variant="primary"
-            size="md"
-            onPress={() => {
-              fire('medium');
-              navigation.navigate('CreateEventModal', {
-                screen: 'Step1',
-                params: { prefilledInviteeIds: [friendId] },
-              });
-            }}
-          />
-          <TwoTapDestructive
-            T={T}
-            label="Remove friend"
-            confirmLabel="Tap again to confirm"
-            onConfirm={() => {
-              navigation.goBack();
-            }}
-          />
+        {/* R16-5 Action row — two equal primary pills. Destructive actions
+            (Remove / Block / Report) live in the header overflow per R16-6. */}
+        <View style={styles.actionsRow}>
+          <View style={styles.actionCell}>
+            <PillBtn
+              T={T}
+              label="Make Plans"
+              variant="primary"
+              size="md"
+              icon={<Ionicons name="calendar-outline" size={16} color={T.bgElevated} />}
+              onPress={handleMakePlans}
+            />
+          </View>
+          <View style={styles.actionCell}>
+            <PillBtn
+              T={T}
+              label="DM"
+              variant="primary"
+              size="md"
+              icon={<Ionicons name="chatbubble-outline" size={16} color={T.bgElevated} />}
+              onPress={handleDmStub}
+            />
+          </View>
         </View>
       </ScrollView>
+
+      {/* R16-6 — Header overflow menu (only mounted when open so the modal
+          backdrop doesn't sit invisibly over the screen). */}
+      {overflowOpen ? (
+        <FriendProfileOverflowMenu
+          T={T}
+          friendFirstName={friendFirstName}
+          onRemoveConfirm={handleRemoveConfirm}
+          onBlockConfirm={handleBlockConfirm}
+          onReportConfirm={handleReportConfirm}
+          onClose={handleCloseOverflow}
+        />
+      ) : null}
+
+      {/* R16-9 — DM + Report stub toasts. Single state slot; whichever stub
+          fires last wins (the previous toast fades on auto-dismiss). */}
+      <View pointerEvents="box-none" style={TOAST_POSITION_DEFAULTS}>
+        <InfoToast
+          T={T}
+          visible={infoToast !== null}
+          message={infoToast ?? ''}
+          onClose={() => setInfoToast(null)}
+        />
+      </View>
+
+      {/* R16-7 / R16-8 — Mutation failures. Stay on screen; user can retry
+          by re-opening the overflow. */}
+      <View pointerEvents="box-none" style={TOAST_POSITION_DEFAULTS}>
+        <ErrorToast
+          T={T}
+          kind="generic"
+          visible={errorToastVisible}
+          onRetry={() => {
+            setErrorToastVisible(false);
+            handleOpenOverflow();
+          }}
+          onClose={() => setErrorToastVisible(false)}
+        />
+      </View>
     </SafeAreaView>
   );
 }
@@ -299,8 +452,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     gap: spacing.xs,
   },
-  actionsCol: {
-    gap: spacing.md,
+  /** R16-5 — action row holds Make Plans + DM as equal-flex pills, 8px gap. */
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
     marginTop: spacing.lg,
+  },
+  actionCell: {
+    flex: 1,
   },
 });

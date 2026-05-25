@@ -2,11 +2,13 @@
  * TabBar — Custom 5-tab bottom bar for the SyncUp tab navigator.
  *
  * Layout (left → right):
- *   [Home] [Friends] [Create +] [Groups] [Profile]
+ *   [Home] [Explore] [Create +] [Friends] [Profile]
  *
- * The center "Create" tab is NOT a tab screen — pressing it intercepts the
+ * The center "Create" slot is NOT a tab screen — pressing it intercepts the
  * `tabPress` event and opens the `CreateEventModal` modal stack at the root.
- * See `RootNavigator.tsx`.
+ * See `RootNavigator.tsx`. `GroupsTab` is registered in RootNavigator for
+ * cross-tab navigation but is intentionally NOT rendered in this bar — groups
+ * are reached via the Friends tab's SegmentedSwitcher.
  *
  * Visual spec (ANCHOR / NAVIGATION.md):
  *   - Background:        colors.bgElevated
