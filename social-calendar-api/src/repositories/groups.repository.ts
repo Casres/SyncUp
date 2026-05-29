@@ -182,6 +182,7 @@ export const groupsRepository = {
   create(db: Db, creatorId: string, data: CreateGroupData) {
     return db.socialGroup.create({
       data: {
+        creatorId,
         name: data.name,
         description: data.description,
         avatarUrl: data.avatarUrl,

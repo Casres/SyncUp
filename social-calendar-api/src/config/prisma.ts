@@ -14,9 +14,5 @@ export const prisma = new PrismaClient({
 // This is what gets passed into request.prismaTransaction via auth.middleware.ts.
 export const prismaApp = new PrismaClient({
   datasources: { db: { url: env.DATABASE_URL_APP } },
-  log: [{ emit: 'event', level: 'query' }, 'warn', 'error'],
-});
-
-prismaApp.$on('query', (e) => {
-  console.log('[prismaApp query]', e.query, '|params:', e.params);
+  log: env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
 });

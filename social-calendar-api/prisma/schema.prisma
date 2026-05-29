@@ -94,6 +94,7 @@ model User {
   blockedByUsers       AvailabilityBlock[] @relation("AvailabilityBlocked")
   friendGroupsOwned    FriendGroup[]
   socialGroups         SocialGroupMember[]
+  socialGroupsCreated  SocialGroup[]       @relation("SocialGroupCreator")
   eventsCreated        Event[]
   eventOrganiserRoles  EventOrganiser[]
   eventInvites         EventInvite[]
@@ -176,8 +177,11 @@ model FriendGroupMember {
 }
 
 // Shared group with roles. Drives polls and suggestions.
+// creatorId is denormalised (same pattern as Event.creatorId) so the SELECT
+// RLS policy can check visibility without a secondary query into SocialGroupMember.
 model SocialGroup {
   id          String  @id @default(cuid())
+  creatorId   String
   name        String
   description String?
   avatarUrl   String?
@@ -186,6 +190,7 @@ model SocialGroup {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  creator     User                @relation("SocialGroupCreator", fields: [creatorId], references: [id])
   members     SocialGroupMember[]
   polls       GroupPoll[]
   suggestions EventSuggestion[]
