@@ -12,6 +12,8 @@ build/
 
 # Expo / React Native
 .expo/
+social-calendar-mobile/ios/
+social-calendar-mobile/android/
 *.jks
 *.p8
 *.p12
