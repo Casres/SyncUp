@@ -21,7 +21,7 @@ builder = "NIXPACKS"
 # 2. Generate the Prisma client inside the API workspace.
 # 3. Compile TypeScript (tsc reads social-calendar-api/tsconfig.json,
 #    outputs to social-calendar-api/dist/server.js).
-buildCommand = "npm ci && npm --workspace=social-calendar-api run prisma:generate && npm --workspace=social-calendar-api run build"
+buildCommand = "npm --workspace=social-calendar-api run prisma:generate && npm --workspace=social-calendar-api run build"
 
 [deploy]
 # Migrations run on every deploy via `prisma migrate deploy` (not `dev`),
