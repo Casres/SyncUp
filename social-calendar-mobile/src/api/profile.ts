@@ -130,6 +130,63 @@ export async function updatePrivacySettings(
 }
 
 // ---------------------------------------------------------------------------
+// Avatar upload (signed, server-mediated Cloudinary flow)
+// ---------------------------------------------------------------------------
+
+/** Response shape from POST /uploads/avatar/sign. */
+interface AvatarUploadSignature {
+  cloudName: string;
+  apiKey: string;
+  signature: string;
+  timestamp: number;
+  folder: string;
+}
+
+/**
+ * Signed avatar upload:
+ *   1. POST /uploads/avatar/sign → signature scoped to the user's folder.
+ *   2. POST the image bytes to Cloudinary's signed upload endpoint.
+ *   3. Return the resulting secure_url for the caller to PATCH into avatarUrl.
+ *
+ * The image URI comes from expo-image-picker. We never send unsigned uploads
+ * and never embed the API secret on the client — the secret stays server-side.
+ */
+export async function uploadAvatar(
+  authedMutate: AuthedMutate,
+  imageUri: string,
+): Promise<string> {
+  const sig = await authedMutate<AvatarUploadSignature>(
+    'POST',
+    '/uploads/avatar/sign',
+  );
+
+  const form = new FormData();
+  // React Native FormData accepts the { uri, name, type } file shape.
+  form.append('file', {
+    uri: imageUri,
+    name: 'avatar.jpg',
+    type: 'image/jpeg',
+  } as unknown as Blob);
+  form.append('api_key', sig.apiKey);
+  form.append('timestamp', String(sig.timestamp));
+  form.append('signature', sig.signature);
+  form.append('folder', sig.folder);
+
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
+    { method: 'POST', body: form },
+  );
+  if (!res.ok) {
+    throw new ApiError('SERVER_ERROR', `Cloudinary upload failed (${res.status})`);
+  }
+  const json = (await res.json()) as { secure_url?: string };
+  if (!json.secure_url) {
+    throw new ApiError('SERVER_ERROR', 'Cloudinary response missing secure_url');
+  }
+  return json.secure_url;
+}
+
+// ---------------------------------------------------------------------------
 // React Query hooks
 // ---------------------------------------------------------------------------
 
@@ -169,6 +226,27 @@ export function useUpdateProfile(): UseMutationResult<
   const authedMutate = useApiMutate();
   return useMutation<User, ApiError, Partial<User>>({
     mutationFn: (patch) => updateProfile(authedMutate, patch),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.profile.me(), updated);
+    },
+  });
+}
+
+/**
+ * Upload a chosen avatar image and persist its URL.
+ *
+ * Runs the signed Cloudinary flow, then PATCHes the returned secure URL into
+ * `User.avatarUrl` via the same /me mutation the profile screen uses. The
+ * cached profile is updated on success so the avatar appears immediately.
+ */
+export function useUploadAvatar(): UseMutationResult<User, ApiError, string> {
+  const queryClient = useQueryClient();
+  const authedMutate = useApiMutate();
+  return useMutation<User, ApiError, string>({
+    mutationFn: async (imageUri) => {
+      const secureUrl = await uploadAvatar(authedMutate, imageUri);
+      return updateProfile(authedMutate, { avatarUrl: secureUrl });
+    },
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.profile.me(), updated);
     },

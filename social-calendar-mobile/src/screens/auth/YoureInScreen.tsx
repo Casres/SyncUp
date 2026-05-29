@@ -27,8 +27,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { PillBtn } from '../../components/foundation/PillBtn';
 import { RingAvatar } from '../../components/foundation/RingAvatar';
 import { colors, durations, easings, radii, spacing, springs, useHaptic } from '../../theme';
-import { useMyProfile } from '../../api/profile';
+import { useMyProfile, useUploadAvatar } from '../../api/profile';
 import type { YoureInScreenProps } from '../../navigation/types';
+import {
+  clearSignupAvatarUri,
+  getSignupAvatarUri,
+} from './signupAvatarStore';
 
 const TRANSLATE_START = 20;
 const BADGE_SIZE = 24;
@@ -40,6 +44,7 @@ export default function YoureInScreen({
   const T = colors.light;
   const fire = useHaptic();
   const { data: me } = useMyProfile();
+  const uploadAvatar = useUploadAvatar();
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const firstName = me ? me.name.trim().split(/\s+/)[0] : '';
@@ -77,12 +82,26 @@ export default function YoureInScreen({
     transform: [{ translateY: translateY.value }],
   }));
 
-  function onGo() {
+  async function onGo() {
     fire('success');
     // TODO (real Clerk): setActive({ session }) hands off to RootNavigator,
     // which unmounts AuthNavigator and renders the main shell.
     // InviteContext routing (push EventDetail or HomeTab root) is wired here
     // once session management is fully integrated.
+
+    // Now that the Clerk session is active, flush any avatar queued during
+    // sign-up (SignUpStep5). Signed Cloudinary upload + PATCH /me avatarUrl.
+    // Best-effort: a failed avatar upload must not block entering the app.
+    const queuedUri = getSignupAvatarUri();
+    if (queuedUri) {
+      try {
+        await uploadAvatar.mutateAsync(queuedUri);
+      } catch {
+        // Swallow — user can set a photo later from their profile.
+      } finally {
+        clearSignupAvatarUri();
+      }
+    }
   }
 
   return (

@@ -1,10 +1,11 @@
 /**
  * SignUpStep5Screen — profile photo (R9-7 — always skippable).
  *
- * Image picker integration is simulated here (we don't pull in
- * expo-image-picker just for this build). Tapping the avatar well
- * flips a local `chosen` flag; CTA label switches from "Choose photo"
- * to "Continue" once a photo has been "picked".
+ * Tapping the avatar well opens the OS photo library via
+ * expo-image-picker. The chosen asset URI is stashed in the transient
+ * signupAvatarStore (local-only — no network here; the Clerk session
+ * isn't active yet). YoureIn uploads it after setActive(). The CTA label
+ * switches from "Choose photo" to "Continue" once a photo is picked.
  */
 
 import React, { useState } from 'react';
@@ -16,11 +17,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 
 import { PillBtn } from '../../components/foundation/PillBtn';
 import { ProgressDots } from '../../components/foundation/ProgressDots';
 import { colors, spacing, typography, useHaptic } from '../../theme';
 import type { SignUpStep5ScreenProps } from '../../navigation/types';
+import { setSignupAvatarUri } from './signupAvatarStore';
 
 export default function SignUpStep5Screen({
   navigation,
@@ -29,10 +32,20 @@ export default function SignUpStep5Screen({
   const fire = useHaptic();
   const [chosen, setChosen] = useState(false);
 
-  function pickPhoto() {
-    // TODO (real): expo-image-picker.launchImageLibraryAsync(...) and
-    // store the asset uri to upload after Clerk session is active.
+  async function pickPhoto() {
     fire('light');
+    // Don't upload during signup — the Clerk session isn't active yet.
+    // Stash the URI; YoureInScreen uploads it after setActive().
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (result.canceled || result.assets.length === 0) return;
+    const asset = result.assets[0];
+    if (!asset) return;
+    setSignupAvatarUri(asset.uri);
     setChosen(true);
   }
 

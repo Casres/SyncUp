@@ -6,6 +6,14 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_WEBHOOK_SECRET: z.string().min(1),
+
+  // ── Cloudinary — signed, server-mediated media uploads ───────────────────
+  // Required at boot. Signing avatar uploads happens server-side; the client
+  // never sees the API secret.
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+  CLOUDINARY_API_KEY: z.string().min(1),
+  CLOUDINARY_API_SECRET: z.string().min(1),
+
   PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 

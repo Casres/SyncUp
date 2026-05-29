@@ -128,6 +128,11 @@ export interface User {
   handle: string;
   /** Single-letter avatar initial. */
   letter: string;
+  /**
+   * Profile photo URL. Maps to the backend `User.avatarUrl` column.
+   * Optional — null/absent falls back to the `letter` initial avatar.
+   */
+  avatarUrl?: string | null;
   bio: string;
   email: string;
   phone: string;

@@ -20,7 +20,13 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SyncUp to access your photos so you can set a profile picture."
+        }
+      ]
     ]
   }
 }
