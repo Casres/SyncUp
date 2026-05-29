@@ -66,6 +66,10 @@ services:
       CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET:-whsec_placeholder}
       PORT: 3000
       NODE_ENV: development
+      # Cloudinary — signed server-side media uploads.
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       # Explore tab — third-party API keys.
       # Leave blank in dev; Explore returns empty results gracefully.
       # Set real keys via .env before running in production.
