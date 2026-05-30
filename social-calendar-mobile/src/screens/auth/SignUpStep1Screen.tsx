@@ -1,9 +1,8 @@
 /**
  * SignUpStep1Screen — credential entry (R9-1..R9-4).
  *
- * Asks for a phone or email; light format check; pushes to Step 2 (OTP).
- * Auth is simulated for this build — TODO comment marks the real Clerk
- * `signUp.create(...)` integration point.
+ * Asks for a phone or email; routes through Clerk `signUp.create` +
+ * prepare-verification, then pushes to Step 2 (OTP).
  */
 
 import React, { useState } from 'react';
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useSignUp } from '@clerk/clerk-expo';
 
 import { AuthInputField } from '../../components/foundation/AuthInputField';
 import { PillBtn } from '../../components/foundation/PillBtn';
@@ -37,16 +37,38 @@ export default function SignUpStep1Screen({
 }: SignUpStep1ScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const { signUp, isLoaded } = useSignUp();
   const [credential, setCredential] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const canContinue = isPlausibleCredential(credential);
+  const canContinue =
+    isPlausibleCredential(credential) && isLoaded && !submitting;
 
-  function onContinue() {
-    if (!canContinue) return;
-    // TODO (real Clerk): signUp.create({ phoneNumber|emailAddress: credential })
-    // then prepare phone/email verification before navigating.
-    fire('medium');
-    navigation.navigate('SignUpStep2', { credential: credential.trim() });
+  async function onContinue() {
+    if (!canContinue || !isLoaded) return;
+    fire('light');
+    setSubmitting(true);
+    setError(null);
+    const trimmed = credential.trim();
+    const isEmail = trimmed.includes('@');
+    try {
+      if (isEmail) {
+        await signUp.create({ emailAddress: trimmed });
+        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      } else {
+        await signUp.create({ phoneNumber: trimmed });
+        await signUp.preparePhoneNumberVerification({ strategy: 'phone_code' });
+      }
+      fire('medium');
+      navigation.navigate('SignUpStep2', { credential: trimmed });
+    } catch (e) {
+      fire('error');
+      const msg = e instanceof Error ? e.message : 'Could not start sign-up';
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -89,8 +111,12 @@ export default function SignUpStep1Screen({
               T={T}
               label="Phone or email"
               value={credential}
-              onChange={setCredential}
+              onChange={(v) => {
+                setCredential(v);
+                if (error) setError(null);
+              }}
               placeholder="you@example.com or +1 555 555 5555"
+              error={error ?? undefined}
               autoFocus
             />
           </View>
@@ -103,6 +129,7 @@ export default function SignUpStep1Screen({
             variant="primary"
             size="lg"
             disabled={!canContinue}
+            loading={submitting}
             onPress={onContinue}
           />
         </View>

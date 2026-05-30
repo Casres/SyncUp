@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useSignUp } from '@clerk/clerk-expo';
 
 import { AuthInputField } from '../../components/foundation/AuthInputField';
 import { PillBtn } from '../../components/foundation/PillBtn';
@@ -30,23 +31,37 @@ export default function SignUpStep4Screen({
 }: SignUpStep4ScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const { signUp, isLoaded } = useSignUp();
   const { credential, name, handle } = route.params;
 
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const meetsLength = password.length >= MIN_PASSWORD_LENGTH;
-  const canContinue = meetsLength;
+  const canContinue = meetsLength && isLoaded && !submitting;
 
-  function onContinue() {
-    if (!canContinue) return;
-    // TODO (real Clerk): signUp.update({ password }) before navigating.
-    fire('success');
-    navigation.navigate('SignUpStep5', {
-      credential,
-      name,
-      handle,
-      password,
-    });
+  async function onContinue() {
+    if (!canContinue || !isLoaded) return;
+    fire('light');
+    setSubmitting(true);
+    setError(null);
+    try {
+      await signUp.update({ password });
+      fire('success');
+      navigation.navigate('SignUpStep5', {
+        credential,
+        name,
+        handle,
+        password,
+      });
+    } catch (e) {
+      fire('error');
+      const msg = e instanceof Error ? e.message : 'Could not set your password';
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -86,10 +101,14 @@ export default function SignUpStep4Screen({
               T={T}
               label="Password"
               value={password}
-              onChange={setPassword}
+              onChange={(v) => {
+                setPassword(v);
+                if (error) setError(null);
+              }}
               type="password"
               autoFocus
               placeholder="••••••••"
+              error={error ?? undefined}
             />
 
             <View style={styles.requirementRow}>
@@ -117,6 +136,7 @@ export default function SignUpStep4Screen({
             variant="primary"
             size="lg"
             disabled={!canContinue}
+            loading={submitting}
             onPress={onContinue}
           />
         </View>

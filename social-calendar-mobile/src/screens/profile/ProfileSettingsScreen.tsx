@@ -129,7 +129,13 @@ export default function ProfileSettingsScreen({
         <View style={[styles.profileCard, { backgroundColor: T.bgElevated, borderColor: T.hair }]}>
           <View style={styles.avatarRow}>
             <View>
-              <RingAvatar T={T} letter={profile.letter} size={72} status="free" />
+              <RingAvatar
+                T={T}
+                letter={profile.letter}
+                size={72}
+                status="free"
+                photoUrl={profile.avatarUrl ?? null}
+              />
               <View
                 accessibilityElementsHidden
                 style={[styles.editFab, { backgroundColor: T.accent, borderColor: T.bgElevated }]}

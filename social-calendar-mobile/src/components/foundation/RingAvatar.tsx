@@ -11,7 +11,7 @@
  */
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { colors, fonts } from '../../theme';
@@ -26,6 +26,8 @@ export interface RingAvatarProps {
   status?: AvailState | null;
   selected?: boolean;
   accessibilityLabel?: string;
+  /** Profile photo URI. Falls back to the letter initial when null/undefined. */
+  photoUrl?: string | null;
 }
 
 export function RingAvatar({
@@ -35,6 +37,7 @@ export function RingAvatar({
   status = null,
   selected = false,
   accessibilityLabel,
+  photoUrl = null,
 }: RingAvatarProps): React.JSX.Element {
   const stroke = Math.max(1, Math.round(size * 0.05));
   const inset = stroke + 1;
@@ -77,19 +80,28 @@ export function RingAvatar({
             borderRadius: innerSize / 2,
             backgroundColor: selected ? T.accent : T.bgSunken,
             borderColor: selected ? T.accent : T.hair,
+            overflow: 'hidden',
           },
         ]}
       >
-        <Text
-          style={{
-            color: selected ? T.bgElevated : T.ink,
-            fontFamily: fonts.sans,
-            fontWeight: '700',
-            fontSize: Math.round(size * 0.42),
-          }}
-        >
-          {letter}
-        </Text>
+        {photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={{ width: innerSize, height: innerSize }}
+            resizeMode="cover"
+          />
+        ) : (
+          <Text
+            style={{
+              color: selected ? T.bgElevated : T.ink,
+              fontFamily: fonts.sans,
+              fontWeight: '700',
+              fontSize: Math.round(size * 0.42),
+            }}
+          >
+            {letter}
+          </Text>
+        )}
       </View>
     </View>
   );

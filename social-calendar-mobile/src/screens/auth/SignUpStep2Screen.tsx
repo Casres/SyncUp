@@ -1,12 +1,12 @@
 /**
  * SignUpStep2Screen — OTP verification (R9-5).
  *
- * Auto-submits on the 6th digit. Resend code is gated by a 30s cooldown.
- * Auth simulated — any 6-digit code advances except '000000' which
- * triggers an explicit error state (for visual QA).
+ * Auto-submits on the 6th digit via Clerk
+ * `signUp.attemptEmailAddressVerification` / `attemptPhoneNumberVerification`.
+ * Resend code is gated by a 30s cooldown.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useSignUp } from '@clerk/clerk-expo';
 
 import { OTPInput } from '../../components/foundation/OTPInput';
 import { PillBtn } from '../../components/foundation/PillBtn';
@@ -32,11 +33,19 @@ export default function SignUpStep2Screen({
 }: SignUpStep2ScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const { signUp, isLoaded } = useSignUp();
   const { credential } = route.params;
+
+  const isEmail = credential.includes('@');
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  const [verifying, setVerifying] = useState(false);
+  // Tracks the last code we submitted to Clerk so we don't re-attempt the
+  // same code if the effect re-runs (e.g., signUp reference changes after
+  // attemptVerification resolves).
+  const attemptedCodeRef = useRef<string | null>(null);
 
   // Cooldown timer for the Resend link.
   useEffect(() => {
@@ -47,17 +56,41 @@ export default function SignUpStep2Screen({
 
   // Auto-submit on the 6th digit (R9-5).
   useEffect(() => {
-    if (code.length !== 6) return;
-    // TODO (real Clerk): signUp.attemptEmailAddressVerification / attemptPhone…
-    if (code === '000000') {
-      fire('error');
-      setError('Incorrect code');
+    if (code.length !== 6) {
+      attemptedCodeRef.current = null;
       return;
     }
-    fire('medium');
-    setError(null);
-    navigation.navigate('SignUpStep3', { credential });
-  }, [code, credential, fire, navigation]);
+    if (!isLoaded) return;
+    if (attemptedCodeRef.current === code) return;
+    attemptedCodeRef.current = code;
+
+    let cancelled = false;
+    setVerifying(true);
+    (async () => {
+      try {
+        if (isEmail) {
+          await signUp.attemptEmailAddressVerification({ code });
+        } else {
+          await signUp.attemptPhoneNumberVerification({ code });
+        }
+        if (cancelled) return;
+        fire('medium');
+        setError(null);
+        navigation.navigate('SignUpStep3', { credential });
+      } catch (e) {
+        if (cancelled) return;
+        fire('error');
+        const msg = e instanceof Error ? e.message : 'Incorrect code';
+        setError(msg);
+      } finally {
+        if (!cancelled) setVerifying(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, credential, fire, navigation, isLoaded, isEmail, signUp]);
 
   function onCodeChange(next: string) {
     setCode(next);
@@ -71,13 +104,25 @@ export default function SignUpStep2Screen({
     fire('medium');
   }
 
-  function onResend() {
+  async function onResend() {
     if (cooldown > 0) return;
-    // TODO (real Clerk): signUp.prepareEmailAddressVerification (or phone)
-    fire('success');
-    setCode('');
-    setError(null);
-    setCooldown(RESEND_COOLDOWN_SECONDS);
+    if (!isLoaded) return;
+    try {
+      if (isEmail) {
+        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+      } else {
+        await signUp.preparePhoneNumberVerification({ strategy: 'phone_code' });
+      }
+      fire('success');
+      setCode('');
+      attemptedCodeRef.current = null;
+      setError(null);
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+    } catch (e) {
+      fire('error');
+      const msg = e instanceof Error ? e.message : 'Could not resend code';
+      setError(msg);
+    }
   }
 
   function onChangeCredential() {
@@ -168,7 +213,8 @@ export default function SignUpStep2Screen({
             label="Verify"
             variant="primary"
             size="lg"
-            disabled={code.length !== 6}
+            disabled={code.length !== 6 || verifying}
+            loading={verifying}
             onPress={onVerify}
           />
         </View>

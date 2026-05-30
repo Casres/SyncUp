@@ -23,6 +23,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useSignUp } from '@clerk/clerk-expo';
 
 import { PillBtn } from '../../components/foundation/PillBtn';
 import { RingAvatar } from '../../components/foundation/RingAvatar';
@@ -45,7 +46,12 @@ export default function YoureInScreen({
   const fire = useHaptic();
   const { data: me } = useMyProfile();
   const uploadAvatar = useUploadAvatar();
+  const { signUp, setActive, isLoaded } = useSignUp();
   const [reduceMotion, setReduceMotion] = useState(false);
+  // Snapshot the queued sign-up avatar URI on first render so we can preview
+  // it before tap-Go. The store is cleared after upload, so we capture it
+  // here to keep the preview stable through the animation.
+  const [previewUri] = useState<string | null>(() => getSignupAvatarUri());
 
   const firstName = me ? me.name.trim().split(/\s+/)[0] : '';
 
@@ -84,10 +90,19 @@ export default function YoureInScreen({
 
   async function onGo() {
     fire('success');
-    // TODO (real Clerk): setActive({ session }) hands off to RootNavigator,
-    // which unmounts AuthNavigator and renders the main shell.
-    // InviteContext routing (push EventDetail or HomeTab root) is wired here
-    // once session management is fully integrated.
+
+    // Activate the session created during sign-up. This hands off to
+    // RootNavigator, which unmounts AuthNavigator and mounts the main
+    // shell. It must run BEFORE the avatar upload — getToken() needs an
+    // active session to mint a valid JWT for the API.
+    if (!isLoaded || !signUp?.createdSessionId) return;
+    try {
+      await setActive({ session: signUp.createdSessionId });
+    } catch {
+      // Activation failed — leave the avatar queued so the user can retry
+      // by tapping Go again rather than losing their photo selection.
+      return;
+    }
 
     // Now that the Clerk session is active, flush any avatar queued during
     // sign-up (SignUpStep5). Signed Cloudinary upload + PATCH /me avatarUrl.
@@ -117,6 +132,7 @@ export default function YoureInScreen({
           size={96}
           status={null}
           letter={me?.letter ?? '?'}
+          photoUrl={previewUri ?? me?.avatarUrl ?? null}
         />
         {/* Lime checkmark badge docked bottom-right of avatar */}
         <View

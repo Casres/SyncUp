@@ -10,6 +10,7 @@
 
 import React, { useState } from 'react';
 import {
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -23,14 +24,16 @@ import { PillBtn } from '../../components/foundation/PillBtn';
 import { ProgressDots } from '../../components/foundation/ProgressDots';
 import { colors, spacing, typography, useHaptic } from '../../theme';
 import type { SignUpStep5ScreenProps } from '../../navigation/types';
-import { setSignupAvatarUri } from './signupAvatarStore';
+import { getSignupAvatarUri, setSignupAvatarUri } from './signupAvatarStore';
 
 export default function SignUpStep5Screen({
   navigation,
 }: SignUpStep5ScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
-  const [chosen, setChosen] = useState(false);
+  // Seed from the store so the preview survives a back-nav from Step 6.
+  const [uri, setUri] = useState<string | null>(() => getSignupAvatarUri());
+  const chosen = uri !== null;
 
   async function pickPhoto() {
     fire('light');
@@ -46,7 +49,7 @@ export default function SignUpStep5Screen({
     const asset = result.assets[0];
     if (!asset) return;
     setSignupAvatarUri(asset.uri);
-    setChosen(true);
+    setUri(asset.uri);
   }
 
   function advance() {
@@ -87,7 +90,7 @@ export default function SignUpStep5Screen({
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Choose profile photo"
+          accessibilityLabel={chosen ? 'Change profile photo' : 'Choose profile photo'}
           onPress={pickPhoto}
           style={[
             styles.well,
@@ -97,11 +100,11 @@ export default function SignUpStep5Screen({
             },
           ]}
         >
-          <Ionicons
-            name={chosen ? 'image' : 'person'}
-            size={36}
-            color={chosen ? T.accent : T.ink3}
-          />
+          {uri ? (
+            <Image source={{ uri }} style={styles.wellImage} resizeMode="cover" />
+          ) : (
+            <Ionicons name="person" size={36} color={T.ink3} />
+          )}
         </Pressable>
       </View>
 
@@ -168,6 +171,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing['4xl'],
+    overflow: 'hidden',
+  },
+  wellImage: {
+    width: 80,
+    height: 80,
   },
   footer: {
     paddingHorizontal: spacing.lg,

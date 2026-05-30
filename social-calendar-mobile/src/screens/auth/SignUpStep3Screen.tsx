@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useSignUp } from '@clerk/clerk-expo';
 
 import { AuthInputField } from '../../components/foundation/AuthInputField';
 import {
@@ -41,12 +42,15 @@ export default function SignUpStep3Screen({
 }: SignUpStep3ScreenProps): React.JSX.Element {
   const T = colors.light;
   const fire = useHaptic();
+  const { signUp, isLoaded } = useSignUp();
   const { credential } = route.params;
 
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [handleDirty, setHandleDirty] = useState(false);
   const [availability, setAvailability] = useState<HandleAvailabilityState>('idle');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Auto-populate handle from name only until the user explicitly edits it.
   useEffect(() => {
@@ -74,16 +78,39 @@ export default function SignUpStep3Screen({
   }
 
   const canContinue =
-    name.trim().length > 0 && availability === 'available';
+    name.trim().length > 0 &&
+    availability === 'available' &&
+    isLoaded &&
+    !submitting;
 
-  function onContinue() {
-    if (!canContinue) return;
-    fire('medium');
-    navigation.navigate('SignUpStep4', {
-      credential,
-      name: name.trim(),
-      handle,
-    });
+  async function onContinue() {
+    if (!canContinue || !isLoaded) return;
+    fire('light');
+    setSubmitting(true);
+    setError(null);
+    const trimmedName = name.trim();
+    const parts = trimmedName.split(/\s+/);
+    const firstName = parts[0] ?? '';
+    const lastName = parts.slice(1).join(' ');
+    try {
+      await signUp.update({
+        username: handle,
+        firstName,
+        lastName: lastName.length > 0 ? lastName : undefined,
+      });
+      fire('medium');
+      navigation.navigate('SignUpStep4', {
+        credential,
+        name: trimmedName,
+        handle,
+      });
+    } catch (e) {
+      fire('error');
+      const msg = e instanceof Error ? e.message : 'Could not save your name';
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -134,6 +161,12 @@ export default function SignUpStep3Screen({
               onChange={onHandleChange}
               availabilityState={availability}
             />
+            {error !== null ? (
+              <View style={styles.errorRow}>
+                <Ionicons name="warning" size={14} color={T.danger} />
+                <Text style={[styles.errorText, { color: T.danger }]}>{error}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -144,6 +177,7 @@ export default function SignUpStep3Screen({
             variant="primary"
             size="lg"
             disabled={!canContinue}
+            loading={submitting}
             onPress={onContinue}
           />
         </View>
@@ -182,6 +216,15 @@ const styles = StyleSheet.create({
   fields: {
     marginTop: spacing['3xl'],
     gap: spacing.lg,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  errorText: {
+    fontSize: 12,
+    fontWeight: '500',
   },
   footer: {
     paddingHorizontal: spacing.lg,
