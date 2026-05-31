@@ -1,13 +1,20 @@
 # SyncUp — Build Checklist (Pre-Testing)
 
-Last updated: 2026-05-25 (post-Round 16 lock)
+Last updated: 2026-05-30
 
 ---
 
-## Recently completed (locked 2026-05-25)
+## Recently completed (2026-05-30)
 
 - [x] **Friend Profile screen** — `social-calendar-mobile/src/screens/friends/FriendProfileScreen.tsx` ships R16-1..R16-11. Route `FriendProfile` registered in `FriendsStack` with `{ friendId: string }` params. Overflow menu (Remove/Block/Report), `useRemoveFriend` + `useBlockUser` mutations, Make Plans + DM action row, DM/Report stubs via `InfoToast` per R16-9. Mutual-friend avatar tap stacks a depth-1 QuickProfileSheet per R16-3 (does NOT deep-push to Friend Profile).
 - [x] **Tab bar reconciliation** — Decision LOCKED: `Home · Explore · Create(+) · Friends · Profile`. Spec rewritten to match shipped code (ANCHOR-DESIGN.txt R6-6, Hard Rule 23, and the "TAB BAR IA (LOCKED)" section all updated). NotifSheet stays a root-level overlay opened from the Home FlowHeader bell — intentionally NOT a tab. GroupsTab is registered for cross-tab navigation but hidden from the bar.
+- [x] **Cloudinary signed avatar upload** — Backend sign endpoint (`POST /uploads/avatar/sign`), mobile `expo-image-picker` integration, upload flow in `YoureInScreen`, and `avatarUrl` PATCH all shipped. `RingAvatar` updated to render `<Image>` when `photoUrl` is provided. Committed `4363529`.
+- [x] **Railway deploy** — API live at `syncup-production-bfb4.up.railway.app`. Postgres + Redis online. Clerk webhook configured. Cloudinary env vars set on Railway service.
+- [x] **Native dev build** — `expo-dev-client` + `expo-image-picker` pinned to SDK 55 via `npx expo install`. `ios/` and `android/` added to `.gitignore`. `npx expo run:ios` compiles successfully.
+- [x] **Clerk signup wiring** — `SignUpStep1Screen` now calls `signUp.create()` + `prepareVerification()`. `SignUpStep2Screen` calls `attemptVerification()` with the real OTP. `YoureInScreen.onGo` calls `setActive({ session: signUp.createdSessionId })` before the avatar upload so `getToken()` returns a valid JWT. `SignUpStep3Screen` wires name into `signUp.update()`. Changes committed (uncommitted as of 2026-05-30 — push before testing).
+- [x] **RLS INSERT…RETURNING fix** — Inlined `"creatorId" = current_app_user_id()` directly into the `event_select_participant` USING clause, removing the recursive SELECT that caused false RLS rejections on `INSERT…RETURNING`. Committed `5f30e3a`.
+- [x] **ts-node added to api devDeps** — `jest.config.ts` requires `ts-node` to parse; it was missing, breaking CI. Fixed in `2518abf`.
+- [x] **Accidental expo deps removed from api** — `expo-dev-client` + `expo-image-picker` were incorrectly added to `social-calendar-api/package.json` during a wrong-directory `expo install`. Cleaned up in `2518abf`.
 
 ---
 
@@ -21,8 +28,8 @@ Last updated: 2026-05-25 (post-Round 16 lock)
 
 ## Frontend — Wiring & Integration
 
-- [ ] **Cloudinary media upload** — `social-calendar-mobile/src/screens/auth/SignUpStep5Screen.tsx:33-34` has a TODO for `expo-image-picker.launchImageLibraryAsync` + post-Clerk upload. There is no `AvatarUploadWell` component in the codebase today; the screen uses an inline upload affordance. Wire Cloudinary SDK upload, return URL back to the form field, and persist to the profile after `setActive`.
-- [ ] **Clerk `setActive` in `YoureInScreen`** — `social-calendar-mobile/src/screens/auth/YoureInScreen.tsx:82` has a TODO comment. Replace stub with real `setActive({ session })` call to hand off to `RootNavigator`.
+- [x] **Cloudinary media upload** — COMPLETE. See "Recently completed" above.
+- [x] **Clerk `setActive` in `YoureInScreen`** — COMPLETE. See "Recently completed" above.
 - [ ] **`FriendFindMatchesScreen` error toast** — `social-calendar-mobile/src/screens/auth/FriendFindMatchesScreen.tsx:48` has a TODO. Wire the add-friend mutation error path to fire `ErrorToast`.
 
 (Path note: onboarding screens live at `src/screens/auth/*`, not `src/screens/auth/onboarding/*`. Earlier drafts of this file used the nested path — corrected here.)
@@ -32,14 +39,14 @@ Last updated: 2026-05-25 (post-Round 16 lock)
 ## Infrastructure & Deployment
 
 - [ ] **Live backend round-trip test** — run `docker compose up -d`, exercise `/explore` and all auth-gated endpoints. Verify Clerk JWT verification, Redis TTLs, and rate limiting end-to-end. First real test against a live backend. *Depends on the three Backend domain services above — defer until at least Notifications + Availability ship, otherwise the auth-gated endpoint coverage is incomplete.*
-- [ ] **Railway project connection** — `railway.toml` and `social-calendar-api/DEPLOY_CHECKLIST.md` are ready. Connect Railway project and provide all required env vars (`DATABASE_URL`, `DATABASE_URL_APP`, `REDIS_URL`, `CLERK_SECRET_KEY`, etc.).
+- [x] **Railway project connection** — DONE 2026-05-28. API live at `syncup-production-bfb4.up.railway.app`. All env vars set including `DATABASE_URL_APP` (manual construction with `syncup_app` role) and `NIXPACKS_NODE_VERSION=22`.
 - [ ] **GCP Billing Alerts** — Terraform is written at `social-calendar-api/src/infra/gcp-billing-alerts.tf`. Apply with `GCP_PROJECT_ID` + `GCP_BILLING_ACCOUNT_ID`. Manual gcloud fallback documented in `gcp-billing-alerts.README.md`.
 
 ---
 
 ## Code Cleanup (do last, before production)
 
-- [ ] **Delete seed file** — remove `social-calendar-api/prisma/seed.ts` and the `prisma.seed` entry in `package.json`. Must not ship to production.
+- [x] **Delete seed file** — DONE 2026-05-28. `prisma/seed.ts` deleted + `prisma:seed` script + `prisma.seed` config block removed from `package.json`.
 - [ ] **Delete mocks tombstone** — remove `social-calendar-mobile/src/mocks/index.ts` once all `src/api/*.ts` stubs are hitting a live backend.
 - [ ] **`publicProfileSelect` consolidation** — constant is duplicated across **4** repositories: `src/repositories/events.repository.ts:8`, `friendGroups.repository.ts:8`, `friends.repository.ts:10`, and `groups.repository.ts:10`. Extract to a shared location (e.g. `src/repositories/_shared/userSelects.ts`) and import everywhere.
 

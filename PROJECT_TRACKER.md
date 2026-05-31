@@ -1,6 +1,6 @@
 # SyncUp — Project Tracker
 
-_Last updated: 2026-05-24_
+_Last updated: 2026-05-30_
 
 A cross-platform social calendar app (iOS & Android). High-level summary of build state. **For the agent-by-agent ground truth see `LEAD_MANAGER.md`.**
 
@@ -20,7 +20,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Cache / Presence | Redis (ioredis 5.10) |
 | Real-time | Socket.io 4.8 |
 | Auth | Clerk (@clerk/clerk-expo on mobile, @clerk/backend on api) |
-| Media | Cloudinary (not yet wired) |
+| Media | Cloudinary (signed upload wired — avatar flow complete) |
 | Testing | Jest + Supertest |
 | CI/CD | GitHub Actions |
 | Hosting | Railway |
@@ -41,7 +41,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 
 ---
 
-## Build State Summary (2026-05-24)
+## Build State Summary (2026-05-30)
 
 ### Backend — Done ✅
 
@@ -84,6 +84,9 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | GAP 10 — AudiencePickerSheet zero-friend state (R13-4) | COMPLETE |
 | GAP 2 — Search overlay (R8-1..R8-7) | COMPLETE |
 | GAP 1 — Onboarding stack (R9-1..R9-10) | COMPLETE (Welcome + Sign-Up Steps 1–6 + Sign-In + Forgot-Password) |
+| Clerk signup wiring | COMPLETE — Steps 1/2 call real Clerk APIs; YoureIn calls `setActive()`; avatar upload follows with valid JWT. Uncommitted as of 2026-05-30 — push before live test. |
+| Cloudinary avatar upload | COMPLETE — signed server-mediated flow; `RingAvatar` renders photo; `avatarUrl` persists. |
+| RLS INSERT…RETURNING fix | COMPLETE — `event_select_participant` policy inlined, recursive SELECT removed (`5f30e3a`). |
 | TweaksPanel absence audit (R14-1) | Verified — zero refs in mobile codebase |
 
 ### Frontend — Pending 📋
@@ -100,7 +103,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Docker / docker-compose | Multi-stage Dockerfile + api/postgres/redis services + two-role DB init via `docker/postgres/init.sql` |
 | GitHub Actions | Lint, type-check, test with postgres + redis service containers + `prisma migrate deploy` |
 | EAS Build Config | dev/preview/prod profiles, bundle ID `tech.casillas.syncup` |
-| Railway Deploy | `railway.toml` + `DEPLOY_CHECKLIST.md` — pending Christian connecting Railway project |
+| Railway Deploy | LIVE — `syncup-production-bfb4.up.railway.app`; Postgres + Redis online; Clerk webhook + Cloudinary env vars configured |
 | Jest / Supertest | Infra + 3 domain test suites + 8 `test.todo` items |
 
 ---
@@ -138,21 +141,20 @@ All previously-open decisions are now locked. See `LEAD_MANAGER.md` → Open Dec
 
 ## Production Deletion Gate
 
-Before any production deploy:
+First production deploy completed 2026-05-28. Status of gates:
 
-1. Delete `social-calendar-api/prisma/seed.ts`
-2. Remove the `"seed"` entry from `social-calendar-api/package.json` `prisma` block
-3. Delete `social-calendar-mobile/src/mocks/index.ts` once every consumer in `src/api/*` is rewired to a live backend endpoint
-4. Verify no `TweaksPanel` references in `social-calendar-mobile/`
-5. Provide Railway env vars per `social-calendar-api/DEPLOY_CHECKLIST.md`
+1. ~~Delete `social-calendar-api/prisma/seed.ts`~~ — **DONE 2026-05-28**
+2. ~~Remove the `"seed"` entry from `social-calendar-api/package.json`~~ — **DONE 2026-05-28**
+3. Delete `social-calendar-mobile/src/mocks/index.ts` once every consumer in `src/api/*` is rewired to a live backend endpoint — **PENDING**
+4. Verify no `TweaksPanel` references in `social-calendar-mobile/` — **VERIFIED** (R14-1 audit)
+5. ~~Provide Railway env vars per `social-calendar-api/DEPLOY_CHECKLIST.md`~~ — **DONE 2026-05-28**
 
-These are tracked as gates in DEPLOY_CHECKLIST.md.
+Remaining gates apply to subsequent deploys.
 
 ---
 
 ## Reminders
 
-- **Seed file (`prisma/seed.ts`) + `prisma.seed` in `package.json`** must be deleted before production.
 - **`src/mocks/index.ts`** tombstone can be deleted once all `src/api/*.ts` stubs hit a real backend endpoint.
 - Any change to `src/types/socket.types.ts` (backend) must be mirrored in `social-calendar-mobile/src/types/`.
 - Every service method that fetches availability for a viewer must check `AvailabilityBlock` first.
