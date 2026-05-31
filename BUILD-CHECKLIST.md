@@ -15,14 +15,11 @@ Last updated: 2026-05-30
 - [x] **RLS INSERT…RETURNING fix** — Inlined `"creatorId" = current_app_user_id()` directly into the `event_select_participant` USING clause, removing the recursive SELECT that caused false RLS rejections on `INSERT…RETURNING`. Committed `5f30e3a`.
 - [x] **ts-node added to api devDeps** — `jest.config.ts` requires `ts-node` to parse; it was missing, breaking CI. Fixed in `2518abf`.
 - [x] **Accidental expo deps removed from api** — `expo-dev-client` + `expo-image-picker` were incorrectly added to `social-calendar-api/package.json` during a wrong-directory `expo install`. Cleaned up in `2518abf`.
-
----
-
-## Backend — New Domains (nothing written yet)
-
-- [ ] **Notifications service** — create `notifications.service.ts`, `notifications.repository.ts`, `notifications.controller.ts`, `notifications.routes.ts`. Wire into `src/app.ts`. Socket layer is already stubbed and waiting for this. Highest priority — blocks real-time UX across the whole app.
-- [ ] **Availability domain service** — `availability.socket.ts` stub exists but has no backing REST layer. Create `availability.service.ts`, `availability.repository.ts`, `availability.controller.ts`, `availability.routes.ts`. Wire into `src/app.ts`.
-- [ ] **Invites incremental endpoints** — pending in project tracker, not yet specced or built. Add to Events domain or create a dedicated Invites route module. Coordinate with socket layer in `events.socket.ts`.
+- [x] **Backend — Notifications domain** — shipped on Wave 1 backend branch, merged at `d8f18af`. Full 4-file stack (`src/services/notifications.service.ts`, `repositories/notifications.repository.ts`, `controllers/notifications.controller.ts`, `routes/notifications.routes.ts`) + new `src/sockets/notifications.socket.ts` registered in `sockets/index.ts`. REST: `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/read-all`, `DELETE /notifications/:id`, `POST /notifications/:id/mute`. Emits `notif:new` / `notif:dismissed`. New migration `20260525000001_notif_avail_broadcast` adds `Notification` + `BroadcastSettings` tables, `AvailState` + `NotifType` + `BroadcastAudienceMode` enums, plus RLS policies.
+- [x] **Backend — Availability domain** — shipped on Wave 1 backend branch, merged at `d8f18af`. Full 4-file stack mounted at `/availability`, wired to the existing `availability.socket.ts` for live broadcasts. REST: `GET /availability/me`, `PUT /availability/me/:date`, `PATCH /availability/me`, `GET /availability/:userId` (FORBIDDEN on non-shared per the FriendProfileScreen contract). Same migration adds `state` column on `UserAvailability` + unique `(userId, windowStart, granularity)` index.
+- [x] **Backend — Invites endpoints** — shipped folded into existing Events domain (placement option a) on Wave 1 backend branch, merged at `d8f18af`. See `src/routes/EVENTS_HANDOFF.md` for the rationale (EventInvite is intrinsically event-scoped; organiser-gating + event-id resolution would duplicate in a standalone module).
+- [x] **Frontend — availability path renames** — Mobile `src/api/availability.ts` URL strings updated to match the backend's `/availability/*` prefix. Hook names, query keys, response shapes unchanged. Cherry-picked at `85fa595`.
+- [x] **Frontend — `FriendFindMatchesScreen` error toast** — Add-friend mutation `onError` now fires `ErrorToast` with retry. Mirrors the `FriendProfileScreen` pattern (`errorToastVisible` + `lastFailed` local state, no Zustand). Cherry-picked at `57cb560`.
 
 ---
 
@@ -30,7 +27,7 @@ Last updated: 2026-05-30
 
 - [x] **Cloudinary media upload** — COMPLETE. See "Recently completed" above.
 - [x] **Clerk `setActive` in `YoureInScreen`** — COMPLETE. See "Recently completed" above.
-- [ ] **`FriendFindMatchesScreen` error toast** — `social-calendar-mobile/src/screens/auth/FriendFindMatchesScreen.tsx:48` has a TODO. Wire the add-friend mutation error path to fire `ErrorToast`.
+- [x] **`FriendFindMatchesScreen` error toast** — COMPLETE. See "Recently completed" above.
 
 (Path note: onboarding screens live at `src/screens/auth/*`, not `src/screens/auth/onboarding/*`. Earlier drafts of this file used the nested path — corrected here.)
 
@@ -38,7 +35,7 @@ Last updated: 2026-05-30
 
 ## Infrastructure & Deployment
 
-- [ ] **Live backend round-trip test** — run `docker compose up -d`, exercise `/explore` and all auth-gated endpoints. Verify Clerk JWT verification, Redis TTLs, and rate limiting end-to-end. First real test against a live backend. *Depends on the three Backend domain services above — defer until at least Notifications + Availability ship, otherwise the auth-gated endpoint coverage is incomplete.*
+- [~] **Live backend round-trip test** — auth-side round-trip captured in `AUTH_DOCKER_ROUNDTRIP_RESULTS.md` (commit `4cbabea`). Outstanding: extend the run to cover the newly-merged `/notifications`, `/availability`, and Invites endpoints. Verify Clerk JWT verification, Redis TTLs, and rate limiting hold under the new surfaces. Requires `npx prisma generate` on host first so the dev server boots with the new models.
 - [x] **Railway project connection** — DONE 2026-05-28. API live at `syncup-production-bfb4.up.railway.app`. All env vars set including `DATABASE_URL_APP` (manual construction with `syncup_app` role) and `NIXPACKS_NODE_VERSION=22`.
 - [ ] **GCP Billing Alerts** — Terraform is written at `social-calendar-api/src/infra/gcp-billing-alerts.tf`. Apply with `GCP_PROJECT_ID` + `GCP_BILLING_ACCOUNT_ID`. Manual gcloud fallback documented in `gcp-billing-alerts.README.md`.
 
@@ -60,3 +57,10 @@ Last updated: 2026-05-30
 - Never call `expo-haptics` directly — use `useHaptic()` from `src/theme/haptics.ts`.
 - `TweaksPanel` (R14-1) is prototype HTML only — must never appear in production build.
 - DM and Report buttons on Friend Profile are toast-only stubs (R16-9). Promote them to real flows or remove the buttons within one major round — do not leave "coming soon" copy in production longer than that.
+
+---
+
+## Known follow-ups (not blocking ship, but tracked)
+
+- **`npx prisma generate` on macOS host** — required before booting the dev server so the real Prisma client picks up the new `Notification`, `BroadcastSettings`, and `UserAvailability.state` shapes from migration `20260525000001`. After that, `src/types/prisma-augment.d.ts` (a temporary shim added by the backend agent so `tsc --noEmit` stays green) can be removed.
+- **AvailabilityBlock RLS** — backend agent flagged: the friend-availability FORBIDDEN gate calls `findBlock(viewerId, blockerId)` to check whether the viewer is the *blocked* party. If existing RLS only grants SELECT on `AvailabilityBlock` to the blocker, the lookup won't see the row. Verify against the RLS policies migration; patch if needed.
