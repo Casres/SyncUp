@@ -68,6 +68,39 @@ enum SuggestionVoteValue {
   DOWN
 }
 
+// Daily availability state. Mirrors the mobile `AvailState` union in
+// TYPES.ts. Absent row (or `state=null` on a UserAvailability row) means
+// the day is unset; never store nulls — delete the row on clear per
+// mobile Hard Rule 14.
+enum AvailState {
+  FREE
+  MAYBE
+  BUSY
+}
+
+// One concrete notification card kind. Mirrors `NotifType` in TYPES.ts
+// (Round 6 / Round 12 NotifSheet spec) — every new card type must be
+// added here AND in the mobile union. Stored verbatim on Notification.type.
+enum NotifType {
+  RSVP
+  EVENT_REMINDER
+  CO_HOST
+  CO_HOST_REVOKED
+  GROUP_ACTIVITY
+  INBOUND_BROADCAST
+  FRIEND_REQUEST
+  GROUP_INVITE
+}
+
+// Audience scope for a broadcast rule. Mirrors `AudienceMode` from
+// TYPES.ts. `EVERYONE` ignores targets; `FRIENDS` / `TYPES` use the
+// `targets` JSON array on BroadcastRule.
+enum BroadcastAudienceMode {
+  EVERYONE
+  FRIENDS
+  TYPES
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -103,6 +136,8 @@ model User {
   pollVotes            PollVote[]
   eventSuggestions     EventSuggestion[]
   suggestionVotes      SuggestionVote[]
+  notifications        Notification[]
+  broadcastSettings    BroadcastSettings?
 }
 
 model Friendship {
@@ -309,6 +344,13 @@ model UserAvailability {
   windowEnd   DateTime
   granularity AvailabilityGranularity
 
+  // Daily state. Nullable for migration safety on pre-existing rows
+  // (none today, but the schema is shared with the seed which only ever
+  // writes when `state` is provided). The Availability service treats
+  // `state IS NULL` rows as "row should not exist" and the service-layer
+  // upsert deletes the row on clear (Hard Rule 14 from mobile spec).
+  state AvailState?
+
   // Per-window notification override. Falls back to User global defaults.
   notifOnChange Boolean       @default(false)
   notifChannel  NotifChannel?
@@ -318,6 +360,11 @@ model UserAvailability {
 
   user User @relation(fields: [userId], references: [id])
 
+  // The mobile contract stores availability as a flat
+  // { [iso]: state } map keyed by day, so each user has at most one
+  // UserAvailability row per (windowStart, granularity=DAY). The unique
+  // constraint enforces idempotent upsert from the service.
+  @@unique([userId, windowStart, granularity])
   @@index([userId, windowStart])
   @@index([windowStart, windowEnd])
 }
@@ -387,4 +434,75 @@ model SuggestionVote {
   user       User            @relation(fields: [userId], references: [id])
 
   @@unique([suggestionId, userId])
+}
+
+// In-app notification feed (NotifSheet — Round 6 / Round 12). The
+// `payload` blob carries the per-type body keyed by mobile Notif union
+// in TYPES.ts (actorId, actorName, eventId, eventName, etc.). The
+// service layer is responsible for shaping the payload to match each
+// mobile `NotifType` — there is no DB-side schema for the payload.
+//
+// Soft-delete via `dismissedAt`: mobile "swipe to dismiss" sets this
+// column rather than hard-deleting, so the row can be undismissed
+// inside the 30-day purge window if the spec ever calls for it.
+//
+// `mutedAt` is mobile's "swipe to mute" — when set, the type is muted
+// for this user (the service may also short-circuit type-level mutes via
+// the per-user notification defaults on the User row).
+model Notification {
+  id     String    @id @default(cuid())
+  userId String
+  type   NotifType
+  read   Boolean   @default(false)
+
+  // Type-specific body. See TYPES.ts `Notif` union for each shape.
+  // The DB layer treats this as opaque JSON; the service serialises and
+  // validates per NotifType.
+  payload Json
+
+  // Optional grouping key the service uses to dedupe / collapse cards
+  // (e.g. `event:{eventId}` for RSVP-style notifs from the same event).
+  // Indexed for fast lookup; nullable when the type has no natural key.
+  groupKey String?
+
+  // Swipe affordances on the mobile NotifSheet.
+  dismissedAt DateTime?
+  mutedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([userId, read])
+  @@index([userId, groupKey])
+}
+
+// Per-user availability broadcast settings. The mobile contract is a
+// `BroadcastSettings` blob with one rule per state — we keep that shape
+// here so the service maps 1:1 without a join. Audience targets are
+// stored as a JSON array of ids (friendId when audience='FRIENDS', or
+// FriendType id when audience='TYPES'). One row per user, hence the
+// unique on userId.
+model BroadcastSettings {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  freeOn       Boolean               @default(false)
+  freeAudience BroadcastAudienceMode @default(FRIENDS)
+  freeTargets  Json                  @default("[]")
+
+  maybeOn       Boolean               @default(false)
+  maybeAudience BroadcastAudienceMode @default(FRIENDS)
+  maybeTargets  Json                  @default("[]")
+
+  busyOn       Boolean               @default(false)
+  busyAudience BroadcastAudienceMode @default(FRIENDS)
+  busyTargets  Json                  @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
 }

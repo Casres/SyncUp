@@ -164,14 +164,78 @@ describe('Events domain — integration', () => {
     });
   });
 
-  // ── Deferred — flagged in EVENTS_HANDOFF.md §1, §2, §3 ─────────────────────
+  // ── Invites (Round-17 Invites Domain — EVENTS_HANDOFF §1 RESOLVED) ────────
 
-  test.todo(
-    'POST /events/:id/invites — invite endpoints not yet implemented (EVENTS_HANDOFF §1)',
-  );
-  test.todo(
-    'PATCH /events/:id/invites/:inviteId — RSVP not yet implemented (EVENTS_HANDOFF §1)',
-  );
+  describe('Invites — incremental endpoints', () => {
+    it('POST /events/:id/invites sends invites to a recipient list', async () => {
+      // Need a second user to receive an invite. Direct insert via the
+      // migration-owner client — RLS bypassed.
+      const recipient = await testPrisma.user.create({
+        data: {
+          clerkId: 'test_clerk_invite_recipient',
+          username: 'inviterec',
+          displayName: 'Invite Recipient',
+        },
+      });
+
+      const created = await supertest(app.server)
+        .post('/events')
+        .set(authHeader())
+        .send({
+          title: 'Invite Test Event',
+          startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+          endsAt: new Date(Date.now() + 90_000_000).toISOString(),
+        });
+      expect(created.status).toBe(201);
+
+      const res = await supertest(app.server)
+        .post(`/events/${created.body.id}/invites`)
+        .set(authHeader())
+        .send({ recipientIds: [recipient.id] });
+
+      expect(res.status).toBe(201);
+      expect(Array.isArray(res.body.invites)).toBe(true);
+      expect(res.body.invites).toHaveLength(1);
+      expect(res.body.invites[0]).toMatchObject({
+        recipientId: recipient.id,
+        status: 'PENDING',
+      });
+    });
+
+    it('PATCH /events/:id/invites/:inviteId returns 403 when the caller is not the recipient', async () => {
+      // Caller (the authenticated user) creates an event AND we direct-
+      // insert an invite where the recipient is a DIFFERENT user. The
+      // caller is the organiser, NOT the recipient — they cannot
+      // change someone else's RSVP.
+      const otherRecipient = await testPrisma.user.create({
+        data: {
+          clerkId: 'test_clerk_rsvp_other',
+          username: 'rsvpother',
+          displayName: 'Other RSVP',
+        },
+      });
+      const event = await supertest(app.server)
+        .post('/events')
+        .set(authHeader())
+        .send({
+          title: 'RSVP Forbidden Test',
+          startsAt: new Date(Date.now() + 86_400_000).toISOString(),
+          endsAt: new Date(Date.now() + 90_000_000).toISOString(),
+        });
+      const invite = await testPrisma.eventInvite.create({
+        data: {
+          eventId: event.body.id,
+          recipientId: otherRecipient.id,
+        },
+      });
+
+      const res = await supertest(app.server)
+        .patch(`/events/${event.body.id}/invites/${invite.id}`)
+        .set(authHeader())
+        .send({ status: 'ACCEPTED' });
+      expect(res.status).toBe(403);
+    });
+  });
   test.todo(
     'POST /events/:id/organisers — co-host management not yet implemented (EVENTS_HANDOFF §2)',
   );

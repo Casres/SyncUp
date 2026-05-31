@@ -17,6 +17,7 @@ import type {
   FriendshipStatus,
   InviteStatus,
   NotifChannel,
+  NotifType,
   Recurrence,
   SocialGroupRole,
   SuggestionVoteValue,
@@ -204,6 +205,25 @@ export type SuggestionPayload = {
   viewerVote: SuggestionVoteValue | null;
 };
 
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+/**
+ * Mirrors the `Notif` union in `social-calendar-mobile/TYPES.ts`. The
+ * server stores the type-specific body in a JSON blob; the service
+ * layer shapes it back to the discriminated union shape before
+ * serialising.
+ *
+ * The wire shape is intentionally the SAME as the mobile `Notif` union
+ * (top-level fields plus per-type body) so React Query consumes it
+ * directly with no transform.
+ */
+export type NotifPayload = {
+  id: string;
+  type: NotifType;
+  read: boolean;
+  createdAt: string;
+} & Record<string, unknown>;
+
 // ─── Server → Client ─────────────────────────────────────────────────────────
 
 export interface ServerToClientEvents {
@@ -256,6 +276,13 @@ export interface ServerToClientEvents {
 
   // Availability — minimal payload; clients re-fetch via REST.
   'availability:updated': (data: { userId: string }) => void;
+
+  // Notifications — server pushes a new card to the recipient's
+  // `user:{userId}` room. `notif:new` is the only push event today;
+  // mark-as-read and dismiss are REST-only (no fan-out needed because
+  // they're scoped to a single user).
+  'notif:new': (data: { notification: NotifPayload }) => void;
+  'notif:dismissed': (data: { notificationId: string }) => void;
 }
 
 // ─── Client → Server ─────────────────────────────────────────────────────────
