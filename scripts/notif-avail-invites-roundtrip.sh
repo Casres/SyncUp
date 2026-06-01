@@ -111,26 +111,34 @@ expect_code "GET /notifications" "200" "$CODE" "$BODY"
 LIST_BEFORE="$BODY"
 info "before-trigger count: $(echo "$BODY" | jq -r 'length // (.items|length // "?")')"
 
-# Trigger a notification by sending an invite from A→B (requires an event)
+# Trigger a notification by sending an invite from A→B (requires an event).
+# API expects startsAt + endsAt as ISO timestamps (createEventBodySchema is .strict()).
+START_AT="2026-06-15T18:00:00Z"
+END_AT="2026-06-15T20:00:00Z"
 RESP=$(hit_auth "$JWT_A" POST "/events" \
-  '{"title":"RoundTrip event","iso":"2026-06-15T18:00:00Z","location":"Anywhere"}')
+  "{\"title\":\"RoundTrip event\",\"location\":\"Anywhere\",\"startsAt\":\"$START_AT\",\"endsAt\":\"$END_AT\"}")
 EV_CODE="${RESP%%|*}"; EV_BODY="${RESP#*|}"
 expect_code "POST /events (trigger event for invite)" "201" "$EV_CODE" "$EV_BODY"
-EVENT_ID=$(echo "$EV_BODY" | jq -r '.id')
+EVENT_ID=$(echo "$EV_BODY" | jq -r '.id // empty')
 info "event_id=$EVENT_ID"
 
-# B's clerkId → app userId. We need B's app userId to send the invite.
-# Easiest path: ask B's /me endpoint (if it exists) or use the friends list.
-# For now, decode from JWT_B sub (clerk id) and call a lookup. If a /me
-# endpoint is missing, this section will fail loudly and you'll know.
+# Warm up B so the auth middleware upserts B's User row if it isn't there yet.
 RESP=$(hit_auth "$JWT_B" GET "/friends"); CODE="${RESP%%|*}"; BODY="${RESP#*|}"
 expect_code "GET /friends (warmup B)" "200" "$CODE" "$BODY"
 
-# Send the invite. The exact body shape depends on the controller; the
-# locked contract is { recipientIds: string[] } per EVENTS_HANDOFF.md.
-# If the body shape differs, this is a contract drift surface — flag it.
+# recipientIds wants APP user UUIDs (User.id), NOT Clerk user_ids. No /me
+# endpoint exists yet, so query Postgres directly. docker-compose.yml
+# provisions the syncup_migrate role with full read access.
+B_APP_ID=$(docker compose exec -T postgres psql -U syncup_migrate -d syncup -tAc \
+  "SELECT id FROM \"User\" WHERE \"clerkId\" = '$TEST_USER_B_CLERK_ID'" 2>/dev/null | tr -d '[:space:]')
+if [ -z "$B_APP_ID" ]; then
+  fail "could not resolve B's app user id from clerkId — is B's User row provisioned?"
+fi
+info "B's app user id: $B_APP_ID"
+
+# Send the invite using B's APP id.
 RESP=$(hit_auth "$JWT_A" POST "/events/$EVENT_ID/invites" \
-  "{\"recipientIds\":[\"$TEST_USER_B_CLERK_ID\"]}")
+  "{\"recipientIds\":[\"$B_APP_ID\"]}")
 INV_CODE="${RESP%%|*}"; INV_BODY="${RESP#*|}"
 expect_code "POST /events/:id/invites" "201" "$INV_CODE" "$INV_BODY"
 INVITE_ID=$(echo "$INV_BODY" | jq -r '.[0].id // .id // empty')
