@@ -1,0 +1,41 @@
+-- ─── Fix: Notification INSERT RLS too tight ───────────────────────────────────
+--
+-- Bug: the original `notification_insert_self` policy (migration
+-- 20260525000001_notif_avail_broadcast, line 107-108) required:
+--
+--     WITH CHECK ("userId" = current_app_user_id())
+--
+-- where `userId` is the RECIPIENT of the notification. Cross-user dispatch
+-- (e.g. A invites B → write a row with userId=B while the request transaction
+-- is set to current_app_user_id=A) therefore always failed the WITH CHECK with
+-- 42501 (insufficient_privilege).
+--
+-- Every cross-user notification path was silently broken — the round-trip test
+-- surfaced it by sending an invite from A→B and observing that B's
+-- GET /notifications was empty. The events.service.ts dispatch is wrapped in
+-- a try/catch so the RLS rejection never propagated.
+--
+-- ─── Fix (option b in handoff: bypass RLS for dispatch) ────────────────────────
+--
+-- The actual fix lives in code: `notificationsRepository.create` now uses the
+-- migration-owner `prisma` client (which bypasses RLS) instead of the
+-- per-request `prismaApp` transaction. Service-level checks already gate WHO
+-- can dispatch a notification (only event organisers can send invites, only
+-- invite recipients can RSVP, etc.), so the loss of the policy as a guard
+-- is not a meaningful weakening.
+--
+-- This migration loosens the WITH CHECK from "recipient = current user" to
+-- "any authenticated user" as defence-in-depth: if a future code path ever
+-- routes a notification create through the app role by mistake, the write
+-- will succeed instead of silently breaking. The SELECT / UPDATE / DELETE
+-- policies stay strict (owner-only) — only INSERT changes here, and only
+-- in the direction of being LESS restrictive for cross-user writes.
+--
+-- See also: 20260529000001_fix_event_select_policy_insert_returning for the
+-- previous RLS-vs-Prisma-INSERT lesson learned. This bug is unrelated to the
+-- snapshot-isolation issue; it is purely "policy was too tight for the only
+-- caller pattern we actually use".
+
+DROP POLICY IF EXISTS notification_insert_self ON "Notification";
+CREATE POLICY notification_insert_authenticated ON "Notification"
+  FOR INSERT WITH CHECK (current_app_user_id() IS NOT NULL);
