@@ -3,6 +3,7 @@ import type {
   NotifType,
   NotificationModel,
 } from '@prisma/client';
+import { prisma } from '../config/prisma.js';
 import type { Db } from './_types.js';
 
 /**
@@ -15,6 +16,17 @@ import type { Db } from './_types.js';
  * the authoritative gate. We still pass it explicitly so the WHERE
  * clause is intent-clear and so unit tests against the migration-owner
  * client also enforce ownership.
+ *
+ * Cross-user write (`create`) is intentionally routed through the
+ * migration-owner `prisma` client, NOT the per-request transaction.
+ * Notifications are by definition written FROM one user TO another, so
+ * the per-request app-role transaction (which sets app.current_user_id
+ * to the SENDER) would fail the recipient-owner WITH CHECK that the
+ * other Notification policies share. See migration
+ * 20260601000001_fix_notification_insert_rls for full rationale. The
+ * dispatch flow's service-layer checks (only event organisers can send
+ * invites, only invite recipients can RSVP, etc.) gate WHO can write
+ * a notification, so bypassing RLS here is a contained surgical fix.
  */
 
 // Until `prisma generate` runs against the new schema, the `Db` type
@@ -137,9 +149,20 @@ export const notificationsRepository = {
    * Insert a new notification. The service is responsible for shaping
    * the payload to match the mobile `Notif` discriminated union for
    * the chosen `type`.
+   *
+   * Routes through the migration-owner `prisma` client (NOT the per-
+   * request transaction) so the row's `userId` (recipient) does not need
+   * to equal `current_app_user_id()` (sender). The `_db` parameter is
+   * retained for call-site readability and to preserve the symmetry of
+   * other repository methods, but is intentionally unused.
+   *
+   * Trade-off: the notification row commits independently of the calling
+   * request's transaction. For the dispatch flow this is correct — the
+   * notification is a fire-and-forget side effect, mirrored by the
+   * `io.emit` call in the service which is also outside the transaction.
    */
-  create(db: Db, data: CreateNotificationData) {
-    return notif(db).create({
+  create(_db: Db, data: CreateNotificationData) {
+    return notif(prisma).create({
       data: {
         userId: data.userId,
         type: data.type,
