@@ -141,13 +141,16 @@ RESP=$(hit_auth "$JWT_A" POST "/events/$EVENT_ID/invites" \
   "{\"recipientIds\":[\"$B_APP_ID\"]}")
 INV_CODE="${RESP%%|*}"; INV_BODY="${RESP#*|}"
 expect_code "POST /events/:id/invites" "201" "$INV_CODE" "$INV_BODY"
-INVITE_ID=$(echo "$INV_BODY" | jq -r '.[0].id // .id // empty')
+# Controller returns { invites: [...] } per events.controller.ts:195.
+INVITE_ID=$(echo "$INV_BODY" | jq -r '.invites[0].id // empty')
 
 # Now B should have a notification.
 sleep 1
 RESP=$(hit_auth "$JWT_B" GET "/notifications"); CODE="${RESP%%|*}"; BODY="${RESP#*|}"
 expect_code "GET /notifications (after trigger, as B)" "200" "$CODE" "$BODY"
-NOTIF_ID=$(echo "$BODY" | jq -r '.[0].id // .items[0].id // empty')
+# Controller returns { notifications: [...], unreadCount: n } per
+# notifications.controller.ts:57.
+NOTIF_ID=$(echo "$BODY" | jq -r '.notifications[0].id // empty')
 [ -n "$NOTIF_ID" ] && pass "B received a notification (id=$NOTIF_ID)" \
   || fail "B did not receive a notification after invite from A"
 
@@ -173,7 +176,7 @@ expect_code "GET /availability/me" "200" "$CODE" "$BODY"
 
 TODAY=$(date -u +%Y-%m-%d)
 RESP=$(hit_auth "$JWT_A" PUT "/availability/me/$TODAY" '{"state":"free"}')
-expect_code "PUT /availability/me/:date (set today=free)" "200" "${RESP%%|*}" "${RESP#*|}"
+expect_code "PUT /availability/me/:date (set today=free)" "204" "${RESP%%|*}" "${RESP#*|}"
 
 # Read back, confirm today is free
 RESP=$(hit_auth "$JWT_A" GET "/availability/me"); CODE="${RESP%%|*}"; BODY="${RESP#*|}"
@@ -181,17 +184,21 @@ TODAY_STATE=$(echo "$BODY" | jq -r --arg d "$TODAY" '.[$d] // .map[$d] // empty'
 [ "$TODAY_STATE" = "free" ] && pass "read-back: today=free confirmed" \
   || fail "read-back: today expected 'free', got '$TODAY_STATE' (body shape may differ — check)"
 
-# Bulk patch
+# Bulk patch (returns 204 on success — no body)
 RESP=$(hit_auth "$JWT_A" PATCH "/availability/me" \
   "{\"$TODAY\":\"busy\"}")
-expect_code "PATCH /availability/me (bulk)" "200" "${RESP%%|*}" "${RESP#*|}"
+expect_code "PATCH /availability/me (bulk)" "204" "${RESP%%|*}" "${RESP#*|}"
 
-# Friend availability — B has not shared with A → FORBIDDEN
-RESP=$(hit_auth "$JWT_A" GET "/availability/$TEST_USER_B_CLERK_ID"); CODE="${RESP%%|*}"; BODY="${RESP#*|}"
+# Friend availability — B has not shared with A → expect FORBIDDEN.
+# NOTE: the API currently returns 200 here. That is a PRIVACY BUG:
+# getFriend only checks for blocks, not for friend+share relationship.
+# Tracked separately; we still assert 403 so this surfaces as long as
+# the bug exists.
+RESP=$(hit_auth "$JWT_A" GET "/availability/$B_APP_ID"); CODE="${RESP%%|*}"; BODY="${RESP#*|}"
 if [ "$CODE" = "403" ]; then
   pass "GET /availability/:userId (non-shared) → 403 FORBIDDEN (contract honored)"
 elif [ "$CODE" = "200" ]; then
-  fail "GET /availability/:userId returned 200 — expected 403 unless A&B are friends with shared availability"
+  fail "GET /availability/:userId returned 200 — PRIVACY BUG: any user can read any other user's availability (see availability.service.ts getFriend)"
 else
   expect_code "GET /availability/:userId" "403" "$CODE" "$BODY"
 fi
@@ -200,9 +207,10 @@ fi
 RESP=$(hit_auth "$JWT_A" GET "/availability/broadcasts"); CODE="${RESP%%|*}"; BODY="${RESP#*|}"
 expect_code "GET /availability/broadcasts" "200" "$CODE" "$BODY"
 
+# PUT broadcasts returns 204 on success
 RESP=$(hit_auth "$JWT_A" PUT "/availability/broadcasts" \
   '{"free":{"on":true,"audience":"everyone","targets":[]},"maybe":{"on":false,"audience":"everyone","targets":[]},"busy":{"on":false,"audience":"everyone","targets":[]}}')
-expect_code "PUT /availability/broadcasts" "200" "${RESP%%|*}" "${RESP#*|}"
+expect_code "PUT /availability/broadcasts" "204" "${RESP%%|*}" "${RESP#*|}"
 
 # ── Invites (event-scoped) ───────────────────────────────────────────────────
 section "Invites — already exercised in Notifications block above"
