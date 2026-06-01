@@ -64,8 +64,14 @@ mint_jwt() {
     -H "Content-Type: application/json" \
     -d "{\"user_id\":\"$clerk_user_id\"}" | jq -r .id)
   [ -n "$session_id" ] && [ "$session_id" != "null" ] || { echo ""; return 1; }
-  curl -s -X POST "https://api.clerk.com/v1/sessions/$session_id/tokens" \
-    -H "Authorization: Bearer $CLERK_SECRET_KEY" | jq -r .jwt
+  # NOTE: Content-Type required even with no body — Clerk's BAPI rejects
+  # POSTs without it as "unsupported_content_type".
+  local jwt
+  jwt=$(curl -s -X POST "https://api.clerk.com/v1/sessions/$session_id/tokens" \
+    -H "Authorization: Bearer $CLERK_SECRET_KEY" \
+    -H "Content-Type: application/json" | jq -r .jwt)
+  [ -n "$jwt" ] && [ "$jwt" != "null" ] || { echo ""; return 1; }
+  echo "$jwt"
 }
 
 section "Mint JWTs for both test users"
