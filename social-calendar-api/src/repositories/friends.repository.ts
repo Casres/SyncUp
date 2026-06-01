@@ -134,6 +134,30 @@ export const friendsRepository = {
     });
   },
 
+  /**
+   * True iff the two users have a non-deleted ACCEPTED friendship in
+   * either direction. Used as the privacy gate for availability and any
+   * other "friends-only" read path. RLS on Friendship restricts
+   * visibility to either party — both userAId and userBId must be the
+   * caller for at least one direction to return a row; otherwise the
+   * helper must run against a client with the relevant party as
+   * current_app_user_id, or under the migration-owner client.
+   */
+  async hasAcceptedFriendship(db: Db, userAId: string, userBId: string) {
+    const row = await db.friendship.findFirst({
+      where: {
+        deletedAt: null,
+        status: FriendshipStatus.ACCEPTED,
+        OR: [
+          { initiatorId: userAId, receiverId: userBId },
+          { initiatorId: userBId, receiverId: userAId },
+        ],
+      },
+      select: { id: true },
+    });
+    return row !== null;
+  },
+
   create(db: Db, initiatorId: string, receiverId: string) {
     return db.friendship.create({
       data: {

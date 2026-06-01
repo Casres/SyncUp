@@ -48,23 +48,29 @@ export const availabilityService = {
   },
 
   /**
-   * Friend's availability — gated by `AvailabilityBlock` (one-directional
-   * hide). The mobile contract is: throw `ApiError('FORBIDDEN', ...)`
-   * when blocked. We mirror that with `AvailabilityForbiddenError`
-   * mapped to HTTP 403 in the controller.
+   * Friend's availability — gated by friendship + block. The mobile
+   * contract is: throw `ApiError('FORBIDDEN', ...)` when the caller
+   * isn't entitled to see the target's calendar. The controller maps
+   * `AvailabilityForbiddenError` to HTTP 403.
    *
-   * RLS on `AvailabilityBlock` is owner-only — but the BLOCKER is the
-   * owner, not the viewer. So we check via the migration-owner
-   * `friendsRepository.findBlock` semantics? No — `friendsRepository.findBlock`
-   * already uses `db.availabilityBlock.findUnique`, and the
-   * `availabilityblock_select_*` RLS policies grant SELECT both to the
-   * blocker AND to the blocked user (so the viewer can see "I'm blocked"
-   * without the blocker hiding it).
+   * Privacy gate (in order):
+   *   1. Self — always allowed.
+   *   2. Block — if the target has an AvailabilityBlock against the
+   *      viewer, 403. The blocked user must not be able to learn they
+   *      are blocked vs simply not-shared, so this check and the
+   *      not-a-friend check below both surface as the same 403.
+   *   3. Friendship — the viewer must be an ACCEPTED friend of the
+   *      target. Non-friends and pending requesters get 403.
    *
-   * If the policies don't extend SELECT to the blocked party, this
-   * service still works against the migration-owner client in tests; in
-   * production the RLS policy needs the blocked party included. Open
-   * item flagged for the Lead Manager.
+   * Note: this is the privacy gate at the EDGE of the friend graph.
+   * Finer-grained "which days does the target share with me" is a
+   * separate concern handled via BroadcastSettings on push delivery,
+   * not on the calendar read.
+   *
+   * RLS on Friendship is "either party can SELECT". Running the check
+   * through the per-request transaction is therefore valid: the viewer
+   * IS a party of any friendship row that would return, so RLS will
+   * surface it.
    */
   async getFriend(
     db: Db,
@@ -74,6 +80,8 @@ export const availabilityService = {
     if (viewerUserId === targetUserId) {
       return availabilityRepository.getMap(db, targetUserId);
     }
+
+    // (2) Block first — even an ACCEPTED friend can be hidden.
     const block = await friendsRepository.findBlock(
       db,
       targetUserId,
@@ -82,6 +90,17 @@ export const availabilityService = {
     if (block) {
       throw new AvailabilityForbiddenError(targetUserId);
     }
+
+    // (3) Must be accepted friends.
+    const friends = await friendsRepository.hasAcceptedFriendship(
+      db,
+      viewerUserId,
+      targetUserId,
+    );
+    if (!friends) {
+      throw new AvailabilityForbiddenError(targetUserId);
+    }
+
     return availabilityRepository.getMap(db, targetUserId);
   },
 
