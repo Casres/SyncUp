@@ -83,12 +83,16 @@ JWT_B=$(mint_jwt "$TEST_USER_B_CLERK_ID")
 # Reusable curl helpers. CODE_<name> and BODY_<name> get set as side effects.
 hit_auth() {
   # hit_auth <jwt> <method> <path> [data]  → echo "<HTTP_CODE> <body>"
+  # Only sets Content-Type when there's actually a body — Fastify
+  # rejects empty-body requests that declare Content-Type: application/json
+  # with FST_ERR_CTP_EMPTY_JSON_BODY (400).
   local jwt="$1"; local method="$2"; local path="$3"; local data="${4:-}"
   local args=(-s -o /tmp/rt_body -w '%{http_code}' -X "$method"
               -H "Authorization: Bearer $jwt"
-              -H "Content-Type: application/json"
               "$API_BASE$path")
-  [ -n "$data" ] && args+=(-d "$data")
+  if [ -n "$data" ]; then
+    args+=(-H "Content-Type: application/json" -d "$data")
+  fi
   local code; code=$(curl "${args[@]}")
   local body; body=$(cat /tmp/rt_body)
   echo "$code|$body"
