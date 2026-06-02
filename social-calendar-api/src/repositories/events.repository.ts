@@ -1,17 +1,11 @@
 import { EventOrganiserRole, InviteStatus, Prisma } from '@prisma/client';
 import type { NotifChannel } from '@prisma/client';
 import type { Db } from './_types.js';
+import { publicProfileSelect } from './_userSelects.js';
 
 // Re-exported for any consumer that imported `Db` from this module
 // before `_types.ts` was extracted.
 export type { Db };
-
-const publicProfileSelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  avatarUrl: true,
-} satisfies Prisma.UserSelect;
 
 const eventInclude = {
   creator: { select: publicProfileSelect },

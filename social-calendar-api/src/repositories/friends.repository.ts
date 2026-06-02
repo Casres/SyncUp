@@ -1,18 +1,6 @@
 import { FriendshipStatus, Prisma } from '@prisma/client';
 import type { Db } from './_types.js';
-
-/**
- * Public profile fields returned to other users in friend / block / member
- * responses. Mirrors the shape used by the Events domain. Will be lifted
- * to a shared `src/lib/userSelects.ts` once a third domain repeats it —
- * see FRIENDS_HANDOFF.md "Open items".
- */
-const publicProfileSelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  avatarUrl: true,
-} satisfies Prisma.UserSelect;
+import { publicProfileSelect } from './_userSelects.js';
 
 const friendshipInclude = {
   initiator: { select: publicProfileSelect },
