@@ -1,8 +1,21 @@
 # SyncUp — Build Checklist (Pre-Testing)
 
-Last updated: 2026-05-30
+Last updated: 2026-06-02
 
 ---
+
+## Recently completed (2026-06-02 — Wave 3 finisher)
+
+- [x] **`publicProfileSelect` consolidation** — constant extracted from 4 repositories into `social-calendar-api/src/repositories/_userSelects.ts`. Pattern matches the existing `_types.ts` shared module. Kept `satisfies Prisma.UserSelect` so literal types survive for `typeof publicProfileSelect` derivations. Committed `c6ee094`.
+- [x] **GCP billing alerts runbook drafted** — `social-calendar-api/src/infra/GCP_BILLING_ALERTS_RUNBOOK.md` covers prereqs (env vars, perms, notification channel), Path A (`terraform init/plan/apply`), Path B (gcloud fallback), verification, teardown, and cost expectations. Existing `gcp-billing-alerts.README.md` now points at the runbook. **Apply not yet run** — awaiting user with GCP credentials. Committed `5489a29`.
+- [x] **Mocks tombstone audit** — 17 consumers still import from `../mocks` (7 api stubs + 10 screens/components). Tombstone stays in place; full consumer table documented below under "Mocks tombstone — remaining consumers". Committed `50046f4`.
+
+## Recently completed (2026-06-01 — backend round-trip bug fixes)
+
+- [x] **Notification cross-user dispatch fix** — `notifications.repository.ts` now routes cross-user notification INSERTs through the migration-owner Prisma client so the RLS app-user context doesn't reject writes destined for the recipient's row. New migration `20260601000001_fix_notification_insert_rls`. Committed `4bf999b`, merged via `736217b`.
+- [x] **Availability privacy fix** — `availability.service.ts` `getFriend()` now requires an accepted friendship in addition to the existing FORBIDDEN gate, closing the bug where any authenticated user could read any other user's availability. Committed `5bcdb23`, merged via `736217b`.
+- [x] **Invitee event visibility fix** — inlined an `EventInvite EXISTS` clause into the `Event` SELECT RLS policy so invited users (who are not yet attendees) can read the event they were invited to, unblocking PATCH/DELETE on `/events/:id/invites/:inviteId`. New migration `20260601000002_fix_invitee_event_visibility`. Committed `e77ec29`, merged via `736217b`.
+- [x] **Round-trip script hardening** — three follow-up script fixes (`3690052`, `99ae4bd`, `7523e5d`, `23e7c64`) corrected the round-trip's Clerk token mint, event-create contract, recipient ID resolution, and empty-body Content-Type handling. Initial run captured at `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` (18/22) — re-run needed after the three backend fixes above to confirm 22/22.
 
 ## Recently completed (2026-05-30)
 
@@ -11,7 +24,7 @@ Last updated: 2026-05-30
 - [x] **Cloudinary signed avatar upload** — Backend sign endpoint (`POST /uploads/avatar/sign`), mobile `expo-image-picker` integration, upload flow in `YoureInScreen`, and `avatarUrl` PATCH all shipped. `RingAvatar` updated to render `<Image>` when `photoUrl` is provided. Committed `4363529`.
 - [x] **Railway deploy** — API live at `syncup-production-bfb4.up.railway.app`. Postgres + Redis online. Clerk webhook configured. Cloudinary env vars set on Railway service.
 - [x] **Native dev build** — `expo-dev-client` + `expo-image-picker` pinned to SDK 55 via `npx expo install`. `ios/` and `android/` added to `.gitignore`. `npx expo run:ios` compiles successfully.
-- [x] **Clerk signup wiring** — `SignUpStep1Screen` now calls `signUp.create()` + `prepareVerification()`. `SignUpStep2Screen` calls `attemptVerification()` with the real OTP. `YoureInScreen.onGo` calls `setActive({ session: signUp.createdSessionId })` before the avatar upload so `getToken()` returns a valid JWT. `SignUpStep3Screen` wires name into `signUp.update()`. Changes committed (uncommitted as of 2026-05-30 — push before testing).
+- [x] **Clerk signup wiring** — `SignUpStep1Screen` now calls `signUp.create()` + `prepareVerification()`. `SignUpStep2Screen` calls `attemptVerification()` with the real OTP. `YoureInScreen.onGo` calls `setActive({ session: signUp.createdSessionId })` before the avatar upload so `getToken()` returns a valid JWT. `SignUpStep3Screen` wires name into `signUp.update()`.
 - [x] **RLS INSERT…RETURNING fix** — Inlined `"creatorId" = current_app_user_id()` directly into the `event_select_participant` USING clause, removing the recursive SELECT that caused false RLS rejections on `INSERT…RETURNING`. Committed `5f30e3a`.
 - [x] **ts-node added to api devDeps** — `jest.config.ts` requires `ts-node` to parse; it was missing, breaking CI. Fixed in `2518abf`.
 - [x] **Accidental expo deps removed from api** — `expo-dev-client` + `expo-image-picker` were incorrectly added to `social-calendar-api/package.json` during a wrong-directory `expo install`. Cleaned up in `2518abf`.
@@ -35,15 +48,21 @@ Last updated: 2026-05-30
 
 ## Infrastructure & Deployment
 
-- [~] **Live backend round-trip test** — auth-side round-trip captured in `AUTH_DOCKER_ROUNDTRIP_RESULTS.md` (commit `4cbabea`). Outstanding: extend the run to cover the newly-merged `/notifications`, `/availability`, and Invites endpoints. Verify Clerk JWT verification, Redis TTLs, and rate limiting hold under the new surfaces. Requires `npx prisma generate` on host first so the dev server boots with the new models.
+- [~] **Live backend round-trip test** — PARTIAL: fix branch (`fix/backend-roundtrip-bugs`) merged at `736217b`, awaiting host re-run for 22/0 verification. Initial run captured 18/22 in `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md`; the 4 failures map 1:1 to the three backend fixes that have since landed on main. Two new migrations (`20260601000001_fix_notification_insert_rls`, `20260601000002_fix_invitee_event_visibility`) must be applied to the local Postgres before re-running:
+  ```bash
+  docker compose exec api npx prisma migrate deploy
+  ./scripts/notif-avail-invites-roundtrip.sh
+  ```
+  Expected: `22 passed, 0 failed`. Once green, delete `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` (it's the stale pre-fix snapshot).
 - [x] **Railway project connection** — DONE 2026-05-28. API live at `syncup-production-bfb4.up.railway.app`. All env vars set including `DATABASE_URL_APP` (manual construction with `syncup_app` role) and `NIXPACKS_NODE_VERSION=22`.
-- [ ] **GCP Billing Alerts** — Terraform is written at `social-calendar-api/src/infra/gcp-billing-alerts.tf`. Apply with `GCP_PROJECT_ID` + `GCP_BILLING_ACCOUNT_ID`. Manual gcloud fallback documented in `gcp-billing-alerts.README.md`.
+- [~] **GCP Billing Alerts** — DOCS READY: full apply runbook at `social-calendar-api/src/infra/GCP_BILLING_ALERTS_RUNBOOK.md`. Terraform at `gcp-billing-alerts.tf` defines three notify-only budgets ($25 / $50 / $100 monthly, Places API only). Awaiting host `terraform apply` (or the gcloud Path B fallback) with `GCP_PROJECT_ID` + `GCP_BILLING_ACCOUNT_ID` set. Optional pre-launch hardening — can defer until traffic shape is known.
 
 ---
 
 ## Code Cleanup (do last, before production)
 
 - [x] **Delete seed file** — DONE 2026-05-28. `prisma/seed.ts` deleted + `prisma:seed` script + `prisma.seed` config block removed from `package.json`.
+- [x] **`publicProfileSelect` consolidation** — DONE 2026-06-02. See "Recently completed" above.
 - [~] **Delete mocks tombstone** — audited 2026-06-02 by Wave 3 finisher. **17 consumers still import from `../mocks`** (7 api stubs, 10 screens/components). Tombstone stays in place; deletion deferred until each consumer is rewired to a live endpoint. See "Mocks tombstone — remaining consumers" below.
 
 ### Mocks tombstone — remaining consumers (audit 2026-06-02)
@@ -82,7 +101,6 @@ When the last consumer is rewired:
 2. `rm social-calendar-mobile/src/mocks/MOCKS_HANDOFF.md`
 3. `rmdir social-calendar-mobile/src/mocks`
 4. Confirm `tsc --noEmit` clean and remove this section.
-- [ ] **`publicProfileSelect` consolidation** — constant is duplicated across **4** repositories: `src/repositories/events.repository.ts:8`, `friendGroups.repository.ts:8`, `friends.repository.ts:10`, and `groups.repository.ts:10`. Extract to a shared location (e.g. `src/repositories/_shared/userSelects.ts`) and import everywhere.
 
 ---
 
@@ -99,5 +117,9 @@ When the last consumer is rewired:
 
 ## Known follow-ups (not blocking ship, but tracked)
 
+- **Host re-run of round-trip script** — see Infrastructure section above. Single command after `prisma migrate deploy`.
 - **`npx prisma generate` on macOS host** — required before booting the dev server so the real Prisma client picks up the new `Notification`, `BroadcastSettings`, and `UserAvailability.state` shapes from migration `20260525000001`. After that, `src/types/prisma-augment.d.ts` (a temporary shim added by the backend agent so `tsc --noEmit` stays green) can be removed.
-- **AvailabilityBlock RLS** — backend agent flagged: the friend-availability FORBIDDEN gate calls `findBlock(viewerId, blockerId)` to check whether the viewer is the *blocked* party. If existing RLS only grants SELECT on `AvailabilityBlock` to the blocker, the lookup won't see the row. Verify against the RLS policies migration; patch if needed.
+- **AvailabilityBlock RLS** — backend agent flagged: the friend-availability FORBIDDEN gate calls `findBlock(viewerId, blockerId)` to check whether the viewer is the *blocked* party. If existing RLS only grants SELECT on `AvailabilityBlock` to the blocker, the lookup won't see the row. Verify against the RLS policies migration; patch if needed. (May already be addressed by `5bcdb23` — re-confirm during the round-trip re-run.)
+- **`useFriendTypes()` / `useFriendLabels()` React Query hooks** — adding these unlocks deletion of 6 mocks consumers in a single PR (see mocks audit above).
+- **Stale round-trip results doc** — delete `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` once the re-run captures the new 22/22 result. The current contents reflect the pre-fix state and will mislead anyone reading it.
+- **GCP billing alerts apply** — runbook ready; one `terraform apply` away. Pre-launch hardening, not a blocker.
