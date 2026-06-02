@@ -1,3 +1,5 @@
+> See **GCP_BILLING_ALERTS_RUNBOOK.md** for the full apply procedure (Terraform + gcloud paths, prereqs, verification, teardown). This file is kept as the standalone gcloud-only fallback reference.
+
 # GCP Billing Alerts — Manual gcloud Fallback
 
 Apply this if Terraform is not available in the deploy environment. Configures
