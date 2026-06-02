@@ -85,3 +85,24 @@ If you're picking up where this round left off, the relevant code lives in:
 - `src/api/friends.ts` — `useRemoveFriend`, `useBlockUser`
 
 DM and Report ship as stubs (toast-only) per R16-9. Promote or remove the buttons within one major round; do not leave "coming soon" copy in production longer than that.
+
+## Session of 2026-06-02 (Backend round-trip wave) — LOCKED
+
+The Notifications, Availability, and EventInvite domains are all live on `main` and verified end-to-end by the round-trip test (`./scripts/notif-avail-invites-roundtrip.sh` runs 26/0).
+
+If you're picking up where this round left off, three things are locked and must not be regressed:
+
+1. **Cross-user notification dispatch routes through the migration-owner Prisma client.** `notificationsRepository.create` uses `prisma` (not `prismaApp`) so the recipient-row INSERT bypasses RLS. Service-layer checks (only organizers can send invites, etc.) gate WHO can dispatch. The INSERT policy was also loosened to `current_app_user_id() IS NOT NULL` as defence-in-depth. See `4bf999b` and migration `20260601000001`.
+2. **`availabilityService.getFriend` requires an accepted friendship before returning the map.** Block check fires first, friendship check fires second, then the map returns. The mobile contract `ApiError('FORBIDDEN', ...)` → "Availability private" is preserved. See `5bcdb23`.
+3. **The Event SELECT policy's invitee leg inlines an `EventInvite EXISTS (...)` clause** instead of calling the `app_is_event_invitee` SECURITY DEFINER helper. Same snapshot-isolation pattern that bit `event_select_participant` in `5f30e3a`, applied to the invitee branch. See `e77ec29` and migration `20260601000002`.
+
+Relevant code:
+- `social-calendar-api/src/repositories/notifications.repository.ts` — dispatch path
+- `social-calendar-api/src/services/availability.service.ts` — getFriend gate
+- `social-calendar-api/src/repositories/friends.repository.ts` — `hasAcceptedFriendship` helper
+- `social-calendar-api/prisma/migrations/20260601000001_fix_notification_insert_rls/`
+- `social-calendar-api/prisma/migrations/20260601000002_fix_invitee_event_visibility/`
+- `social-calendar-api/src/repositories/_userSelects.ts` — `publicProfileSelect` consolidated here (was duplicated across 4 repos)
+- `scripts/notif-avail-invites-roundtrip.sh` — re-run after any change touching these domains; expect 26/0
+
+The mobile mocks tombstone (`social-calendar-mobile/src/mocks/index.ts`) is intentionally kept in place — 17 consumers still import from it. See `BUILD-CHECKLIST.md` for the consumer table and the priority unblock (ship `useFriendTypes()` + `useFriendLabels()` React Query hooks to kill 6 consumers in one PR).

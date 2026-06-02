@@ -1,6 +1,6 @@
 # SyncUp — Project Tracker
 
-_Last updated: 2026-05-30_
+_Last updated: 2026-06-02_
 
 A cross-platform social calendar app (iOS & Android). High-level summary of build state. **For the agent-by-agent ground truth see `LEAD_MANAGER.md`.**
 
@@ -41,7 +41,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 
 ---
 
-## Build State Summary (2026-05-30)
+## Build State Summary (2026-06-02)
 
 ### Backend — Done ✅
 
@@ -55,17 +55,20 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Backend Cleanup | Dual Prisma client, `GET /health`, `DATABASE_URL_APP` |
 | Socket.io Layer | 14 socket events across presence/events/friends/groups/availability |
 | EXPLORE Gateway (Phase A) | `/explore/*` routes + Eventbrite + Google Places clients, behind auth |
-| Seed Rebuild | Full Decision #4 extended seed (5 users, 4 events, RSVP spread, closed poll) — **must be deleted before production** |
+| EXPLORE Cache + Rate-Limit (Phase B) | DONE — modular `exploreCache.ts`, `X-RateLimit-*` headers, burst budget, configurable TTL |
+| EXPLORE Cron + Billing (Phase C) | DONE — `node-cron` pre-warmer (6 cities, 2h), GCP billing alerts terraform written |
+| Notifications Domain | DONE 2026-06-02 — full 4-file stack mounted at `/notifications`, socket layer at `src/sockets/notifications.socket.ts`, dispatch routes cross-user INSERTs through migration-owner client to bypass RLS, 5 REST endpoints + `notif:new`/`notif:dismissed` events |
+| Availability Domain | DONE 2026-06-02 — full 4-file stack mounted at `/availability`, friend-availability gate requires accepted friendship (no longer privacy-leaks), broadcasts CRUD, socket wired |
+| Invites endpoints | DONE 2026-06-02 — folded into Events domain (POST/PATCH/DELETE under `/events/:id/invites`), invitee event-visibility RLS fix landed |
+| Round-trip verification | DONE 2026-06-02 — `scripts/notif-avail-invites-roundtrip.sh` runs 26/0 against docker stack; results at `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` |
+| Seed Rebuild | Full Decision #4 extended seed shipped, then **deleted 2026-05-28** in `c14cf03` per production gate |
 
 ### Backend — Pending 📋
 
 | Domain | Status | Prompt |
 |---|---|---|
-| EXPLORE Cache + Rate-Limit (Phase B) | PARTIAL — rate-limit middleware wired but with deviations (default 30 not 20, no burst budget, no X-RateLimit-* headers); cache is inline, not modular | `agent-prompts/EXPLORE_BACKEND_AGENT_PROMPT.md` (Phase B section — REDESIGNED 2026-05-23 to fit on-disk types) |
-| EXPLORE Cron + Billing (Phase C) | PENDING — pre-warmer cron, GCP billing alerts ($25/$50/$100 notify-only), Featured-listings hook stub | `agent-prompts/EXPLORE_BACKEND_AGENT_PROMPT.md` (Phase C section) |
-| Availability Domain | Not yet specced — pending socket TODO at `src/sockets/availability.socket.ts` | — |
-| Invites Domain (incremental) | Pending socket TODOs at `src/sockets/events.socket.ts` | — |
-| Notifications service | Not yet built | — |
+| `prisma-augment.d.ts` cleanup | Type shim no longer needed since `prisma generate` ran on host 2026-06-02 — safe to delete | — |
+| GCP billing alerts apply | Terraform + runbook ready (`GCP_BILLING_ALERTS_RUNBOOK.md`); awaits user `terraform apply` with GCP creds | — |
 
 ### Frontend — Done ✅
 
@@ -115,9 +118,10 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Step 1 | Initial scaffolding + schema | DONE |
 | Step 2 | Backend domains + frontend scaffold + screens | DONE |
 | Step 3 | Wave 1 orchestration (Seed Rebuild, EXPLORE Phase A, GAPs, Mocks tombstone, R15 prep) | DONE — partial in-flight when prior session hit usage limit; recovery cleanup committed 2026-05-23 in `90972f9` |
-| **Step 4** | **Orchestrator chat (NEW Claude Code terminal) spawns the remaining four agents: EXPLORE Phase B → EXPLORE Phase C → Onboarding R15 + AttendeesSheet R15 in parallel** | **READY TO START** |
+| Step 4 | Wave 1 backend domains (Notifications/Availability/Invites) + frontend wiring trio + cleanup + round-trip verification | DONE 2026-06-02 — all merged on main, 26/0 round-trip pass |
+| **Step 5** | **Next session targets (open queue):** rewire 7 mobile `src/api/*.ts` stubs to live backend; add `useFriendTypes()` + `useFriendLabels()` React Query hooks (unlocks 6 mocks consumers); promote DM + Report on Friend Profile from R16-9 stubs; finish Onboarding R15-7..R15-13 (if not already done — verify); finish AttendeesSheet R15-1..R15-6 (if not already done — verify); GCP billing alerts `terraform apply` whenever ready | **READY TO PRIORITIZE** |
 
-**Step 4 ground state:** working tree clean, tracker accurate, orchestrator prompt indexed with all five remaining prompt files + their dependencies + HANDOFF locations. See `agent-prompts/ORCHESTRATOR_PROMPT.md`.
+**Step 5 ground state (2026-06-02):** working tree clean (after the docs commit); both `tsc --noEmit` passes green; 25 commits on `main` pushed to `origin`; round-trip script ready to re-run after any backend change touching notifications/availability/invites. See `BUILD-CHECKLIST.md` "Known follow-ups" for the prioritized punchlist.
 
 ---
 
@@ -155,9 +159,11 @@ Remaining gates apply to subsequent deploys.
 
 ## Reminders
 
-- **`src/mocks/index.ts`** tombstone can be deleted once all `src/api/*.ts` stubs hit a real backend endpoint.
+- **`src/mocks/index.ts`** tombstone can be deleted once all `src/api/*.ts` stubs hit a real backend endpoint. As of 2026-06-02, 7 api stubs + 10 screens/components still import from `../mocks`. See `BUILD-CHECKLIST.md` for the full consumer table.
 - Any change to `src/types/socket.types.ts` (backend) must be mirrored in `social-calendar-mobile/src/types/`.
-- Every service method that fetches availability for a viewer must check `AvailabilityBlock` first.
+- Every service method that fetches availability for a viewer must check the friendship/share gate AND `AvailabilityBlock`. As of `5bcdb23`, `availability.service.ts getFriend` requires accepted friendship — don't regress that.
 - Overlapping availability windows are resolved in code (DAY > WEEK > MONTH) — no DB constraint.
 - `creatorId` on `Event` is denormalized — always write the corresponding `EventOrganiser` CREATOR row atomically at creation time.
-- `_types.ts` (publicProfileSelect) is triplicated across Events/Friends/Groups repos — Lead-managed consolidation PR still pending.
+- `publicProfileSelect` lives at `social-calendar-api/src/repositories/_userSelects.ts` (consolidated 2026-06-02 in `c6ee094`). Do not redefine it locally in any new repository — import from the shared module.
+- Cross-user notification writes must go through `notificationsRepository.create` which routes to the migration-owner Prisma client to bypass RLS (`4bf999b`). Calling `prismaApp` directly for an insert destined for another user's row will silently fail under RLS.
+- Run `./scripts/notif-avail-invites-roundtrip.sh` after any backend change touching notifications, availability, or invites. Expect 26/0.

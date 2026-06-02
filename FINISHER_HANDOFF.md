@@ -1,6 +1,8 @@
-# Wave 3 Finisher — Handoff
+# Wave 3 Finisher — Handoff (CLOSED 2026-06-02)
 
-**Branch:** `feat/wave-3-finisher` (NOT pushed)
+**Status:** All host steps below were run successfully. Round-trip script printed **26 pass / 0 fail**. This file is preserved as the session audit trail; for the authoritative current state see `BUILD-CHECKLIST.md` and `PROJECT_TRACKER.md`.
+
+**Branch:** `feat/wave-3-finisher` — merged into `main` at `d52c9d3`, pushed to `origin`.
 
 **Base:** `main` at `736217b` (Merge `fix/backend-roundtrip-bugs`)
 
@@ -17,27 +19,25 @@
 
 ---
 
-## Host-only commands to run next
+## Host-only commands — STATUS
 
-Run these in order. The first two together verify the 22/0 round-trip; the third is optional pre-launch hardening.
-
-### 1. Apply the two new bug-fix migrations
+### 1. Apply the two new bug-fix migrations — DONE 2026-06-02
 
 ```bash
 docker compose exec api npx prisma migrate deploy
 ```
 
-What it does: applies `20260601000001_fix_notification_insert_rls` and `20260601000002_fix_invitee_event_visibility` to the local Postgres. Both came in with the `fix/backend-roundtrip-bugs` merge and are not yet on disk in your local DB. Success looks like: `2 migrations applied` (or `Database is in sync` if you already ran them).
+Applied `20260601000001_fix_notification_insert_rls` and `20260601000002_fix_invitee_event_visibility` to the local Postgres.
 
-### 2. Re-run the round-trip script
+### 2. Re-run the round-trip script — DONE 2026-06-02, 26/0 PASS
 
 ```bash
 ./scripts/notif-avail-invites-roundtrip.sh
 ```
 
-What it does: exercises `/notifications`, `/availability`, and `/events/:id/invites` against the running API. Success looks like: `22 passed, 0 failed`. If you see any failures, capture the output — the four pre-fix failures (cross-user notification delivery, availability privacy 403, invitee PATCH 404, invitee DELETE 400) are all expected to be GREEN now. Once green, delete `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` (it's the pre-fix snapshot and will mislead).
+Final run printed `Total: 26 · Passed: 26 · Failed: 0`. `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` was regenerated as the green snapshot and committed (`5e523b4`). Re-run after any backend change touching notifications, availability, or invites.
 
-### 3. (Optional) Apply GCP billing alerts
+### 3. (Optional) Apply GCP billing alerts — STILL PENDING
 
 ```bash
 cd social-calendar-api/src/infra
@@ -59,10 +59,10 @@ None. All four tasks landed cleanly with both `tsc --noEmit` passes green.
 
 - **Mocks decision:** keep the tombstone, don't delete. 17 consumers still import from `../mocks` (7 api stubs + 10 screens/components). `MOCK_FRIEND_LABELS` and `MOCK_FRIEND_TYPES` are the long pole — 6 of the 10 screen consumers read them because no React Query hook exists yet. Adding `useFriendTypes()` + `useFriendLabels()` unlocks half the deletions in one PR. Full consumer table in `BUILD-CHECKLIST.md` under "Mocks tombstone — remaining consumers".
 - **`publicProfileSelect` placement:** put it at `social-calendar-api/src/repositories/_userSelects.ts` (sibling of the existing `_types.ts` shared module) rather than creating a new `_shared/` directory. Matches the existing project convention.
-- **Pre-existing untracked file:** `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` at the repo root is the stale pre-fix snapshot. Not committed by this branch. Delete it after step 2 above shows 22/0 green.
+- **`NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md`** was overwritten by the 26/0 re-run and committed at `5e523b4` as the current green snapshot.
 
 ---
 
-## Branch is on disk, NOT pushed
+## Final state
 
-Working tree is back on `main` (the next agent or you starts clean). To inspect: `git checkout feat/wave-3-finisher`. To ship: `git push -u origin feat/wave-3-finisher` then open a PR, or `git checkout main && git merge feat/wave-3-finisher` for a fast-forward merge.
+Branch `feat/wave-3-finisher` was merged into `main` (`d52c9d3`) and `origin/main` is up to date. The session is closed; future work picks up against the post-merge `main`. See `PROJECT_TRACKER.md` "Step 5" for the next open queue.

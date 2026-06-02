@@ -1,8 +1,12 @@
 # SyncUp — Build Checklist (Pre-Testing)
 
-Last updated: 2026-06-02
+Last updated: 2026-06-02 (Wave 2 round-trip VERIFIED 26/0)
 
 ---
+
+## Recently completed (2026-06-02 — Wave 2 round-trip verified)
+
+- [x] **Live backend round-trip — 26/0 PASS** — Migrations `20260601000001` + `20260601000002` applied; `./scripts/notif-avail-invites-roundtrip.sh` ran end-to-end against the docker compose stack and posted 26 passes / 0 fails. Covers full notification create→read→mute→read-all→dismiss chain (with cross-user dispatch), availability self GET/PUT/PATCH + FORBIDDEN gate + broadcasts GET/PUT, invite send/accept/rescind chain, and regression smoke on events/friends/groups. Green snapshot captured at `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` (commit `5e523b4`); script-side read-all expectation fixed in `6a35299`. Confirms all three backend bug fixes (`4bf999b`, `5bcdb23`, `e77ec29`) are live and correct.
 
 ## Recently completed (2026-06-02 — Wave 3 finisher)
 
@@ -48,12 +52,7 @@ Last updated: 2026-06-02
 
 ## Infrastructure & Deployment
 
-- [~] **Live backend round-trip test** — PARTIAL: fix branch (`fix/backend-roundtrip-bugs`) merged at `736217b`, awaiting host re-run for 22/0 verification. Initial run captured 18/22 in `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md`; the 4 failures map 1:1 to the three backend fixes that have since landed on main. Two new migrations (`20260601000001_fix_notification_insert_rls`, `20260601000002_fix_invitee_event_visibility`) must be applied to the local Postgres before re-running:
-  ```bash
-  docker compose exec api npx prisma migrate deploy
-  ./scripts/notif-avail-invites-roundtrip.sh
-  ```
-  Expected: `22 passed, 0 failed`. Once green, delete `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` (it's the stale pre-fix snapshot).
+- [x] **Live backend round-trip test** — VERIFIED 26/0 on 2026-06-02. See "Recently completed (Wave 2 verified)" above. Current results snapshot at `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` (commit `5e523b4`); re-run with `./scripts/notif-avail-invites-roundtrip.sh` after any backend change touching notifications/availability/invites.
 - [x] **Railway project connection** — DONE 2026-05-28. API live at `syncup-production-bfb4.up.railway.app`. All env vars set including `DATABASE_URL_APP` (manual construction with `syncup_app` role) and `NIXPACKS_NODE_VERSION=22`.
 - [~] **GCP Billing Alerts** — DOCS READY: full apply runbook at `social-calendar-api/src/infra/GCP_BILLING_ALERTS_RUNBOOK.md`. Terraform at `gcp-billing-alerts.tf` defines three notify-only budgets ($25 / $50 / $100 monthly, Places API only). Awaiting host `terraform apply` (or the gcloud Path B fallback) with `GCP_PROJECT_ID` + `GCP_BILLING_ACCOUNT_ID` set. Optional pre-launch hardening — can defer until traffic shape is known.
 
@@ -117,9 +116,8 @@ When the last consumer is rewired:
 
 ## Known follow-ups (not blocking ship, but tracked)
 
-- **Host re-run of round-trip script** — see Infrastructure section above. Single command after `prisma migrate deploy`.
-- **`npx prisma generate` on macOS host** — required before booting the dev server so the real Prisma client picks up the new `Notification`, `BroadcastSettings`, and `UserAvailability.state` shapes from migration `20260525000001`. After that, `src/types/prisma-augment.d.ts` (a temporary shim added by the backend agent so `tsc --noEmit` stays green) can be removed.
-- **AvailabilityBlock RLS** — backend agent flagged: the friend-availability FORBIDDEN gate calls `findBlock(viewerId, blockerId)` to check whether the viewer is the *blocked* party. If existing RLS only grants SELECT on `AvailabilityBlock` to the blocker, the lookup won't see the row. Verify against the RLS policies migration; patch if needed. (May already be addressed by `5bcdb23` — re-confirm during the round-trip re-run.)
-- **`useFriendTypes()` / `useFriendLabels()` React Query hooks** — adding these unlocks deletion of 6 mocks consumers in a single PR (see mocks audit above).
-- **Stale round-trip results doc** — delete `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` once the re-run captures the new 22/22 result. The current contents reflect the pre-fix state and will mislead anyone reading it.
-- **GCP billing alerts apply** — runbook ready; one `terraform apply` away. Pre-launch hardening, not a blocker.
+- **`useFriendTypes()` / `useFriendLabels()` React Query hooks** — adding these unlocks deletion of 6 mocks consumers in a single PR (see mocks audit above). Biggest remaining cleanup unblock.
+- **Rewire remaining `src/api/*.ts` stubs** — 7 API stubs still import from `../mocks` (see audit table above). Each needs to switch from a mock import to an `authedFetch` call against the live backend. Order of priority probably tracks user-facing impact: `events.ts` → `notifications.ts` → `availability.ts` → `friends.ts` → `groups.ts` → `profile.ts` → `explore.ts`.
+- **GCP billing alerts apply** — runbook ready at `social-calendar-api/src/infra/GCP_BILLING_ALERTS_RUNBOOK.md`; one `terraform apply` away. Pre-launch hardening, not a blocker.
+- **`prisma-augment.d.ts` shim** — temporary type-only shim added during Wave 1 to keep `tsc --noEmit` green before `prisma generate` ran on the host. Now redundant (generate ran 2026-06-02). Safe to delete; leaving in place is harmless but adds noise. Lives at `social-calendar-api/src/types/prisma-augment.d.ts`.
+- **Promote DM and Report on Friend Profile** — R16-9 toast-only stubs ("coming soon" copy). Either ship the real flows or remove the buttons within one major round.
