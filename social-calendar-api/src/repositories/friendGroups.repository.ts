@@ -1,16 +1,6 @@
 import { Prisma } from '@prisma/client';
 import type { Db } from './_types.js';
-
-/**
- * Same shape used elsewhere. See `friends.repository.ts` for the
- * eventual consolidation note.
- */
-const publicProfileSelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  avatarUrl: true,
-} satisfies Prisma.UserSelect;
+import { publicProfileSelect } from './_userSelects.js';
 
 const friendGroupWithCountInclude = {
   _count: { select: { members: true } },

@@ -1,18 +1,6 @@
 import { Prisma, SocialGroupRole, SuggestionVoteValue } from '@prisma/client';
 import type { Db } from './_types.js';
-
-/**
- * Public profile shape exposed inside group / member / poll / suggestion
- * payloads. Identical to the one used by the Events domain — slated for
- * consolidation into `_types.ts` once Friends + Groups have both shipped.
- * See GROUPS_HANDOFF for the cross-section flag.
- */
-const publicProfileSelect = {
-  id: true,
-  username: true,
-  displayName: true,
-  avatarUrl: true,
-} satisfies Prisma.UserSelect;
+import { publicProfileSelect } from './_userSelects.js';
 
 // ─── Selects / Includes ──────────────────────────────────────────────────────
 
