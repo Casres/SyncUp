@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type {
   NotifType,
-  NotificationModel,
+  Notification,
 } from '@prisma/client';
 import { prisma } from '../config/prisma.js';
 import type { Db } from './_types.js';
@@ -44,11 +44,11 @@ type NotificationDelegate = {
     orderBy?: { createdAt?: 'asc' | 'desc' };
     take?: number;
     skip?: number;
-  }): Promise<NotificationModel[]>;
+  }): Promise<Notification[]>;
 
   findFirst(args: {
     where: { id: string; userId?: string; dismissedAt?: null };
-  }): Promise<NotificationModel | null>;
+  }): Promise<Notification | null>;
 
   count(args?: { where?: NotifWhere }): Promise<number>;
 
@@ -60,7 +60,7 @@ type NotificationDelegate = {
       groupKey?: string | null;
       read?: boolean;
     };
-  }): Promise<NotificationModel>;
+  }): Promise<Notification>;
 
   updateMany(args: {
     where: NotifWhere;

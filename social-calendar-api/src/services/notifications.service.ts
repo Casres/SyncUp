@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io';
 import { NotifType } from '@prisma/client';
-import type { NotificationModel } from '@prisma/client';
+import type { Notification } from '@prisma/client';
 import {
   notificationsRepository,
   type CreateNotificationData,
@@ -39,7 +39,7 @@ export class NotificationNotFoundError extends Error {
  * level alongside `id`, `type`, `read`, `createdAt`. The payload column
  * stores those extra fields verbatim.
  */
-function toPayload(row: NotificationModel): NotifPayload {
+function toPayload(row: Notification): NotifPayload {
   const body =
     typeof row.payload === 'object' && row.payload !== null
       ? (row.payload as Record<string, unknown>)

@@ -1,6 +1,53 @@
 # SyncUp — Build Checklist (Pre-Testing)
 
-Last updated: 2026-06-02 (Wave 2 round-trip VERIFIED 26/0)
+Last updated: 2026-06-02 (Wave 5: events.ts + notifications.ts live paths wired)
+
+---
+
+## Recently completed (2026-06-02 — Wave 5: API stub live-path wiring)
+
+- [x] **`events.ts` live paths wired** — All 6 fetch/mutate functions now call the real backend when `isApiConfigured()` is true. Key changes:
+  - `BackendEvent` / `BackendOrganiser` / `BackendInvite` / `BackendPublicProfile` wire types added inline (using actual Prisma field names `username` / `displayName`).
+  - `inviteStatusToRsvp()` converter: `ACCEPTED→'yes'`, `DECLINED→'no'`, `MAYBE→'maybe'`, `PENDING→null`.
+  - `toMobileEvent(raw, currentUserId?)` mapper: `creatorId→hostId`, `organisers→coHostIds`, `startsAt→startAt/iso`, `endsAt→endAt`, `invites→inviteeIds+rsvps`. Current user's RSVP entry aliased under both their actual Clerk userId AND `'me'` to preserve the `event.rsvps['me']` screen convention.
+  - `getEvents` unwraps the `{ events: [] }` list wrapper.
+  - `createEvent` maps draft to backend schema (`startAt→startsAt`, strips `glyph`/`price`/`groupId`/`geo`) and sends `inviteeIds` as a separate `POST /events/:id/invites`.
+  - `updateEvent` translates `startAt/endAt → startsAt/endsAt`, drops client-only fields.
+  - `getRSVPs` fetches the event and extracts from `invites[]` (no standalone `/rsvps` route on backend).
+  - `submitRSVP` uses the new `POST /events/:id/rsvp` convenience endpoint.
+  - Hooks (`useEvents`, `useEvent`, `useUpdateEvent`, `useSubmitRSVP`) pass `userId` from `useAuth()` into mappers for the `'me'` alias. Mock fallback path preserved for `!isApiConfigured()`.
+
+- [x] **Backend: `POST /events/:id/rsvp` convenience endpoint** — Mobile callers do not need to know their `inviteId`; backend resolves it from `(eventId, request.user.id)`.
+  - `events.repository.ts` — `findInviteForRecipient(db, eventId, recipientId)` helper added.
+  - `events.service.ts` — `rsvp()` method resolves the invite then delegates to `respondToInvite` (preserves socket fan-out + RSVP notification dispatch).
+  - `events.controller.ts` — `rsvp` handler added.
+  - `events.routes.ts` — `POST /:id/rsvp` registered before the parameterized invite routes.
+
+- [x] **Backend: notification dispatch payloads enriched** — Actor profile data (name, handle/username, initial) now denormalized into the stored payload at dispatch time so the mobile NotifSheet can render cards without a secondary user lookup. Both dispatch sites in `events.service.ts` updated:
+  - RSVP notifications: `actorName`, `actorHandle`, `actorInitial` sourced from `updated.recipient` (already loaded via `eventInclude`).
+  - Event-invite notifications: `actorName`, `actorInitial` sourced from `event.organisers.find(o => o.user.id === userId)`.
+
+- [x] **`notifications.ts` live paths wired** — Previously mock-only. Now calls real backend:
+  - `BackendNotif` wire type + `BACKEND_TYPE_MAP` for `SCREAMING_SNAKE → lowercase_snake` type conversion.
+  - `toMobileNotif()` mapper; RSVP `rsvpStatus` re-mapped `ACCEPTED/DECLINED/MAYBE → 'yes'/'no'/'maybe'`.
+  - `getNotifications` calls `GET /notifications`, unwraps `{ notifications }`, maps and filters unknown types.
+  - **Three new mutations added:** `useMarkNotifRead`, `useMarkAllNotifsRead`, `useDismissNotif` — all with optimistic cache updates. Exported from `src/api/index.ts` automatically.
+  - `staleTime: 60_000` preserved.
+  - ⚠️ Note: `GROUP_INVITE` type is currently dispatched for both event invites and future group invites (backend convention, locked). Event-invite rows have `eventId`/`eventName` in the payload; true group-invite rows will have `groupId`/`groupName` when that domain is wired.
+
+Both `tsc --noEmit` (mobile + API) clean after all changes.
+
+---
+
+## Recently completed (2026-06-02 — Wave 4: mock-tombstone hooks)
+
+- [x] **`useFriendTypes()` + `useFriendLabels()` hooks + mutations** — `useFriendTypes`, `useFriendLabels`, `useCreateFriendType`, `useDeleteFriendType` added to `src/api/friends.ts`. Backend `friendGroups.repository.ts` / `friendGroups.service.ts` updated to include `memberIds: string[]` inline (Prisma `members: { select: { userId: true } }`). `queryKeys.friends.types()` key added. Both `tsc --noEmit` (mobile + API) clean. Mock consumer count: **17 → 12**.
+
+  Screens fully freed of mock imports (MOCK_FRIEND_TYPES + MOCK_FRIEND_LABELS removed):
+  - `FriendTypesManagerScreen`, `FriendProfileScreen`, `FriendsListScreen`, `AudiencePickerSheetScreen`, `Step3Screen`
+
+  Screens partially cleaned (MOCK_FRIEND_TYPES removed; MOCK_FRIENDS remains for friends-name lookup — clears when `src/api/friends.ts` stub wires to live `/friends`):
+  - `BroadcastSettingsScreen`, `AvailabilityEditorScreen`
 
 ---
 
@@ -62,38 +109,35 @@ Last updated: 2026-06-02 (Wave 2 round-trip VERIFIED 26/0)
 
 - [x] **Delete seed file** — DONE 2026-05-28. `prisma/seed.ts` deleted + `prisma:seed` script + `prisma.seed` config block removed from `package.json`.
 - [x] **`publicProfileSelect` consolidation** — DONE 2026-06-02. See "Recently completed" above.
-- [~] **Delete mocks tombstone** — audited 2026-06-02 by Wave 3 finisher. **17 consumers still import from `../mocks`** (7 api stubs, 10 screens/components). Tombstone stays in place; deletion deferred until each consumer is rewired to a live endpoint. See "Mocks tombstone — remaining consumers" below.
+- [~] **Delete mocks tombstone** — **12 consumers still import from `../mocks`** (7 api stubs, 5 screens/components) as of 2026-06-02 Wave 4. Tombstone stays in place; deletion deferred until each consumer is rewired to a live endpoint. See "Mocks tombstone — remaining consumers" below.
 
-### Mocks tombstone — remaining consumers (audit 2026-06-02)
+### Mocks tombstone — remaining consumers (updated 2026-06-02 after Wave 5)
 
-API stubs still mock-backed (replace each with `authedFetch` + drop the mock import):
+API stubs — **live path wired** but mock import retained for `!isApiConfigured()` fallback:
+
+| File | Status | Symbols imported (fallback only) |
+|---|---|---|
+| `src/api/events.ts` | ✅ **Live path wired (Wave 5)** | `MOCK_EVENTS`, `MOCK_EVENT_ORGANISERS`, `MOCK_RSVPS`, type `EventOrganiser` |
+| `src/api/notifications.ts` | ✅ **Live path wired (Wave 5)** | `MOCK_NOTIFICATIONS` |
+| `src/api/friends.ts` | ⏳ Mock-backed | `MOCK_FRIENDS`, `MOCK_PENDING_REQUESTS`, `MOCK_USERS_BY_ID` |
+| `src/api/availability.ts` | ⏳ Mock-backed | `MOCK_AVAILABILITY`, `MOCK_AVAILABILITY_BLOCKS`, `MOCK_BROADCAST_SETTINGS`, `MOCK_MY_AVAILABILITY`, `MOCK_SASHA_AVAILABILITY` |
+| `src/api/profile.ts` | ⏳ Mock-backed | `MOCK_ME` |
+| `src/api/groups.ts` | ⏳ Mock-backed | `MOCK_POLLS_BY_GROUP`, `MOCK_SOCIAL_GROUPS`, `MOCK_SUGGESTIONS_BY_GROUP` |
+| `src/api/explore.ts` | ⏳ Mock-backed | `MOCK_EXPLORE_VENUES` |
+
+Screens / components reading mocks directly (should consume the React Query hook instead):
 
 | File | Symbols imported |
 |---|---|
-| `src/api/notifications.ts` | `MOCK_NOTIFICATIONS` |
-| `src/api/availability.ts` | `MOCK_AVAILABILITY`, `MOCK_AVAILABILITY_BLOCKS`, `MOCK_BROADCAST_SETTINGS`, `MOCK_MY_AVAILABILITY`, `MOCK_SASHA_AVAILABILITY` |
-| `src/api/profile.ts` | `MOCK_ME` |
-| `src/api/groups.ts` | `MOCK_POLLS_BY_GROUP`, `MOCK_SOCIAL_GROUPS`, `MOCK_SUGGESTIONS_BY_GROUP` |
-| `src/api/friends.ts` | `MOCK_FRIENDS`, `MOCK_PENDING_REQUESTS`, `MOCK_USERS_BY_ID` |
-| `src/api/events.ts` | `MOCK_EVENTS`, `MOCK_EVENT_ORGANISERS`, `MOCK_RSVPS`, type `EventOrganiser` |
-| `src/api/explore.ts` | `MOCK_EXPLORE_VENUES` |
-
-Screens / components reading mocks directly (should consume the React Query hook instead — most need a hook to exist before they can be cleaned):
-
-| File | Symbols imported |
-|---|---|
-| `src/screens/profile/BroadcastSettingsScreen.tsx` | `MOCK_FRIENDS`, `MOCK_FRIEND_TYPES` |
-| `src/screens/profile/AudiencePickerSheetScreen.tsx` | `MOCK_FRIEND_LABELS`, `MOCK_FRIEND_TYPES` |
-| `src/screens/profile/AvailabilityEditorScreen.tsx` | `MOCK_FRIENDS`, `MOCK_FRIEND_TYPES` |
-| `src/screens/friends/FriendsListScreen.tsx` | `MOCK_FRIEND_LABELS`, `MOCK_FRIEND_TYPES` |
-| `src/screens/friends/FriendTypesManagerScreen.tsx` | `MOCK_FRIEND_TYPES` |
-| `src/screens/friends/FriendProfileScreen.tsx` | `MOCK_FRIEND_LABELS`, `MOCK_FRIEND_TYPES` |
+| `src/screens/profile/BroadcastSettingsScreen.tsx` | `MOCK_FRIENDS` |
+| `src/screens/profile/AvailabilityEditorScreen.tsx` | `MOCK_FRIENDS` |
 | `src/screens/groups/GroupDetailScreen.tsx` | `MOCK_USERS_BY_ID` |
 | `src/screens/events/EventDetailScreen.tsx` | `MOCK_USERS_BY_ID` |
-| `src/screens/create/Step3Screen.tsx` | `MOCK_FRIEND_TYPES` |
+
+**Next priority:** Wire `src/api/friends.ts` → live `GET /friends` — clears `MOCK_FRIENDS` which unblocks all 4 screen consumers above and reduces the tombstone to explore/availability/profile/groups only.
 | `src/components/social/SearchOverlay.tsx` | `MOCK_EVENTS`, `MOCK_FRIENDS`, `MOCK_SOCIAL_GROUPS` |
 
-Observation: `MOCK_FRIEND_LABELS` and `MOCK_FRIEND_TYPES` are the long pole — 6 screens still hard-read them because no React Query hook exists for friend-types/labels yet. Adding `useFriendTypes()` + `useFriendLabels()` (or merging into `useFriends`) unlocks half the deletions in a single PR.
+Observation: The `MOCK_FRIEND_TYPES` / `MOCK_FRIEND_LABELS` long pole is cleared (Wave 4). **The new long pole is `MOCK_FRIENDS`** — it blocks BroadcastSettingsScreen, AvailabilityEditorScreen, and SearchOverlay. Wiring `src/api/friends.ts` → live `GET /friends` endpoint kills 3 screen consumers and unblocks `src/api/friends.ts` itself (which still holds `MOCK_FRIENDS`, `MOCK_PENDING_REQUESTS`, `MOCK_USERS_BY_ID`). After that, `events.ts` → `notifications.ts` → remaining stubs.
 
 When the last consumer is rewired:
 1. `rm social-calendar-mobile/src/mocks/index.ts`
@@ -116,8 +160,8 @@ When the last consumer is rewired:
 
 ## Known follow-ups (not blocking ship, but tracked)
 
-- **`useFriendTypes()` / `useFriendLabels()` React Query hooks** — adding these unlocks deletion of 6 mocks consumers in a single PR (see mocks audit above). Biggest remaining cleanup unblock.
+- ~~**`useFriendTypes()` / `useFriendLabels()` React Query hooks**~~ — **DONE 2026-06-02.** Hooks shipped in `src/api/friends.ts`; `useCreateFriendType` + `useDeleteFriendType` mutations wired. Backend `/friend-groups` list now returns `memberIds: string[]` inline. 5 screens fully freed of mock imports (FriendTypesManagerScreen, FriendProfileScreen, FriendsListScreen, AudiencePickerSheetScreen, Step3Screen); BroadcastSettings + AvailabilityEditor still import `MOCK_FRIENDS` for the friends-name path in `audienceLabel`/`formatSummary` — they will clear when `src/api/friends.ts` stub is wired to the live endpoint.
 - **Rewire remaining `src/api/*.ts` stubs** — 7 API stubs still import from `../mocks` (see audit table above). Each needs to switch from a mock import to an `authedFetch` call against the live backend. Order of priority probably tracks user-facing impact: `events.ts` → `notifications.ts` → `availability.ts` → `friends.ts` → `groups.ts` → `profile.ts` → `explore.ts`.
 - **GCP billing alerts apply** — runbook ready at `social-calendar-api/src/infra/GCP_BILLING_ALERTS_RUNBOOK.md`; one `terraform apply` away. Pre-launch hardening, not a blocker.
-- **`prisma-augment.d.ts` shim** — temporary type-only shim added during Wave 1 to keep `tsc --noEmit` green before `prisma generate` ran on the host. Now redundant (generate ran 2026-06-02). Safe to delete; leaving in place is harmless but adds noise. Lives at `social-calendar-api/src/types/prisma-augment.d.ts`.
+- ~~**`prisma-augment.d.ts` shim**~~ — **DELETED 2026-06-02.** Not a clean one-file delete as originally assumed: the shim didn't just declare the new enums, it also invented bespoke row-type names (`NotificationModel`, `BroadcastSettingsModel`, `UserAvailabilityModel`) that the repos imported from `@prisma/client` — names `prisma generate` never produces (it emits `Notification`, `BroadcastSettings`, `UserAvailability`). Refactored those imports/usages to the real names in `notifications.repository.ts`, `availability.repository.ts`, `notifications.service.ts`, then deleted the shim. `tsc --noEmit` verified 0 errors against the real generated Prisma surface. **Note:** `tsc` now requires the generated client — run `npm run prisma:generate` after a fresh checkout (Dockerfile L33 already does this); without it you'll see `TS2305: has no exported member 'AvailState'` etc.
 - **Promote DM and Report on Friend Profile** — R16-9 toast-only stubs ("coming soon" copy). Either ship the real flows or remove the buttons within one major round.

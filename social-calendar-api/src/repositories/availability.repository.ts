@@ -2,8 +2,8 @@ import { AvailabilityGranularity, Prisma } from '@prisma/client';
 import type {
   AvailState,
   BroadcastAudienceMode,
-  BroadcastSettingsModel,
-  UserAvailabilityModel,
+  BroadcastSettings,
+  UserAvailability,
 } from '@prisma/client';
 import type { Db } from './_types.js';
 
@@ -35,7 +35,7 @@ type UserAvailabilityDelegate = {
       state?: { not: null } | AvailState;
     };
     orderBy?: { windowStart?: 'asc' | 'desc' };
-  }): Promise<UserAvailabilityModel[]>;
+  }): Promise<UserAvailability[]>;
 
   upsert(args: {
     where: {
@@ -53,7 +53,7 @@ type UserAvailabilityDelegate = {
       state: AvailState;
     };
     update: { state: AvailState };
-  }): Promise<UserAvailabilityModel>;
+  }): Promise<UserAvailability>;
 
   deleteMany(args: {
     where: {
@@ -69,15 +69,15 @@ type UserAvailabilityDelegate = {
 type BroadcastSettingsDelegate = {
   findUnique(args: {
     where: { userId: string };
-  }): Promise<BroadcastSettingsModel | null>;
+  }): Promise<BroadcastSettings | null>;
 
   upsert(args: {
     where: { userId: string };
-    create: Omit<BroadcastSettingsModel, 'id' | 'createdAt' | 'updatedAt'>;
+    create: Omit<BroadcastSettings, 'id' | 'createdAt' | 'updatedAt'>;
     update: Partial<
-      Omit<BroadcastSettingsModel, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+      Omit<BroadcastSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
     >;
-  }): Promise<BroadcastSettingsModel>;
+  }): Promise<BroadcastSettings>;
 };
 
 function availability(db: Db): UserAvailabilityDelegate {
@@ -130,7 +130,7 @@ export type BroadcastSettingsData = {
 
 // ── Mapping helpers ────────────────────────────────────────────────────
 
-function rowsToMap(rows: UserAvailabilityModel[]): AvailabilityMap {
+function rowsToMap(rows: UserAvailability[]): AvailabilityMap {
   const out: AvailabilityMap = {};
   for (const row of rows) {
     if (row.state === null) continue;
@@ -139,7 +139,7 @@ function rowsToMap(rows: UserAvailabilityModel[]): AvailabilityMap {
   return out;
 }
 
-function rowToSettings(row: BroadcastSettingsModel | null): BroadcastSettingsData {
+function rowToSettings(row: BroadcastSettings | null): BroadcastSettingsData {
   if (!row) {
     const empty: BroadcastRuleData = {
       on: false,
@@ -343,7 +343,7 @@ export const availabilityRepository = {
       // The `create` payload satisfies the model row shape modulo PK +
       // timestamps which Prisma fills in.
       create: payload as unknown as Omit<
-        BroadcastSettingsModel,
+        BroadcastSettings,
         'id' | 'createdAt' | 'updatedAt'
       >,
       update: {
@@ -357,7 +357,7 @@ export const availabilityRepository = {
         busyAudience: data.busy.audience,
         busyTargets: data.busy.targets as unknown as Prisma.InputJsonValue,
       } as unknown as Partial<
-        Omit<BroadcastSettingsModel, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
+        Omit<BroadcastSettings, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
       >,
     });
     return rowToSettings(row);

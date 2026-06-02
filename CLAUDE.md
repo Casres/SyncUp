@@ -84,7 +84,13 @@ If you're picking up where this round left off, the relevant code lives in:
 - `src/components/polish/InfoToast.tsx` — DM + Report stub feedback
 - `src/api/friends.ts` — `useRemoveFriend`, `useBlockUser`
 
-DM and Report ship as stubs (toast-only) per R16-9. Promote or remove the buttons within one major round; do not leave "coming soon" copy in production longer than that.
+DM and Report ship as stubs (toast-only) per R16-9.
+
+**Stub decision — 2026-06-02:** both stubs are intentionally KEPT this round, not promoted and not cut.
+- **DM** stays a stub. No DM backend domain exists; building a real DM flow is a separate scoped task, deferred to a future round.
+- **Report** stays a stub. It's a safety/flag affordance — cutting it would remove the only path to report someone from a profile with nothing replacing it, so the stub is retained until a real report pipeline is built.
+
+This is a conscious extension of the R16-9 "one major round" clock, not a silent breach. The clock resets to the next major round. When either is promoted: DM → new agent task (no backend yet); Report → wire `handleReportConfirm` to a real endpoint. Stub copy + wiring live in `FriendProfileScreen.tsx` (`DM_STUB_COPY`, `REPORT_CONFIRM_COPY`, `handleDmStub`, `handleReportConfirm`) and `InfoToast.tsx`.
 
 ## Session of 2026-06-02 (Backend round-trip wave) — LOCKED
 
@@ -106,3 +112,5 @@ Relevant code:
 - `scripts/notif-avail-invites-roundtrip.sh` — re-run after any change touching these domains; expect 26/0
 
 The mobile mocks tombstone (`social-calendar-mobile/src/mocks/index.ts`) is intentionally kept in place — 17 consumers still import from it. See `BUILD-CHECKLIST.md` for the consumer table and the priority unblock (ship `useFriendTypes()` + `useFriendLabels()` React Query hooks to kill 6 consumers in one PR).
+
+**`prisma-augment.d.ts` removed (2026-06-02).** The temporary type shim is gone. It had invented bespoke row-type names (`NotificationModel` / `BroadcastSettingsModel` / `UserAvailabilityModel`) that the repos imported from `@prisma/client`; those were refactored to the real generated names (`Notification` / `BroadcastSettings` / `UserAvailability`) in `notifications.repository.ts`, `availability.repository.ts`, and `notifications.service.ts`. Consequence: **the generated Prisma client is now the only source of these types — run `npm run prisma:generate` (in `social-calendar-api`) after a fresh checkout or schema change before `tsc`/`npm run build`.** The Dockerfile already runs `npx prisma generate` (L33). Without a generated client you'll see `TS2305: Module '@prisma/client' has no exported member 'AvailState'` (and similar) — that's a missing generate, not a code regression.

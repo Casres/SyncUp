@@ -62,12 +62,12 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Invites endpoints | DONE 2026-06-02 — folded into Events domain (POST/PATCH/DELETE under `/events/:id/invites`), invitee event-visibility RLS fix landed |
 | Round-trip verification | DONE 2026-06-02 — `scripts/notif-avail-invites-roundtrip.sh` runs 26/0 against docker stack; results at `NOTIF_AVAIL_INVITES_ROUNDTRIP_RESULTS.md` |
 | Seed Rebuild | Full Decision #4 extended seed shipped, then **deleted 2026-05-28** in `c14cf03` per production gate |
+| `prisma-augment.d.ts` cleanup | DONE 2026-06-02 — shim deleted. Required a refactor first: the repos imported bespoke `NotificationModel`/`BroadcastSettingsModel`/`UserAvailabilityModel` type names that ONLY the shim declared (Prisma generates `Notification`/`BroadcastSettings`/`UserAvailability`). Renamed all three in `notifications.repository.ts`, `availability.repository.ts`, `notifications.service.ts`. `tsc --noEmit` = 0 errors verified against the real generated Prisma surface. Canonical green requires `prisma generate` (Dockerfile L33 runs it). |
 
 ### Backend — Pending 📋
 
 | Domain | Status | Prompt |
 |---|---|---|
-| `prisma-augment.d.ts` cleanup | Type shim no longer needed since `prisma generate` ran on host 2026-06-02 — safe to delete | — |
 | GCP billing alerts apply | Terraform + runbook ready (`GCP_BILLING_ALERTS_RUNBOOK.md`); awaits user `terraform apply` with GCP creds | — |
 
 ### Frontend — Done ✅
@@ -119,7 +119,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Step 2 | Backend domains + frontend scaffold + screens | DONE |
 | Step 3 | Wave 1 orchestration (Seed Rebuild, EXPLORE Phase A, GAPs, Mocks tombstone, R15 prep) | DONE — partial in-flight when prior session hit usage limit; recovery cleanup committed 2026-05-23 in `90972f9` |
 | Step 4 | Wave 1 backend domains (Notifications/Availability/Invites) + frontend wiring trio + cleanup + round-trip verification | DONE 2026-06-02 — all merged on main, 26/0 round-trip pass |
-| **Step 5** | **Next session targets (open queue):** rewire 7 mobile `src/api/*.ts` stubs to live backend; add `useFriendTypes()` + `useFriendLabels()` React Query hooks (unlocks 6 mocks consumers); promote DM + Report on Friend Profile from R16-9 stubs; finish Onboarding R15-7..R15-13 (if not already done — verify); finish AttendeesSheet R15-1..R15-6 (if not already done — verify); GCP billing alerts `terraform apply` whenever ready | **READY TO PRIORITIZE** |
+| **Step 5** | **Next session targets (open queue):** rewire 7 mobile `src/api/*.ts` stubs to live backend; add `useFriendTypes()` + `useFriendLabels()` React Query hooks (unlocks 6 mocks consumers); ~~promote DM + Report on Friend Profile from R16-9 stubs~~ (DECIDED 2026-06-02 — both KEPT as stubs, deferred to a future round; see CLAUDE.md R16 stub-decision note); finish Onboarding R15-7..R15-13 (if not already done — verify); finish AttendeesSheet R15-1..R15-6 (if not already done — verify); GCP billing alerts `terraform apply` whenever ready | **READY TO PRIORITIZE** |
 
 **Step 5 ground state (2026-06-02):** working tree clean (after the docs commit); both `tsc --noEmit` passes green; 25 commits on `main` pushed to `origin`; round-trip script ready to re-run after any backend change touching notifications/availability/invites. See `BUILD-CHECKLIST.md` "Known follow-ups" for the prioritized punchlist.
 
