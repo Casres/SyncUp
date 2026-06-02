@@ -44,7 +44,44 @@ Last updated: 2026-05-30
 ## Code Cleanup (do last, before production)
 
 - [x] **Delete seed file** — DONE 2026-05-28. `prisma/seed.ts` deleted + `prisma:seed` script + `prisma.seed` config block removed from `package.json`.
-- [ ] **Delete mocks tombstone** — remove `social-calendar-mobile/src/mocks/index.ts` once all `src/api/*.ts` stubs are hitting a live backend.
+- [~] **Delete mocks tombstone** — audited 2026-06-02 by Wave 3 finisher. **17 consumers still import from `../mocks`** (7 api stubs, 10 screens/components). Tombstone stays in place; deletion deferred until each consumer is rewired to a live endpoint. See "Mocks tombstone — remaining consumers" below.
+
+### Mocks tombstone — remaining consumers (audit 2026-06-02)
+
+API stubs still mock-backed (replace each with `authedFetch` + drop the mock import):
+
+| File | Symbols imported |
+|---|---|
+| `src/api/notifications.ts` | `MOCK_NOTIFICATIONS` |
+| `src/api/availability.ts` | `MOCK_AVAILABILITY`, `MOCK_AVAILABILITY_BLOCKS`, `MOCK_BROADCAST_SETTINGS`, `MOCK_MY_AVAILABILITY`, `MOCK_SASHA_AVAILABILITY` |
+| `src/api/profile.ts` | `MOCK_ME` |
+| `src/api/groups.ts` | `MOCK_POLLS_BY_GROUP`, `MOCK_SOCIAL_GROUPS`, `MOCK_SUGGESTIONS_BY_GROUP` |
+| `src/api/friends.ts` | `MOCK_FRIENDS`, `MOCK_PENDING_REQUESTS`, `MOCK_USERS_BY_ID` |
+| `src/api/events.ts` | `MOCK_EVENTS`, `MOCK_EVENT_ORGANISERS`, `MOCK_RSVPS`, type `EventOrganiser` |
+| `src/api/explore.ts` | `MOCK_EXPLORE_VENUES` |
+
+Screens / components reading mocks directly (should consume the React Query hook instead — most need a hook to exist before they can be cleaned):
+
+| File | Symbols imported |
+|---|---|
+| `src/screens/profile/BroadcastSettingsScreen.tsx` | `MOCK_FRIENDS`, `MOCK_FRIEND_TYPES` |
+| `src/screens/profile/AudiencePickerSheetScreen.tsx` | `MOCK_FRIEND_LABELS`, `MOCK_FRIEND_TYPES` |
+| `src/screens/profile/AvailabilityEditorScreen.tsx` | `MOCK_FRIENDS`, `MOCK_FRIEND_TYPES` |
+| `src/screens/friends/FriendsListScreen.tsx` | `MOCK_FRIEND_LABELS`, `MOCK_FRIEND_TYPES` |
+| `src/screens/friends/FriendTypesManagerScreen.tsx` | `MOCK_FRIEND_TYPES` |
+| `src/screens/friends/FriendProfileScreen.tsx` | `MOCK_FRIEND_LABELS`, `MOCK_FRIEND_TYPES` |
+| `src/screens/groups/GroupDetailScreen.tsx` | `MOCK_USERS_BY_ID` |
+| `src/screens/events/EventDetailScreen.tsx` | `MOCK_USERS_BY_ID` |
+| `src/screens/create/Step3Screen.tsx` | `MOCK_FRIEND_TYPES` |
+| `src/components/social/SearchOverlay.tsx` | `MOCK_EVENTS`, `MOCK_FRIENDS`, `MOCK_SOCIAL_GROUPS` |
+
+Observation: `MOCK_FRIEND_LABELS` and `MOCK_FRIEND_TYPES` are the long pole — 6 screens still hard-read them because no React Query hook exists for friend-types/labels yet. Adding `useFriendTypes()` + `useFriendLabels()` (or merging into `useFriends`) unlocks half the deletions in a single PR.
+
+When the last consumer is rewired:
+1. `rm social-calendar-mobile/src/mocks/index.ts`
+2. `rm social-calendar-mobile/src/mocks/MOCKS_HANDOFF.md`
+3. `rmdir social-calendar-mobile/src/mocks`
+4. Confirm `tsc --noEmit` clean and remove this section.
 - [ ] **`publicProfileSelect` consolidation** — constant is duplicated across **4** repositories: `src/repositories/events.repository.ts:8`, `friendGroups.repository.ts:8`, `friends.repository.ts:10`, and `groups.repository.ts:10`. Extract to a shared location (e.g. `src/repositories/_shared/userSelects.ts`) and import everywhere.
 
 ---
