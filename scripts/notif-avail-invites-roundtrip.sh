@@ -166,8 +166,10 @@ if [ -n "$NOTIF_ID" ]; then
   RESP=$(hit_auth "$JWT_B" POST "/notifications/$NOTIF_ID/mute" "")
   expect_code "POST /notifications/:id/mute" "204" "${RESP%%|*}" "${RESP#*|}"
 
+  # read-all returns 200 with {"count": N} where N is how many got marked
+  # read. Not 204 — there IS a useful body.
   RESP=$(hit_auth "$JWT_B" POST "/notifications/read-all" "")
-  expect_code "POST /notifications/read-all" "204" "${RESP%%|*}" "${RESP#*|}"
+  expect_code "POST /notifications/read-all" "200" "${RESP%%|*}" "${RESP#*|}"
 
   RESP=$(hit_auth "$JWT_B" DELETE "/notifications/$NOTIF_ID" "")
   expect_code "DELETE /notifications/:id" "204" "${RESP%%|*}" "${RESP#*|}"
