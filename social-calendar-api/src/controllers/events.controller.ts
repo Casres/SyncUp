@@ -237,6 +237,41 @@ export const eventsController = {
     }
   },
 
+  /**
+   * Convenience RSVP — POST /events/:id/rsvp { status }.
+   * Caller does not need to know their inviteId; the service resolves
+   * it from (eventId, request.user.id).
+   */
+  async rsvp(request: FastifyRequest, reply: FastifyReply) {
+    const params = idParamsSchema.safeParse(request.params);
+    if (!params.success) return badRequest(reply, params.error);
+
+    const body = rsvpBodySchema.safeParse(request.body);
+    if (!body.success) return badRequest(reply, body.error);
+
+    try {
+      await eventsService.rsvp(
+        request.prismaTransaction,
+        params.data.id,
+        request.user.id,
+        body.data.status,
+        request.server.io,
+      );
+      return reply.code(204).send();
+    } catch (err) {
+      if (err instanceof EventNotFoundError) {
+        return reply.code(404).send({ error: 'Event not found' });
+      }
+      if (err instanceof InviteNotFoundError) {
+        return reply.code(404).send({ error: 'No invite found for this event' });
+      }
+      if (err instanceof InviteForbiddenError) {
+        return reply.code(403).send({ error: err.message });
+      }
+      throw err;
+    }
+  },
+
   async rescindInvite(request: FastifyRequest, reply: FastifyReply) {
     const params = inviteParamsSchema.safeParse(request.params);
     if (!params.success) return badRequest(reply, params.error);

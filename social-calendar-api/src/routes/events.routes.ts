@@ -9,6 +9,9 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.patch('/:id', eventsController.update);
   fastify.delete('/:id', eventsController.softDelete);
 
+  // Convenience RSVP — caller does not need to know their inviteId.
+  fastify.post('/:id/rsvp', eventsController.rsvp);
+
   // Invites (incremental) — see EVENTS_HANDOFF.md "Open items §1".
   // Folded into the Events domain rather than a standalone /invites
   // module because the schema's EventInvite is event-scoped (unique by

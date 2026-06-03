@@ -282,4 +282,16 @@ export const eventsRepository = {
     });
     return result.count;
   },
+
+  /**
+   * Find the invite belonging to a specific recipient for an event.
+   * Used by the convenience RSVP endpoint — the caller supplies only
+   * `eventId` + their own userId; we resolve the inviteId internally.
+   */
+  findInviteForRecipient(db: Db, eventId: string, recipientId: string) {
+    return db.eventInvite.findFirst({
+      where: { eventId, recipientId },
+      include: { recipient: { select: publicProfileSelect } },
+    });
+  },
 };

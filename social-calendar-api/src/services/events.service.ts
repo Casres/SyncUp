@@ -263,6 +263,11 @@ export const eventsService = {
       }
     }
 
+    // Snapshot actor profile once for notification fan-out. The actor is
+    // always an organiser, so their profile is already loaded via eventInclude.
+    const actorOrganiser = event.organisers.find((o) => o.user.id === userId);
+    const actorProfile = actorOrganiser?.user;
+
     // Dispatch a notification for each new recipient. Failures here
     // are non-fatal — the invite has already committed via the
     // transaction context Prisma passed through.
@@ -276,6 +281,10 @@ export const eventsService = {
             eventId: invite.eventId,
             eventName: event.title,
             actorId: userId,
+            // Denormalize actor profile so the mobile NotifSheet can render
+            // the card without a secondary user lookup.
+            actorName: actorProfile?.displayName ?? '',
+            actorInitial: (actorProfile?.displayName ?? '?').charAt(0).toUpperCase(),
           },
           groupKey: `invite:${invite.eventId}`,
         });
@@ -354,7 +363,12 @@ export const eventsService = {
                 eventId,
                 eventName: event.title,
                 actorId: userId,
-                rsvpStatus: status,
+                // Denormalize actor (the RSVP respondent) so the mobile can
+                // render RsvpNotif without a secondary user lookup.
+                actorName: updated.recipient.displayName,
+                actorHandle: updated.recipient.username,
+                actorInitial: updated.recipient.displayName.charAt(0).toUpperCase(),
+                rsvpStatus: status, // InviteStatus — mobile mapper converts to RSVPStatus
               },
               groupKey: `rsvp:${eventId}`,
             });
@@ -366,6 +380,28 @@ export const eventsService = {
     }
 
     return wire;
+  },
+
+  /**
+   * Convenience RSVP — the invite recipient submits a status update
+   * without needing to know their inviteId. Resolves the invite by
+   * (eventId, recipientId) then delegates to respondToInvite which
+   * handles the update, socket fan-out, and organiser notifications.
+   */
+  async rsvp(
+    db: Db,
+    eventId: string,
+    userId: string,
+    status: InviteStatus,
+    io?: IoServer,
+  ) {
+    const invite = await eventsRepository.findInviteForRecipient(
+      db,
+      eventId,
+      userId,
+    );
+    if (!invite) throw new InviteNotFoundError(userId);
+    return this.respondToInvite(db, eventId, invite.id, userId, status, io);
   },
 
   /**
