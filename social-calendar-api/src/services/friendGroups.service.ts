@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import {
   friendGroupsRepository,
-  type FriendGroupWithCount,
+  type FriendGroupWithMembers,
 } from '../repositories/friendGroups.repository.js';
 import type { Db } from '../repositories/_types.js';
 
@@ -37,9 +37,11 @@ export type FriendGroupResponse = {
   createdAt: Date;
   updatedAt: Date;
   memberCount: number;
+  /** Ordered list of member user IDs. Populated inline from the FriendGroupMember join. */
+  memberIds: string[];
 };
 
-function shape(group: FriendGroupWithCount): FriendGroupResponse {
+function shape(group: FriendGroupWithMembers): FriendGroupResponse {
   return {
     id: group.id,
     ownerId: group.ownerId,
@@ -47,6 +49,7 @@ function shape(group: FriendGroupWithCount): FriendGroupResponse {
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
     memberCount: group._count.members,
+    memberIds: group.members.map((m) => m.userId),
   };
 }
 

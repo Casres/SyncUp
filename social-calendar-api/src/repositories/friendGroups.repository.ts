@@ -2,13 +2,17 @@ import { Prisma } from '@prisma/client';
 import type { Db } from './_types.js';
 import { publicProfileSelect } from './_userSelects.js';
 
-const friendGroupWithCountInclude = {
+const friendGroupWithMembersInclude = {
   _count: { select: { members: true } },
+  members: { select: { userId: true }, orderBy: { id: 'asc' as const } },
 } satisfies Prisma.FriendGroupInclude;
 
-export type FriendGroupWithCount = Prisma.FriendGroupGetPayload<{
-  include: typeof friendGroupWithCountInclude;
+export type FriendGroupWithMembers = Prisma.FriendGroupGetPayload<{
+  include: typeof friendGroupWithMembersInclude;
 }>;
+
+/** @deprecated Alias kept for backward-compat during the memberIds migration — remove once all callers are updated. */
+export type FriendGroupWithCount = FriendGroupWithMembers;
 
 export const friendGroupsRepository = {
   /**
@@ -19,27 +23,28 @@ export const friendGroupsRepository = {
     return db.friendGroup.findMany({
       where: { ownerId },
       orderBy: { createdAt: 'asc' },
-      include: friendGroupWithCountInclude,
+      include: friendGroupWithMembersInclude,
     });
   },
 
   findById(db: Db, id: string) {
     return db.friendGroup.findUnique({
       where: { id },
-      include: friendGroupWithCountInclude,
+      include: friendGroupWithMembersInclude,
     });
   },
 
   create(db: Db, ownerId: string, name: string) {
     return db.friendGroup.create({
       data: { ownerId, name },
-      include: friendGroupWithCountInclude,
+      include: friendGroupWithMembersInclude,
     });
   },
 
   /**
    * Rename. RLS already gates on owner; we still constrain on
-   * `(id, ownerId)` to keep the query honest.
+   * `(id, ownerId)` to keep the query honest. Returns the updated
+   * record (with members inline) or null if not found / not owned.
    */
   async rename(db: Db, id: string, ownerId: string, name: string) {
     const result = await db.friendGroup.updateMany({
