@@ -2,9 +2,7 @@
  * Explore API — React Query hooks.
  *
  * DATA FLOW
- *   When EXPO_PUBLIC_API_URL (or EXPO_PUBLIC_DEV_TOKEN) is set the hooks call
- *   the real SyncUp backend.  Otherwise they fall back to MOCK_EXPLORE_VENUES
- *   so the Explore UI is exercisable without a running server or a Clerk token.
+ *   Every hook calls the live SyncUp backend via `useApiFetch()`.
  *
  * REAL BACKEND ENDPOINTS
  *   GET /explore/feed?lat=&lng=&category=&cursor=
@@ -43,9 +41,7 @@ import {
 } from '@tanstack/react-query';
 
 import type { ExploreCategory, ExploreVenue } from '../../../TYPES';
-import { MOCK_EXPLORE_VENUES } from '../mocks';
-import { simulateLatency } from './_utils';
-import { isApiConfigured, useApiFetch, type AuthedFetch } from './_client';
+import { useApiFetch, type AuthedFetch } from './_client';
 import { queryKeys } from './queryKeys';
 
 // ─── Cost control constants ─────────────────────────────────────────────────
@@ -78,10 +74,7 @@ export interface ExploreFeedPage {
 
 // ─── Fetch functions ─────────────────────────────────────────────────────────
 
-/**
- * Real API fetch for the paginated feed.
- * Falls back to mock data when the API is not configured.
- */
+/** Real API fetch for the paginated feed. */
 async function fetchExploreFeed(
   authedFetch: AuthedFetch,
   lat: number,
@@ -89,25 +82,6 @@ async function fetchExploreFeed(
   category: ExploreCategory,
   cursor: number,
 ): Promise<ExploreFeedPage> {
-  if (!isApiConfigured()) {
-    // ── Mock path ──
-    await simulateLatency();
-    const filtered =
-      category === 'all'
-        ? MOCK_EXPLORE_VENUES
-        : MOCK_EXPLORE_VENUES.filter((v) => v.category === category);
-    const sorted = [
-      ...filtered.filter((v) => v.isFeatured),
-      ...filtered.filter((v) => !v.isFeatured),
-    ];
-    const slice = sorted.slice(cursor, cursor + PAGE_SIZE);
-    return {
-      venues: slice,
-      nextCursor: cursor + slice.length < sorted.length ? cursor + slice.length : null,
-    };
-  }
-
-  // ── Real API path ──
   const params = new URLSearchParams({
     lat:      String(lat),
     lng:      String(lng),
@@ -117,25 +91,13 @@ async function fetchExploreFeed(
   return authedFetch<ExploreFeedPage>(`/explore/feed?${params.toString()}`);
 }
 
-/**
- * Real API fetch for a single venue detail.
- * Falls back to mock data when the API is not configured.
- */
+/** Real API fetch for a single venue detail. */
 async function fetchExploreVenueDetail(
   authedFetch: AuthedFetch,
   id: string,
   lat: number,
   lng: number,
 ): Promise<ExploreVenue> {
-  if (!isApiConfigured()) {
-    // ── Mock path ──
-    await simulateLatency();
-    const venue = MOCK_EXPLORE_VENUES.find((v) => v.id === id);
-    if (!venue) throw new Error(`ExploreVenue not found: ${id}`);
-    return venue;
-  }
-
-  // ── Real API path ──
   const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
   return authedFetch<ExploreVenue>(`/explore/${encodeURIComponent(id)}?${params.toString()}`);
 }
@@ -180,7 +142,7 @@ export function useExploreVenueDetail(
   userLat?: number,
   userLng?: number,
 ): UseQueryResult<ExploreVenue, Error> {
-  // Default to 0,0 when no location is provided (mock path ignores them).
+  // Default to 0,0 when no location is provided.
   const { lat, lng } = bucketLocation(userLat ?? 0, userLng ?? 0);
   const authedFetch = useApiFetch();
 

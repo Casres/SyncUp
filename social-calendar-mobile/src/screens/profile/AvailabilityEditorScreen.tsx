@@ -82,10 +82,11 @@ import {
 import { colors, durations, radii, spacing, typography, useHaptic } from '../../theme';
 import {
   useBroadcastSettings,
+  useFriends,
+  useFriendTypes,
   useMyAvailability,
   useUpdateAvailability,
 } from '../../api';
-import { MOCK_FRIENDS, MOCK_FRIEND_TYPES } from '../../mocks';
 import type { AvailabilityEditorScreenProps } from '../../navigation/types';
 import type {
   AvailState,
@@ -93,6 +94,8 @@ import type {
   AvailabilityEntry,
   BroadcastRule,
   BroadcastSettings,
+  Friend,
+  FriendType,
   Quickset,
 } from '../../../../TYPES';
 
@@ -132,6 +135,8 @@ export default function AvailabilityEditorScreen({
   // ── Server data ────────────────────────────────────────────────────────
   const { data: avail, isLoading, error, refetch } = useMyAvailability();
   const { data: broadcastSettings } = useBroadcastSettings();
+  const { data: friendTypes = [] } = useFriendTypes();
+  const { data: friends = [] } = useFriends();
   const updateAvail = useUpdateAvailability();
 
   // ── Ephemeral UI state ─────────────────────────────────────────────────
@@ -379,6 +384,8 @@ export default function AvailabilityEditorScreen({
             T={T}
             expanded={broadcastsExpanded}
             settings={broadcastSettings}
+            friendTypes={friendTypes}
+            friends={friends}
             expandAnim={expandAnim}
             onToggle={() => {
               fire('light');
@@ -445,6 +452,8 @@ interface BroadcastInlineCollapseProps {
   T: typeof colors.light;
   expanded: boolean;
   settings: BroadcastSettings | undefined;
+  friendTypes: FriendType[];
+  friends: Friend[];
   expandAnim: Animated.Value;
   onToggle: () => void;
   onManage: () => void;
@@ -454,6 +463,8 @@ function BroadcastInlineCollapse({
   T,
   expanded,
   settings,
+  friendTypes,
+  friends,
   expandAnim,
   onToggle,
   onManage,
@@ -512,6 +523,8 @@ function BroadcastInlineCollapse({
                 title={title}
                 body={body}
                 rule={rule}
+                friendTypes={friendTypes}
+                friends={friends}
               />
             );
           })}
@@ -536,10 +549,12 @@ interface PreviewCardProps {
   title: string;
   body: string;
   rule: BroadcastRule | undefined;
+  friendTypes: FriendType[];
+  friends: Friend[];
 }
 
-function PreviewCard({ T, state, title, body, rule }: PreviewCardProps): React.JSX.Element {
-  const summary = useMemo(() => formatSummary(rule), [rule]);
+function PreviewCard({ T, state, title, body, rule, friendTypes, friends }: PreviewCardProps): React.JSX.Element {
+  const summary = useMemo(() => formatSummary(rule, friendTypes, friends), [rule, friendTypes, friends]);
   const isOn = rule?.on ?? false;
   return (
     <View style={[styles.previewCard, { backgroundColor: T.bgElevated, borderColor: T.hair }]}>
@@ -689,7 +704,11 @@ function computeQuicksetPatch(
   }
 }
 
-function formatSummary(rule: BroadcastRule | undefined): string {
+function formatSummary(
+  rule: BroadcastRule | undefined,
+  friendTypes: FriendType[],
+  friends: Friend[],
+): string {
   if (!rule) return 'Off';
   if (!rule.on) return 'Off';
   if (rule.audience === 'everyone') return 'Everyone';
@@ -698,11 +717,11 @@ function formatSummary(rule: BroadcastRule | undefined): string {
   }
   if (rule.audience === 'types') {
     return rule.targets
-      .map((id) => MOCK_FRIEND_TYPES.find((t) => t.id === id)?.label ?? id)
+      .map((id) => friendTypes.find((t) => t.id === id)?.label ?? id)
       .join(', ');
   }
   return rule.targets
-    .map((id) => MOCK_FRIENDS.find((f) => f.id === id)?.name ?? id)
+    .map((id) => friends.find((f) => f.id === id)?.name ?? id)
     .join(', ');
 }
 

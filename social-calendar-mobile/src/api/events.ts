@@ -2,19 +2,25 @@
  * Events API — React Query hooks.
  *
  * DATA FLOW
- *   When `isApiConfigured()` is true (EXPO_PUBLIC_API_URL or
- *   EXPO_PUBLIC_DEV_TOKEN set) the hooks call the real SyncUp backend.
- *   Otherwise they fall back to MOCK_EVENTS / MOCK_RSVPS / MOCK_EVENT_ORGANISERS
- *   so screens stay exercisable without a running server.
+ *   Every hook calls the live SyncUp backend via `useApiFetch()` /
+ *   `useApiMutate()`.
  *
  * REAL BACKEND ENDPOINTS
- *   GET    /events                       → Event[]
- *   GET    /events/:id                   → Event
- *   POST   /events                       → Event             (body: EventDraft)
- *   PATCH  /events/:id                   → Event             (body: Partial<Event>)
- *   DELETE /events/:id                   → 204 No Content
- *   GET    /events/:id/rsvps             → RSVPEntry[]
- *   POST   /events/:id/rsvp              → 204               (body: { status })
+ *   GET    /events                            → { events: BackendEvent[] }
+ *   GET    /events/:id                        → BackendEvent (with invites)
+ *   POST   /events                            → BackendEvent   (body: BackendCreateBody)
+ *   POST   /events/:id/invites                → InvitePayload[] (body: { recipientIds })
+ *   PATCH  /events/:id                        → BackendEvent   (body: BackendUpdateBody)
+ *   DELETE /events/:id                        → 204 No Content
+ *   POST   /events/:id/rsvp                   → 204            (body: { status })
+ *
+ * SHAPE MAPPING
+ *   The backend uses a relational model (organisers[], invites[]) that differs
+ *   from the mobile Event type (hostId, coHostIds, rsvps{}, inviteeIds[]).
+ *   `toMobileEvent()` handles the translation. `currentUserId` (Clerk userId)
+ *   is threaded through so the current user's invite is also indexed under the
+ *   `'me'` key in `rsvps` — preserving the mock-data convention that screens
+ *   depend on (e.g. `event.rsvps['me']`).
  *
  * CLERK INTEGRATION
  *   All hooks pull a pre-authorized fetch/mutate via `useApiFetch()` /
@@ -22,11 +28,8 @@
  *   directly here. Tokens are intentionally absent from query keys so
  *   logout/login is handled by the auth layer's cache invalidation.
  *
- * MOCK-ONLY ERROR SIMULATIONS (live API uses real HTTP status codes):
- *   - getEvent('unknown')    → NOT_FOUND
- *   - deleteEvent('event-4') → FORBIDDEN (only Priya, the CREATOR, can delete)
- *   - submitRSVP             → ~10% SERVER_ERROR to exercise the RSVP toast
  */
+import { useAuth } from '@clerk/clerk-expo';
 import {
   useMutation,
   useQuery,
@@ -36,16 +39,9 @@ import {
 } from '@tanstack/react-query';
 
 import type { Event, RSVPStatus } from '../../../TYPES';
-import {
-  MOCK_EVENTS,
-  MOCK_EVENT_ORGANISERS,
-  MOCK_RSVPS,
-  type EventOrganiser,
-} from '../mocks';
 
-import { ApiError, shouldSimulateFailure, simulateLatency } from './_utils';
+import { ApiError } from './_utils';
 import {
-  isApiConfigured,
   useApiFetch,
   useApiMutate,
   type AuthedFetch,
@@ -70,79 +66,190 @@ export interface RSVPEntry {
 export type EventDraft = Omit<Event, 'id'>;
 
 // ---------------------------------------------------------------------------
+// Backend wire types (what the API actually returns)
+// ---------------------------------------------------------------------------
+
+interface BackendPublicProfile {
+  id: string;
+  username: string;    // Prisma User.username  (≈ mobile Friend.handle)
+  displayName: string; // Prisma User.displayName (≈ mobile Friend.name)
+  avatarUrl: string | null;
+}
+
+interface BackendOrganiser {
+  id: string;
+  role: string; // 'CREATOR' | 'CO_HOST'
+  user: BackendPublicProfile;
+}
+
+interface BackendInvite {
+  id: string;
+  status: string; // 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'MAYBE'
+  friendGroupId: string | null;
+  recipient: BackendPublicProfile;
+}
+
+/**
+ * Shape returned by `GET /events/:id` (full, with invites).
+ * `GET /events` list omits `invites` — callers should treat it as optional.
+ */
+interface BackendEvent {
+  id: string;
+  creatorId: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  startsAt: string; // ISO datetime string
+  endsAt: string;   // ISO datetime string
+  recurrence: string;
+  recurrenceRuleRaw: string | null;
+  allowSuggestionVoting: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  creator: BackendPublicProfile;
+  organisers: BackendOrganiser[];
+  invites?: BackendInvite[]; // omitted from list endpoint
+}
+
+// ---------------------------------------------------------------------------
+// Shape-mapping helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Backend InviteStatus → mobile RSVPStatus.
+ * PENDING → null (not yet responded), ACCEPTED → 'yes', DECLINED → 'no',
+ * MAYBE → 'maybe'.
+ */
+function inviteStatusToRsvp(status: string): RSVPStatus {
+  if (status === 'ACCEPTED') return 'yes';
+  if (status === 'DECLINED') return 'no';
+  if (status === 'MAYBE') return 'maybe';
+  return null; // PENDING
+}
+
+/**
+ * Convert a `BackendEvent` to the mobile `Event` shape.
+ *
+ * `currentUserId` (the Clerk userId of the authenticated user) is optional.
+ * When supplied, the current user's invite is also indexed under the `'me'`
+ * key in `rsvps` so that code like `event.rsvps['me']` continues to work
+ * without change when screens are migrated to live data.
+ */
+function toMobileEvent(raw: BackendEvent, currentUserId?: string | null): Event {
+  const coHostIds = raw.organisers
+    .filter((o) => o.role !== 'CREATOR')
+    .map((o) => o.user.id);
+
+  const invites = raw.invites ?? [];
+  const inviteeIds = invites.map((inv) => inv.recipient.id);
+
+  const rsvps: Record<string, RSVPStatus> = {};
+  for (const inv of invites) {
+    const status = inviteStatusToRsvp(inv.status);
+    rsvps[inv.recipient.id] = status;
+    // Alias current user's entry under 'me' for backward compat with
+    // code paths that do `event.rsvps['me']`.
+    if (currentUserId && inv.recipient.id === currentUserId) {
+      rsvps['me'] = status;
+    }
+  }
+
+  return {
+    id: raw.id,
+    title: raw.title,
+    hostId: raw.creatorId,
+    coHostIds,
+    // ISO date portion only (YYYY-MM-DD) — backend stores full datetime.
+    iso: raw.startsAt.substring(0, 10),
+    startAt: raw.startsAt,
+    endAt: raw.endsAt,
+    ...(raw.location != null ? { location: raw.location } : {}),
+    ...(raw.description != null ? { description: raw.description } : {}),
+    inviteeIds,
+    rsvps,
+    // geo, glyph, price, groupId — not in backend schema; omitted.
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Fetch / mutate functions
 // ---------------------------------------------------------------------------
 
-export async function getEvents(authedFetch: AuthedFetch): Promise<Event[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return [...MOCK_EVENTS];
-  }
-  return authedFetch<Event[]>('/events');
+export async function getEvents(
+  authedFetch: AuthedFetch,
+  currentUserId?: string | null,
+): Promise<Event[]> {
+  const data = await authedFetch<{ events: BackendEvent[] }>('/events');
+  return data.events.map((e) => toMobileEvent(e, currentUserId));
 }
 
 export async function getEvent(
   authedFetch: AuthedFetch,
   id: string,
+  currentUserId?: string | null,
 ): Promise<Event> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const evt = MOCK_EVENTS.find((e) => e.id === id);
-    if (!evt) {
-      throw new ApiError('NOT_FOUND', `Event "${id}" not found.`);
-    }
-    return evt;
-  }
-  return authedFetch<Event>(`/events/${encodeURIComponent(id)}`);
+  const raw = await authedFetch<BackendEvent>(`/events/${encodeURIComponent(id)}`);
+  return toMobileEvent(raw, currentUserId);
 }
 
 export async function createEvent(
   authedMutate: AuthedMutate,
   draft: EventDraft,
 ): Promise<Event> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const id = `event-${Date.now().toString(36)}`;
-    return { ...draft, id };
+  // Backend schema: title, description?, location?, startsAt, endsAt.
+  // Unsupported draft fields (glyph, price, groupId, iso, geo) are dropped.
+  const body: Record<string, unknown> = { title: draft.title };
+  if (draft.description != null) body['description'] = draft.description;
+  if (draft.location != null) body['location'] = draft.location;
+  if (draft.startAt != null) body['startsAt'] = draft.startAt;
+  if (draft.endAt != null) body['endsAt'] = draft.endAt;
+
+  const created = await authedMutate<BackendEvent>('POST', '/events', body);
+
+  // Send invites as a separate incremental request (event creation and
+  // invite delivery are decoupled in the backend schema).
+  if (draft.inviteeIds.length > 0) {
+    await authedMutate<unknown>(
+      'POST',
+      `/events/${encodeURIComponent(created.id)}/invites`,
+      { recipientIds: draft.inviteeIds },
+    );
   }
-  return authedMutate<Event>('POST', '/events', draft);
+
+  // Return the mapped event. inviteeIds/rsvps will be empty here (the
+  // creation response has no invites yet); the detail screen re-fetches
+  // via useEvent(id) which returns the full shape with invites.
+  return toMobileEvent(created);
 }
 
 export async function updateEvent(
   authedMutate: AuthedMutate,
   id: string,
   patch: Partial<Event>,
+  currentUserId?: string | null,
 ): Promise<Event> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const existing = MOCK_EVENTS.find((e) => e.id === id);
-    if (!existing) {
-      throw new ApiError('NOT_FOUND', `Event "${id}" not found.`);
-    }
-    return { ...existing, ...patch, id: existing.id };
-  }
-  return authedMutate<Event>('PATCH', `/events/${encodeURIComponent(id)}`, patch);
+  // Translate mobile patch keys to backend field names.
+  // Omit fields the backend update schema doesn't accept.
+  const backendPatch: Record<string, unknown> = {};
+  if (patch.title !== undefined) backendPatch['title'] = patch.title;
+  if (patch.description !== undefined) backendPatch['description'] = patch.description;
+  if (patch.location !== undefined) backendPatch['location'] = patch.location;
+  if (patch.startAt !== undefined) backendPatch['startsAt'] = patch.startAt;
+  if (patch.endAt !== undefined) backendPatch['endsAt'] = patch.endAt;
+
+  const updated = await authedMutate<BackendEvent>(
+    'PATCH',
+    `/events/${encodeURIComponent(id)}`,
+    backendPatch,
+  );
+  return toMobileEvent(updated, currentUserId);
 }
 
 export async function deleteEvent(
   authedMutate: AuthedMutate,
   id: string,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (id === 'event-4') {
-      const meRow: EventOrganiser | undefined = MOCK_EVENT_ORGANISERS.find(
-        (o) => o.eventId === id && o.userId === 'me',
-      );
-      if (!meRow || meRow.role !== 'CREATOR') {
-        throw new ApiError(
-          'FORBIDDEN',
-          'Only the event creator can delete this event.',
-        );
-      }
-    }
-    return;
-  }
   await authedMutate<void>('DELETE', `/events/${encodeURIComponent(id)}`);
 }
 
@@ -150,13 +257,15 @@ export async function getRSVPs(
   authedFetch: AuthedFetch,
   eventId: string,
 ): Promise<RSVPEntry[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const rows = MOCK_RSVPS[eventId];
-    if (!rows) return [];
-    return rows.map((r) => ({ userId: r.userId, status: r.status }));
-  }
-  return authedFetch<RSVPEntry[]>(`/events/${encodeURIComponent(eventId)}/rsvps`);
+  // The backend embeds invites in the event detail response; there is no
+  // standalone /events/:id/rsvps endpoint. Fetch the event and extract.
+  const raw = await authedFetch<BackendEvent>(
+    `/events/${encodeURIComponent(eventId)}`,
+  );
+  return (raw.invites ?? []).map((inv) => ({
+    userId: inv.recipient.id,
+    status: inviteStatusToRsvp(inv.status),
+  }));
 }
 
 export async function submitRSVP(
@@ -164,20 +273,17 @@ export async function submitRSVP(
   eventId: string,
   status: RSVPStatus,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (shouldSimulateFailure(0.1)) {
-      throw new ApiError(
-        'SERVER_ERROR',
-        `Failed to submit RSVP for event "${eventId}". Please try again.`,
-      );
-    }
-    return;
-  }
+  // Convenience endpoint — backend resolves inviteId from (eventId, userId).
+  // Maps mobile RSVPStatus → backend InviteStatus.
+  const backendStatus =
+    status === 'yes' ? 'ACCEPTED' :
+    status === 'no' ? 'DECLINED' :
+    status === 'maybe' ? 'MAYBE' :
+    'PENDING';
   await authedMutate<void>(
     'POST',
     `/events/${encodeURIComponent(eventId)}/rsvp`,
-    { status },
+    { status: backendStatus },
   );
 }
 
@@ -187,17 +293,19 @@ export async function submitRSVP(
 
 export function useEvents(): UseQueryResult<Event[], ApiError> {
   const authedFetch = useApiFetch();
+  const { userId } = useAuth();
   return useQuery<Event[], ApiError>({
     queryKey: queryKeys.events.all(),
-    queryFn: () => getEvents(authedFetch),
+    queryFn: () => getEvents(authedFetch, userId),
   });
 }
 
 export function useEvent(id: string): UseQueryResult<Event, ApiError> {
   const authedFetch = useApiFetch();
+  const { userId } = useAuth();
   return useQuery<Event, ApiError>({
     queryKey: queryKeys.events.detail(id),
-    queryFn: () => getEvent(authedFetch, id),
+    queryFn: () => getEvent(authedFetch, id, userId),
     enabled: !!id,
   });
 }
@@ -226,7 +334,7 @@ interface SubmitRSVPContext {
  * Optimistic RSVP submission. Pattern:
  *  1. Cancel in-flight refetches for the affected event.
  *  2. Snapshot the prior cache value.
- *  3. Patch `Event.rsvps['me']` optimistically.
+ *  3. Patch `Event.rsvps` optimistically under both `userId` and `'me'`.
  *  4. On error, restore the snapshot.
  *  5. On settle, invalidate so the canonical truth is fetched.
  */
@@ -238,6 +346,7 @@ export function useSubmitRSVP(): UseMutationResult<
 > {
   const queryClient = useQueryClient();
   const authedMutate = useApiMutate();
+  const { userId } = useAuth();
 
   return useMutation<void, ApiError, SubmitRSVPVars, SubmitRSVPContext>({
     mutationFn: ({ eventId, status }) => submitRSVP(authedMutate, eventId, status),
@@ -248,7 +357,13 @@ export function useSubmitRSVP(): UseMutationResult<
       if (previousEvent) {
         queryClient.setQueryData<Event>(key, {
           ...previousEvent,
-          rsvps: { ...previousEvent.rsvps, me: status },
+          rsvps: {
+            ...previousEvent.rsvps,
+            // Index under both the actual userId and the 'me' alias so any
+            // code that reads either key sees the optimistic value.
+            ...(userId ? { [userId]: status } : {}),
+            me: status,
+          },
         });
       }
       return { previousEvent };
@@ -291,8 +406,9 @@ export function useUpdateEvent(): UseMutationResult<
 > {
   const queryClient = useQueryClient();
   const authedMutate = useApiMutate();
+  const { userId } = useAuth();
   return useMutation<Event, ApiError, UpdateEventVars>({
-    mutationFn: ({ id, patch }) => updateEvent(authedMutate, id, patch),
+    mutationFn: ({ id, patch }) => updateEvent(authedMutate, id, patch, userId),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.events.detail(updated.id), updated);
       queryClient.invalidateQueries({ queryKey: queryKeys.events.all() });

@@ -52,7 +52,6 @@ import {
   useGroupSuggestions,
   useVotePoll,
 } from '../../api';
-import { MOCK_USERS_BY_ID } from '../../mocks';
 import type { GroupDetailScreenProps } from '../../navigation/types';
 import type { GroupDetailTab } from '../../../../TYPES';
 
@@ -287,23 +286,20 @@ export default function GroupDetailScreen({
                 <EmptySuggestions T={T} />
               </View>
             ) : (
-              (suggestions ?? []).map((s) => {
-                const author = MOCK_USERS_BY_ID[s.authorId];
-                return (
-                  <SuggestionRow
-                    key={s.id}
-                    T={T}
-                    suggestion={s}
-                    authorName={author?.name ?? s.authorId}
-                    upvotedByMe={s.upvotes.includes('me')}
-                    onUpvote={() => {
-                      // Local upvote — optimistic only via the mutation cache
-                      // pattern; for now no API write, the haptic fires inside
-                      // SuggestionRow.
-                    }}
-                  />
-                );
-              })
+              (suggestions ?? []).map((s) => (
+                <SuggestionRow
+                  key={s.id}
+                  T={T}
+                  suggestion={s}
+                  authorName={s.authorId}
+                  upvotedByMe={s.upvotes.includes('me')}
+                  onUpvote={() => {
+                    // Local upvote — optimistic only via the mutation cache
+                    // pattern; for now no API write, the haptic fires inside
+                    // SuggestionRow.
+                  }}
+                />
+              ))
             )}
             <View
               style={[

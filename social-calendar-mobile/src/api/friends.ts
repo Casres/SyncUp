@@ -2,9 +2,8 @@
  * Friends API — React Query hooks.
  *
  * DATA FLOW
- *   When `isApiConfigured()` is true, hooks call the real backend.
- *   Otherwise they fall back to MOCK_FRIENDS / MOCK_PENDING_REQUESTS /
- *   MOCK_USERS_BY_ID.
+ *   Every hook calls the live SyncUp backend via `useApiFetch()` /
+ *   `useApiMutate()`.
  *
  * REAL BACKEND ENDPOINTS
  *   GET    /friends?label=                  → Friend[]
@@ -14,16 +13,12 @@
  *   DELETE /friends/:id                     → 204            (R16-7 · unfriend)
  *   PATCH  /friends/:id/block               → 200            (R16-8 · block user)
  *   GET    /users/:id                       → User
+ *   GET    /friend-groups                   → FriendType[]   (useFriendTypes)
+ *   POST   /friend-groups                   → FriendType     (useCreateFriendType)
+ *   DELETE /friend-groups/:id              → 204            (useDeleteFriendType)
  *
  * CLERK INTEGRATION via `useApiFetch()` / `useApiMutate()` only — never
  * import @clerk/clerk-expo here.
- *
- * MOCK-ONLY ERROR SIMULATIONS:
- *   - sendFriendRequest(existingFriendId) → CONFLICT
- *   - getFriendProfile(unknownId)         → NOT_FOUND
- *   - respondToFriendRequest(unknownId)   → NOT_FOUND
- *   - removeFriend(unknownId)             → NOT_FOUND        (R16-7)
- *   - blockUser(unknownId)                → NOT_FOUND        (R16-8)
  */
 import {
   useMutation,
@@ -33,16 +28,10 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 
-import type { Friend, User } from '../../../TYPES';
-import {
-  MOCK_FRIENDS,
-  MOCK_PENDING_REQUESTS,
-  MOCK_USERS_BY_ID,
-} from '../mocks';
+import type { Friend, FriendType, User } from '../../../TYPES';
 
-import { ApiError, simulateLatency } from './_utils';
+import { ApiError } from './_utils';
 import {
-  isApiConfigured,
   useApiFetch,
   useApiMutate,
   type AuthedFetch,
@@ -58,11 +47,6 @@ export async function getFriends(
   authedFetch: AuthedFetch,
   label?: string,
 ): Promise<Friend[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (!label) return [...MOCK_FRIENDS];
-    return MOCK_FRIENDS.filter((f) => f.category === label);
-  }
   const path = label
     ? `/friends?label=${encodeURIComponent(label)}`
     : '/friends';
@@ -72,10 +56,6 @@ export async function getFriends(
 export async function getFriendRequests(
   authedFetch: AuthedFetch,
 ): Promise<Friend[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return [...MOCK_PENDING_REQUESTS];
-  }
   return authedFetch<Friend[]>('/friends/requests');
 }
 
@@ -83,16 +63,6 @@ export async function sendFriendRequest(
   authedMutate: AuthedMutate,
   recipientId: string,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (MOCK_FRIENDS.some((f) => f.id === recipientId)) {
-      throw new ApiError(
-        'CONFLICT',
-        `User "${recipientId}" is already in your friends list.`,
-      );
-    }
-    return;
-  }
   await authedMutate<void>('POST', '/friends/requests', { recipientId });
 }
 
@@ -101,14 +71,6 @@ export async function respondToFriendRequest(
   id: string,
   action: 'accept' | 'decline',
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (!MOCK_PENDING_REQUESTS.some((r) => r.id === id)) {
-      throw new ApiError('NOT_FOUND', `Friend request "${id}" not found.`);
-    }
-    void action;
-    return;
-  }
   // TODO: confirm endpoint — could also be PATCH /friends/requests/:id { action }
   await authedMutate<void>(
     'POST',
@@ -121,14 +83,6 @@ export async function getFriendProfile(
   authedFetch: AuthedFetch,
   friendId: string,
 ): Promise<User> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const user = MOCK_USERS_BY_ID[friendId];
-    if (!user) {
-      throw new ApiError('NOT_FOUND', `User "${friendId}" not found.`);
-    }
-    return user;
-  }
   return authedFetch<User>(`/users/${encodeURIComponent(friendId)}`);
 }
 
@@ -140,13 +94,6 @@ export async function removeFriend(
   authedMutate: AuthedMutate,
   friendId: string,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (!MOCK_FRIENDS.some((f) => f.id === friendId)) {
-      throw new ApiError('NOT_FOUND', `Friend "${friendId}" not found.`);
-    }
-    return;
-  }
   await authedMutate<void>('DELETE', `/friends/${encodeURIComponent(friendId)}`);
 }
 
@@ -159,13 +106,6 @@ export async function blockUser(
   authedMutate: AuthedMutate,
   friendId: string,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (!MOCK_FRIENDS.some((f) => f.id === friendId)) {
-      throw new ApiError('NOT_FOUND', `Friend "${friendId}" not found.`);
-    }
-    return;
-  }
   await authedMutate<void>('PATCH', `/friends/${encodeURIComponent(friendId)}/block`);
 }
 
@@ -276,6 +216,98 @@ export function useBlockUser(): UseMutationResult<void, ApiError, string> {
       queryClient.invalidateQueries({ queryKey: queryKeys.friends.blocks() });
       queryClient.invalidateQueries({ queryKey: queryKeys.events.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// FriendType (FriendGroup) hooks — /friend-groups
+// ---------------------------------------------------------------------------
+
+/** Wire shape from the backend FriendGroupResponse to the shared FriendType. */
+interface FriendGroupApiItem {
+  id: string;
+  name: string;
+  memberIds: string[];
+}
+
+export async function getFriendTypes(authedFetch: AuthedFetch): Promise<FriendType[]> {
+  const data = await authedFetch<{ groups: FriendGroupApiItem[] }>('/friend-groups');
+  return data.groups.map((g) => ({ id: g.id, label: g.name, members: g.memberIds }));
+}
+
+/**
+ * List the caller's private FriendType buckets.
+ * Backed by GET /friend-groups. Maps backend FriendGroup → FriendType shape.
+ */
+export function useFriendTypes(): UseQueryResult<FriendType[], ApiError> {
+  const authedFetch = useApiFetch();
+  return useQuery<FriendType[], ApiError>({
+    queryKey: queryKeys.friends.types(),
+    queryFn: () => getFriendTypes(authedFetch),
+  });
+}
+
+/**
+ * Derive the list of distinct friend category labels the caller has used.
+ * Shares the `friends.list()` cache with `useFriends()` — no extra network
+ * call when both are mounted on the same screen.
+ *
+ * With real API data, `Friend.category` is already the display string
+ * (e.g. 'BFF', 'Work'). The returned `{ id, label }` pairs have id === label
+ * so existing `labelLookup[id] ?? id` fallback patterns continue to work.
+ */
+export function useFriendLabels(): UseQueryResult<
+  Array<{ id: string; label: string }>,
+  ApiError
+> {
+  const authedFetch = useApiFetch();
+  return useQuery<Friend[], ApiError, Array<{ id: string; label: string }>>({
+    queryKey: queryKeys.friends.list(),
+    queryFn: () => getFriends(authedFetch),
+    select: (friends) => {
+      const seen = new Set<string>();
+      const result: Array<{ id: string; label: string }> = [];
+      for (const f of friends) {
+        if (f.category && !seen.has(f.category)) {
+          seen.add(f.category);
+          result.push({ id: f.category, label: f.category });
+        }
+      }
+      return result;
+    },
+  });
+}
+
+/**
+ * Create a new FriendType bucket. Invalidates the types list on success.
+ */
+export function useCreateFriendType(): UseMutationResult<FriendType, ApiError, string> {
+  const queryClient = useQueryClient();
+  const authedMutate = useApiMutate();
+  return useMutation<FriendType, ApiError, string>({
+    mutationFn: async (name) => {
+      const item = await authedMutate<FriendGroupApiItem>('POST', '/friend-groups', { name });
+      return { id: item.id, label: item.name, members: item.memberIds };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.types() });
+    },
+  });
+}
+
+/**
+ * Delete a FriendType bucket by id. Invalidates the types list on success.
+ */
+export function useDeleteFriendType(): UseMutationResult<void, ApiError, string> {
+  const queryClient = useQueryClient();
+  const authedMutate = useApiMutate();
+  return useMutation<void, ApiError, string>({
+    mutationFn: async (typeId) => {
+      await authedMutate<void>('DELETE', `/friend-groups/${encodeURIComponent(typeId)}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.types() });
     },
   });
 }

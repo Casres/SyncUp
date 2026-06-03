@@ -9,8 +9,10 @@
  * Empty sections are omitted entirely. Zero-result query renders
  * EmptySearch as a full replacement (R8-5).
  *
- * Mock-data only for now — real API integration is deferred. Results are
- * derived by filtering the existing mocks client-side against the query.
+ * Friend / group / event results are filtered client-side against the live
+ * React Query caches (useFriends / useGroups / useEvents). The PEOPLE section
+ * (non-friend discovery) is still a local fixture until a /search endpoint
+ * lands.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -46,11 +48,7 @@ import { Overline } from '../foundation/Overline';
 import { PillBtn } from '../foundation/PillBtn';
 import { Spinner } from '../polish/Spinner';
 import { EmptySearch } from '../emptyStates/EmptySearch';
-import {
-  MOCK_EVENTS,
-  MOCK_FRIENDS,
-  MOCK_SOCIAL_GROUPS,
-} from '../../mocks';
+import { useEvents, useFriends, useGroups } from '../../api';
 import type {
   Event,
   Friend,
@@ -118,18 +116,23 @@ function matchesQuery(haystack: string, q: string): boolean {
   return haystack.toLowerCase().includes(q.toLowerCase());
 }
 
-function runSearch(query: string): SearchResults {
+function runSearch(
+  query: string,
+  allFriends: Friend[],
+  allGroups: SocialGroup[],
+  allEvents: Event[],
+): SearchResults {
   const q = query.trim();
   if (q.length === 0) return EMPTY_RESULTS;
 
-  const friends = MOCK_FRIENDS.filter(
+  const friends = allFriends.filter(
     (f) => matchesQuery(f.name, q) || matchesQuery(f.handle, q),
   );
   const people: PeopleResultPerson[] = MOCK_PEOPLE.filter(
     (p) => matchesQuery(p.name, q) || matchesQuery(p.handle, q),
   );
-  const groups = MOCK_SOCIAL_GROUPS.filter((g) => matchesQuery(g.name, q));
-  const events = MOCK_EVENTS.filter((e) => matchesQuery(e.title, q));
+  const groups = allGroups.filter((g) => matchesQuery(g.name, q));
+  const events = allEvents.filter((e) => matchesQuery(e.title, q));
 
   return { friends, people, groups, events };
 }
@@ -144,6 +147,15 @@ export function SearchOverlay({
 }: SearchOverlayProps): React.JSX.Element | null {
   const fire = useHaptic();
   const inputRef = useRef<TextInput | null>(null);
+
+  // ── Live data (React Query caches) ─────────────────────────────────────────
+  // Search filters these client-side. Held in a ref so the debounced query
+  // effect reads the latest data without re-subscribing on every cache update.
+  const { data: friends = [] } = useFriends();
+  const { data: groups = [] } = useGroups();
+  const { data: events = [] } = useEvents();
+  const searchDataRef = useRef({ friends, groups, events });
+  searchDataRef.current = { friends, groups, events };
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [query, setQuery] = useState('');
@@ -210,7 +222,8 @@ export function SearchOverlay({
     const debounce = setTimeout(() => {
       // Simulate a tiny latency so the spinner is visible.
       const latency = setTimeout(() => {
-        const next = runSearch(q);
+        const { friends: fr, groups: gr, events: ev } = searchDataRef.current;
+        const next = runSearch(q, fr, gr, ev);
         setResults(next);
         setLoading(false);
         const isFullyEmpty =
@@ -291,17 +304,17 @@ export function SearchOverlay({
     setQuickProfileOpen(true);
   }
 
-  // QuickProfile data — mock for now.
+  // QuickProfile mutual-friend preview — derived from the live friends cache.
   const quickProfileMutuals: QuickProfileMutualFriend[] = useMemo(() => {
     if (!quickProfilePerson) return [];
     const count = PEOPLE_MUTUAL_LOOKUP.get(quickProfilePerson.id) ?? 0;
-    return MOCK_FRIENDS.slice(0, count).map((f) => ({
+    return friends.slice(0, count).map((f) => ({
       id: f.id,
       name: f.name,
       letter: f.letter,
       availState: null,
     }));
-  }, [quickProfilePerson]);
+  }, [quickProfilePerson, friends]);
 
   const quickProfileStats: QuickProfileStats = { hosted: 4, attended: 11 };
 

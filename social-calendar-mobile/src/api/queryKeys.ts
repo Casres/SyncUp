@@ -24,6 +24,8 @@ export const queryKeys = {
     requests: () => ['friends', 'requests'] as const,
     profile: (id: string) => ['friends', id] as const,
     blocks: () => ['friends', 'blocks'] as const,
+    /** Private FriendType buckets owned by the caller (maps to /friend-groups). */
+    types: () => ['friends', 'types'] as const,
   },
   groups: {
     all: () => ['groups'] as const,

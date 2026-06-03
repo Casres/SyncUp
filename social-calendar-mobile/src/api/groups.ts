@@ -2,9 +2,8 @@
  * Groups API — React Query hooks.
  *
  * DATA FLOW
- *   When `isApiConfigured()` is true, hooks call the real backend.
- *   Otherwise they fall back to MOCK_SOCIAL_GROUPS / MOCK_POLLS_BY_GROUP /
- *   MOCK_SUGGESTIONS_BY_GROUP.
+ *   Every hook calls the live SyncUp backend via `useApiFetch()` /
+ *   `useApiMutate()`.
  *
  * REAL BACKEND ENDPOINTS
  *   GET    /groups                                → SocialGroup[]
@@ -30,15 +29,9 @@ import {
 } from '@tanstack/react-query';
 
 import type { Poll, SocialGroup, Suggestion } from '../../../TYPES';
-import {
-  MOCK_POLLS_BY_GROUP,
-  MOCK_SOCIAL_GROUPS,
-  MOCK_SUGGESTIONS_BY_GROUP,
-} from '../mocks';
 
-import { ApiError, simulateLatency } from './_utils';
+import { ApiError } from './_utils';
 import {
-  isApiConfigured,
   useApiFetch,
   useApiMutate,
   type AuthedFetch,
@@ -64,10 +57,6 @@ export function pollIsClosed(poll: Poll, now: Date = new Date()): boolean {
 // ---------------------------------------------------------------------------
 
 export async function getGroups(authedFetch: AuthedFetch): Promise<SocialGroup[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return [...MOCK_SOCIAL_GROUPS];
-  }
   return authedFetch<SocialGroup[]>('/groups');
 }
 
@@ -75,14 +64,6 @@ export async function getGroupDetail(
   authedFetch: AuthedFetch,
   id: string,
 ): Promise<SocialGroup> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const group = MOCK_SOCIAL_GROUPS.find((g) => g.id === id);
-    if (!group) {
-      throw new ApiError('NOT_FOUND', `Group "${id}" not found.`);
-    }
-    return group;
-  }
   return authedFetch<SocialGroup>(`/groups/${encodeURIComponent(id)}`);
 }
 
@@ -90,10 +71,6 @@ export async function getGroupPolls(
   authedFetch: AuthedFetch,
   groupId: string,
 ): Promise<Poll[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return [...(MOCK_POLLS_BY_GROUP[groupId] ?? [])];
-  }
   return authedFetch<Poll[]>(`/groups/${encodeURIComponent(groupId)}/polls`);
 }
 
@@ -101,10 +78,6 @@ export async function getGroupSuggestions(
   authedFetch: AuthedFetch,
   groupId: string,
 ): Promise<Suggestion[]> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return [...(MOCK_SUGGESTIONS_BY_GROUP[groupId] ?? [])];
-  }
   return authedFetch<Suggestion[]>(
     `/groups/${encodeURIComponent(groupId)}/suggestions`,
   );
@@ -114,26 +87,6 @@ export async function createGroup(
   authedMutate: AuthedMutate,
   name: string,
 ): Promise<SocialGroup> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const id = `group-${Date.now().toString(36)}`;
-    return {
-      id,
-      name,
-      cover: { id: 'cover-default', label: 'Default', art: 'covers/default.svg' },
-      isPrivate: false,
-      members: [
-        {
-          id: 'me',
-          name: 'Ben Rivera',
-          letter: 'B',
-          handle: '@ben',
-          role: 'admin',
-        },
-      ],
-      userRole: 'admin',
-    };
-  }
   return authedMutate<SocialGroup>('POST', '/groups', { name });
 }
 
@@ -143,25 +96,6 @@ export async function votePoll(
   pollId: string,
   optionId: string,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    const poll = Object.values(MOCK_POLLS_BY_GROUP)
-      .flat()
-      .find((p) => p.id === pollId);
-    if (!poll) {
-      throw new ApiError('NOT_FOUND', `Poll "${pollId}" not found.`);
-    }
-    if (pollIsClosed(poll)) {
-      throw new ApiError('CONFLICT', `Poll "${pollId}" is closed.`);
-    }
-    if (!poll.options.some((o) => o.id === optionId)) {
-      throw new ApiError(
-        'NOT_FOUND',
-        `Option "${optionId}" not found on poll "${pollId}".`,
-      );
-    }
-    return;
-  }
   await authedMutate<void>(
     'POST',
     `/groups/${encodeURIComponent(groupId)}/polls/${encodeURIComponent(pollId)}/vote`,
@@ -174,19 +108,6 @@ export async function addSuggestion(
   groupId: string,
   text: string,
 ): Promise<Suggestion> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    if (!MOCK_SOCIAL_GROUPS.some((g) => g.id === groupId)) {
-      throw new ApiError('NOT_FOUND', `Group "${groupId}" not found.`);
-    }
-    return {
-      id: `sug-${Date.now().toString(36)}`,
-      authorId: 'me',
-      text,
-      upvotes: [],
-      createdAt: new Date().toISOString(),
-    };
-  }
   return authedMutate<Suggestion>(
     'POST',
     `/groups/${encodeURIComponent(groupId)}/suggestions`,

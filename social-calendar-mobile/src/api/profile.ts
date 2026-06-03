@@ -2,12 +2,8 @@
  * Profile API — React Query hooks.
  *
  * DATA FLOW
- *   When `isApiConfigured()` is true, hooks call the real backend.
- *   Otherwise they fall back to MOCK_ME and synthesised default
- *   Notification + Privacy settings per the ANCHOR defaults:
- *
- *     NotificationSettings — all true except `availBroadcasts: false`
- *     PrivacySettings — `findableBy: 'friends-of-friends'`, `invitableBy: 'friends'`
+ *   Every hook calls the live SyncUp backend via `useApiFetch()` /
+ *   `useApiMutate()`.
  *
  * REAL BACKEND ENDPOINTS
  *   GET    /me                      → User
@@ -32,11 +28,9 @@ import type {
   PrivacySettings,
   User,
 } from '../../../TYPES';
-import { MOCK_ME } from '../mocks';
 
-import { ApiError, simulateLatency } from './_utils';
+import { ApiError } from './_utils';
 import {
-  isApiConfigured,
   useApiFetch,
   useApiMutate,
   type AuthedFetch,
@@ -45,52 +39,22 @@ import {
 import { queryKeys } from './queryKeys';
 
 // ---------------------------------------------------------------------------
-// ANCHOR-defined defaults (mock fallback only)
-// ---------------------------------------------------------------------------
-
-const DEFAULT_NOTIFICATIONS: NotificationSettings = {
-  eventInvites: true,
-  friendRequests: true,
-  groupInvites: true,
-  rsvps: true,
-  eventReminders: true,
-  availBroadcasts: false,
-};
-
-const DEFAULT_PRIVACY: PrivacySettings = {
-  findableBy: 'friends-of-friends',
-  invitableBy: 'friends',
-};
-
-// ---------------------------------------------------------------------------
 // Fetch / mutate functions
 // ---------------------------------------------------------------------------
 
 export async function getMyProfile(authedFetch: AuthedFetch): Promise<User> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return { ...MOCK_ME };
-  }
   return authedFetch<User>('/me');
 }
 
 export async function getNotificationSettings(
   authedFetch: AuthedFetch,
 ): Promise<NotificationSettings> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return { ...DEFAULT_NOTIFICATIONS };
-  }
   return authedFetch<NotificationSettings>('/me/notifications');
 }
 
 export async function getPrivacySettings(
   authedFetch: AuthedFetch,
 ): Promise<PrivacySettings> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return { ...DEFAULT_PRIVACY };
-  }
   return authedFetch<PrivacySettings>('/me/privacy');
 }
 
@@ -98,10 +62,6 @@ export async function updateProfile(
   authedMutate: AuthedMutate,
   patch: Partial<User>,
 ): Promise<User> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    return { ...MOCK_ME, ...patch, id: MOCK_ME.id };
-  }
   return authedMutate<User>('PATCH', '/me', patch);
 }
 
@@ -109,11 +69,6 @@ export async function updateNotificationSettings(
   authedMutate: AuthedMutate,
   settings: NotificationSettings,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    void settings;
-    return;
-  }
   await authedMutate<void>('PUT', '/me/notifications', settings);
 }
 
@@ -121,11 +76,6 @@ export async function updatePrivacySettings(
   authedMutate: AuthedMutate,
   settings: PrivacySettings,
 ): Promise<void> {
-  if (!isApiConfigured()) {
-    await simulateLatency();
-    void settings;
-    return;
-  }
   await authedMutate<void>('PUT', '/me/privacy', settings);
 }
 

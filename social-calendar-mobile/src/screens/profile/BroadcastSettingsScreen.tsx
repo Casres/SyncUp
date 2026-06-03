@@ -38,15 +38,18 @@ import {
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
 import {
   useBroadcastSettings,
+  useFriends,
+  useFriendTypes,
   useUpdateBroadcastSettings,
 } from '../../api';
-import { MOCK_FRIENDS, MOCK_FRIEND_TYPES } from '../../mocks';
 import type { BroadcastSettingsScreenProps } from '../../navigation/types';
 import type {
   AudienceMode,
   AvailState,
   BroadcastRule,
   BroadcastSettings,
+  Friend,
+  FriendType,
 } from '../../../../TYPES';
 
 const STATE_ORDER: Array<{ key: AvailState; title: string; body: string }> = [
@@ -63,6 +66,8 @@ export default function BroadcastSettingsScreen({
 
   const { data: serverSettings, isLoading, error, refetch } = useBroadcastSettings();
   const update = useUpdateBroadcastSettings();
+  const { data: friendTypes = [] } = useFriendTypes();
+  const { data: friends = [] } = useFriends();
 
   const [local, setLocal] = useState<BroadcastSettings | null>(null);
   const [toastState, setToastState] = useState<AvailState | null>(null);
@@ -128,6 +133,8 @@ export default function BroadcastSettingsScreen({
               title={title}
               body={body}
               rule={rule}
+              friendTypes={friendTypes}
+              friends={friends}
               onToggle={(v) => writeRule(key, { on: v })}
               onAudienceChange={(audience) =>
                 writeRule(key, {
@@ -164,7 +171,7 @@ export default function BroadcastSettingsScreen({
           visible={toastState !== null}
           status={toastState ?? 'free'}
           audienceLabel={
-            toastState ? audienceLabel(local[toastState]) : ''
+            toastState ? audienceLabel(local[toastState], friendTypes, friends) : ''
           }
           onUndo={() => setToastState(null)}
           onDismiss={() => setToastState(null)}
@@ -180,6 +187,8 @@ interface BroadcastCardProps {
   title: string;
   body: string;
   rule: BroadcastRule;
+  friendTypes: FriendType[];
+  friends: Friend[];
   onToggle: (v: boolean) => void;
   onAudienceChange: (m: AudienceMode) => void;
   onOpenPicker: () => void;
@@ -192,6 +201,8 @@ function BroadcastCard({
   title,
   body,
   rule,
+  friendTypes,
+  friends,
   onToggle,
   onAudienceChange,
   onOpenPicker,
@@ -234,7 +245,7 @@ function BroadcastCard({
                 style={[typography.caption, { color: T.ink, fontWeight: '600' }]}
                 numberOfLines={1}
               >
-                {audienceLabel(rule)}
+                {audienceLabel(rule, friendTypes, friends)}
               </Text>
               <Text style={[typography.caption, { color: T.ink2 }]}>Tap to edit</Text>
             </Pressable>
@@ -259,21 +270,23 @@ function BroadcastCard({
   );
 }
 
-function audienceLabel(rule: BroadcastRule): string {
+function audienceLabel(
+  rule: BroadcastRule,
+  friendTypes: FriendType[],
+  friends: Friend[],
+): string {
   if (rule.audience === 'everyone') return 'Everyone';
   if (rule.targets.length === 0) {
     return rule.audience === 'types' ? 'No types selected' : 'No friends selected';
   }
   if (rule.audience === 'types') {
-    const labels = rule.targets
-      .map((id) => MOCK_FRIEND_TYPES.find((t) => t.id === id)?.label ?? id)
+    return rule.targets
+      .map((id) => friendTypes.find((t) => t.id === id)?.label ?? id)
       .join(', ');
-    return labels;
   }
-  const labels = rule.targets
-    .map((id) => MOCK_FRIENDS.find((f) => f.id === id)?.name ?? id)
+  return rule.targets
+    .map((id) => friends.find((f) => f.id === id)?.name ?? id)
     .join(', ');
-  return labels;
 }
 
 const cardStyles = StyleSheet.create({

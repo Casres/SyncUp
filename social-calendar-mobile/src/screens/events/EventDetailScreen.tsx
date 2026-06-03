@@ -39,8 +39,7 @@ import {
   TOAST_POSITION_DEFAULTS,
 } from '../../components';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
-import { useEvent, useSubmitRSVP } from '../../api';
-import { MOCK_USERS_BY_ID } from '../../mocks';
+import { useEvent, useFriendProfile, useSubmitRSVP } from '../../api';
 import type { EventDetailScreenProps } from '../../navigation/types';
 import type { RSVPStatus } from '../../../../TYPES';
 
@@ -61,6 +60,9 @@ export default function EventDetailScreen({
   const { eventId } = route.params;
 
   const { data: event, isLoading, error, refetch } = useEvent(eventId);
+  // Host display name — resolved from /users/:id. `enabled` guards the empty
+  // id during the event's own load.
+  const { data: host } = useFriendProfile(event?.hostId ?? '');
   const submitRSVP = useSubmitRSVP();
 
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -97,7 +99,6 @@ export default function EventDetailScreen({
   const visibleAttendees = attendees.slice(0, ATTENDEE_COLLAPSE_THRESHOLD);
   const overflow = Math.max(0, attendees.length - ATTENDEE_COLLAPSE_THRESHOLD);
 
-  const host = MOCK_USERS_BY_ID[event.hostId];
   const myStatus = myRsvp ? RSVP_LABEL[myRsvp] : null;
 
   const handleRSVP = (next: 'yes' | 'maybe' | 'no'): void => {
@@ -204,18 +205,15 @@ export default function EventDetailScreen({
         >
           <Overline T={T} color="ink2">{`GOING · ${attendees.length}`}</Overline>
           <View style={styles.attendeeGrid}>
-            {visibleAttendees.map(([userId]) => {
-              const user = MOCK_USERS_BY_ID[userId];
-              return (
-                <RingAvatar
-                  key={userId}
-                  T={T}
-                  letter={user?.letter ?? userId[0]?.toUpperCase() ?? '?'}
-                  status="free"
-                  size={36}
-                />
-              );
-            })}
+            {visibleAttendees.map(([userId]) => (
+              <RingAvatar
+                key={userId}
+                T={T}
+                letter={userId[0]?.toUpperCase() ?? '?'}
+                status="free"
+                size={36}
+              />
+            ))}
             {overflow > 0 ? (
               <View style={[styles.overflow, { backgroundColor: T.bgSunken, borderColor: T.hair }]}>
                 <Text style={[typography.caption, { color: T.ink2, fontWeight: '700' }]}>
