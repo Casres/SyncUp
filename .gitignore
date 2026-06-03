@@ -32,6 +32,12 @@ npm-debug.log*
 # TypeScript
 *.tsbuildinfo
 
+# Terraform — machine-generated provider cache + state (state holds secrets).
+# The .terraform.lock.hcl IS committed (dependency lock, meant for VCS).
+**/.terraform/
+*.tfstate
+*.tfstate.*
+
 # Claude Code / Cowork — machine-specific local settings (allowlists, etc.)
 .claude/settings.local.json
 **/.claude/settings.local.json

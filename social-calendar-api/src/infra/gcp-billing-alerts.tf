@@ -21,6 +21,17 @@ terraform {
   }
 }
 
+# The billingbudgets API requires a "quota project" on every request. Without
+# this, Terraform routes the call through the gcloud SDK's default client
+# project (which you can't enable APIs on) and the apply fails with a 403
+# SERVICE_DISABLED. user_project_override + billing_project send the
+# X-Goog-User-Project header so the call is billed/quota'd against the SyncUp
+# project, where billingbudgets.googleapis.com is enabled.
+provider "google" {
+  user_project_override = true
+  billing_project       = var.project_id
+}
+
 variable "billing_account_id" {
   description = "GCP billing account ID hosting the Places API key"
   type        = string
