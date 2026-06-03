@@ -11,8 +11,8 @@
  * Hard Rule 8 (Friend Type is PRIVATE), Hard Rule 11 (PrivateBadge sparingly:
  * the screen title states privacy, so per-row badges omitted).
  *
- * Data: purely local — read from MOCK_FRIEND_TYPES; create/delete actions are
- * local-state stubs.
+ * Data: read from useFriendTypes() (GET /friend-groups). Create/delete actions
+ * wire through useCreateFriendType / useDeleteFriendType mutations.
  *
  * Haptics: type assigned/created → medium; deletion arm → heavy + commit
  * success — fired internally by TwoTapDestructive.
@@ -29,9 +29,12 @@ import {
   TwoTapDestructive,
 } from '../../components';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
-import { MOCK_FRIEND_TYPES } from '../../mocks';
+import {
+  useCreateFriendType,
+  useDeleteFriendType,
+  useFriendTypes,
+} from '../../api';
 import type { FriendTypesManagerScreenProps } from '../../navigation/types';
-import type { FriendType } from '../../../../TYPES';
 
 export default function FriendTypesManagerScreen({
   navigation,
@@ -39,22 +42,20 @@ export default function FriendTypesManagerScreen({
   const T = colors.light;
   const fire = useHaptic();
 
-  const [types, setTypes] = useState<FriendType[]>(MOCK_FRIEND_TYPES);
+  const { data: types = [] } = useFriendTypes();
+  const createType = useCreateFriendType();
+  const deleteType = useDeleteFriendType();
   const [newLabel, setNewLabel] = useState<string>('');
 
   const handleCreate = (): void => {
     const label = newLabel.trim();
     if (!label) return;
     fire('medium');
-    setTypes((prev) => [
-      ...prev,
-      { id: `ft-${Date.now()}`, label, members: [] },
-    ]);
-    setNewLabel('');
+    createType.mutate(label, { onSuccess: () => setNewLabel('') });
   };
 
   const handleDelete = (typeId: string): void => {
-    setTypes((prev) => prev.filter((t) => t.id !== typeId));
+    deleteType.mutate(typeId);
   };
 
   return (

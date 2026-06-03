@@ -60,11 +60,12 @@ import {
   useBlockUser,
   useEvents,
   useFriendAvailability,
+  useFriendLabels,
   useFriendProfile,
   useFriends,
+  useFriendTypes,
   useRemoveFriend,
 } from '../../api';
-import { MOCK_FRIEND_LABELS, MOCK_FRIEND_TYPES } from '../../mocks';
 import type { FriendProfileScreenProps } from '../../navigation/types';
 import type { AvailState, Event } from '../../../../TYPES';
 
@@ -85,6 +86,8 @@ export default function FriendProfileScreen({
   const { data: friends } = useFriends();
   const { data: friendAvail, error: availError } = useFriendAvailability(friendId);
   const { data: events } = useEvents();
+  const { data: friendTypes = [] } = useFriendTypes();
+  const { data: friendLabels = [] } = useFriendLabels();
 
   // ── R16-7 / R16-8 mutations ────────────────────────────────────────────────
   const removeFriend = useRemoveFriend();
@@ -98,9 +101,9 @@ export default function FriendProfileScreen({
   const friend = friends?.find((f) => f.id === friendId);
   const labelLookup = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const c of MOCK_FRIEND_LABELS) m[c.id] = c.label;
+    for (const c of friendLabels) m[c.id] = c.label;
     return m;
-  }, []);
+  }, [friendLabels]);
 
   const todayState = useMemo<AvailState | null>(() => {
     if (!friendAvail) return null;
@@ -215,7 +218,7 @@ export default function FriendProfileScreen({
     );
   }
 
-  const friendTypes = MOCK_FRIEND_TYPES.filter((t) => t.members.includes(friendId));
+  const friendTypesForFriend = friendTypes.filter((t) => t.members.includes(friendId));
   const friendFirstName = profile.name.split(' ')[0] ?? profile.name;
 
   return (
@@ -268,11 +271,11 @@ export default function FriendProfileScreen({
         </View>
 
         {/* Friend types (private to me) */}
-        {friendTypes.length > 0 ? (
+        {friendTypesForFriend.length > 0 ? (
           <View style={styles.section}>
             <Overline T={T} color="ink2">FRIEND TYPES</Overline>
             <View style={styles.chipsRow}>
-              {friendTypes.map((t) => (
+              {friendTypesForFriend.map((t) => (
                 <View
                   key={t.id}
                   style={[

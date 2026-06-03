@@ -36,8 +36,7 @@ import {
   LoadingOverlay,
 } from '../../components';
 import { colors, spacing } from '../../theme';
-import { useFriends } from '../../api';
-import { MOCK_FRIEND_LABELS, MOCK_FRIEND_TYPES } from '../../mocks';
+import { useFriendLabels, useFriends, useFriendTypes } from '../../api';
 import type { AudiencePickerSheetScreenProps } from '../../navigation/types';
 
 export default function AudiencePickerSheetScreen({
@@ -49,12 +48,14 @@ export default function AudiencePickerSheetScreen({
   const [selected, setSelected] = useState<string[]>(initialSelected);
 
   const { data: friends, isLoading } = useFriends();
+  const { data: friendTypes = [] } = useFriendTypes();
+  const { data: friendLabels = [] } = useFriendLabels();
 
   const labelLookup = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const c of MOCK_FRIEND_LABELS) m[c.id] = c.label;
+    for (const c of friendLabels) m[c.id] = c.label;
     return m;
-  }, []);
+  }, [friendLabels]);
 
   const handleDone = (): void => {
     onConfirm(selected);
@@ -65,7 +66,7 @@ export default function AudiencePickerSheetScreen({
   // sheet itself (inline empty state + disabled Done). Only mode='types'
   // with zero types gets its own screen-level empty state, since types
   // empty is not covered by R13-4.
-  const typesEmpty = mode === 'types' && MOCK_FRIEND_TYPES.length === 0;
+  const typesEmpty = mode === 'types' && friendTypes.length === 0;
 
   return (
     <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
@@ -101,7 +102,7 @@ export default function AudiencePickerSheetScreen({
             onClose={() => navigation.goBack()}
             onDone={handleDone}
             friends={mode === 'friends' ? friends ?? [] : undefined}
-            types={mode === 'types' ? MOCK_FRIEND_TYPES : undefined}
+            types={mode === 'types' ? friendTypes : undefined}
             resolveCategoryLabel={(id) => labelLookup[id] ?? id}
           />
         </View>

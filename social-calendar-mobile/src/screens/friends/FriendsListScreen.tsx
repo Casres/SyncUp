@@ -34,9 +34,14 @@ import {
   type FilterChip,
 } from '../../components';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
-import { useFriendRequests, useFriends, useRespondToFriendRequest } from '../../api';
-import { MOCK_FRIEND_LABELS, MOCK_FRIEND_TYPES } from '../../mocks';
-import { ContactsDeniedAffordance } from '../../components/social/ContactsDeniedAffordance';
+import {
+  useFriendLabels,
+  useFriendRequests,
+  useFriends,
+  useFriendTypes,
+  useRespondToFriendRequest,
+} from '../../api';
+import { ContactsDeniedAffordance } from '../../components/foundation/ContactsDeniedAffordance';
 import { useIsFirstRun } from '../auth/onboarding/useIsFirstRun';
 import { useContactsPermissionStatus } from '../auth/onboarding/useContactsPermissionStatus';
 import type { FriendsListScreenProps } from '../../navigation/types';
@@ -61,6 +66,8 @@ export default function FriendsListScreen({
 
   const { data: friends, isLoading, error, refetch } = useFriends();
   const { data: requests } = useFriendRequests();
+  const { data: friendTypes = [] } = useFriendTypes();
+  const { data: friendLabels = [] } = useFriendLabels();
   const respond = useRespondToFriendRequest();
 
   const visibleFriends = useMemo(
@@ -70,15 +77,19 @@ export default function FriendsListScreen({
 
   const typeChips: FilterChip[] = useMemo(
     () =>
-      MOCK_FRIEND_TYPES.map((t) => ({
+      friendTypes.map((t) => ({
         id: t.id,
         label: t.label,
         count: t.members.length,
       })),
-    []
+    [friendTypes]
   );
 
-  const labelLookup = useMemo(() => buildLabelLookup(), []);
+  const labelLookup = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of friendLabels) map[c.id] = c.label;
+    return map;
+  }, [friendLabels]);
 
   if (isLoading) {
     return (
@@ -259,12 +270,6 @@ function filterFriends(
     list = list.filter((f) => f.friendTypes.some((t) => set.has(t)));
   }
   return list;
-}
-
-function buildLabelLookup(): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (const c of MOCK_FRIEND_LABELS) map[c.id] = c.label;
-  return map;
 }
 
 const styles = StyleSheet.create({

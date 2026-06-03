@@ -18,7 +18,7 @@
 | `src/screens/auth/FriendFindMatchesScreen.tsx` | R15-10: contacts matches list with Add/Sent pills |
 | `src/screens/auth/FriendFindNoWorriesScreen.tsx` | R15-10: unified denial/skip destination |
 | `src/screens/auth/YoureInScreen.tsx` | R15-12: last pre-app beat with flow-fade-up animation |
-| `src/components/social/ContactsDeniedAffordance.tsx` | R15-11: deep-link-to-Settings nudge in Friends tab |
+| `src/components/foundation/ContactsDeniedAffordance.tsx` | R15-11: deep-link-to-Settings nudge in Friends tab |
 
 ---
 

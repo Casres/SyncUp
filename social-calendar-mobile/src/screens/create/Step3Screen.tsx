@@ -53,9 +53,9 @@ import {
   useApiFetch,
   useCreateEvent,
   useFriends,
+  useFriendTypes,
   useMyAvailability,
 } from '../../api';
-import { MOCK_FRIEND_TYPES } from '../../mocks';
 import type { Step3ScreenProps } from '../../navigation/types';
 import type {
   AvailState,
@@ -78,6 +78,7 @@ export default function Step3Screen({ navigation }: Step3ScreenProps): React.JSX
 
   const { data: friends, isLoading: friendsLoading, error: friendsError, refetch } = useFriends();
   const { data: myAvail } = useMyAvailability();
+  const { data: friendTypes = [] } = useFriendTypes();
   const createEvent = useCreateEvent();
   const authedFetch = useApiFetch();
 
@@ -129,12 +130,12 @@ export default function Step3Screen({ navigation }: Step3ScreenProps): React.JSX
 
   const typeChips: FilterChip[] = useMemo(
     () =>
-      MOCK_FRIEND_TYPES.map((t) => ({
+      friendTypes.map((t) => ({
         id: t.id,
         label: t.label,
         count: t.members.length,
       })),
-    []
+    [friendTypes]
   );
 
   const invitedCount = draft.inviteeIds.length;
