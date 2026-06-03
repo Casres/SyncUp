@@ -56,7 +56,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Socket.io Layer | 14 socket events across presence/events/friends/groups/availability |
 | EXPLORE Gateway (Phase A) | `/explore/*` routes + Eventbrite + Google Places clients, behind auth |
 | EXPLORE Cache + Rate-Limit (Phase B) | DONE — modular `exploreCache.ts`, `X-RateLimit-*` headers, burst budget, configurable TTL |
-| EXPLORE Cron + Billing (Phase C) | DONE — `node-cron` pre-warmer (6 cities, 2h), GCP billing alerts terraform written |
+| EXPLORE Cron + Billing (Phase C) | DONE — `node-cron` pre-warmer (6 cities, 2h); GCP billing alerts terraform written AND APPLIED 2026-06-03 (3 budgets live on billing acct `016726-8F7807-EEE435`) |
 | Notifications Domain | DONE 2026-06-02 — full 4-file stack mounted at `/notifications`, socket layer at `src/sockets/notifications.socket.ts`, dispatch routes cross-user INSERTs through migration-owner client to bypass RLS, 5 REST endpoints + `notif:new`/`notif:dismissed` events |
 | Availability Domain | DONE 2026-06-02 — full 4-file stack mounted at `/availability`, friend-availability gate requires accepted friendship (no longer privacy-leaks), broadcasts CRUD, socket wired |
 | Invites endpoints | DONE 2026-06-02 — folded into Events domain (POST/PATCH/DELETE under `/events/:id/invites`), invitee event-visibility RLS fix landed |
@@ -68,7 +68,7 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 
 | Domain | Status | Prompt |
 |---|---|---|
-| GCP billing alerts apply | Terraform + runbook ready (`GCP_BILLING_ALERTS_RUNBOOK.md`); awaits user `terraform apply` with GCP creds | — |
+| GCP billing alerts apply | ✅ DONE 2026-06-03 — full GCP provisioning completed end-to-end: created project `syncup-prod-8412`, opened billing acct `016726-8F7807-EEE435` ($10 prepay, after a card decline), linked, enabled Places API (New) + billingbudgets API, created Places-restricted API key wired into Railway as `GOOGLE_PLACES_API_KEY`, then `terraform apply` → 3 notify-only budgets ($25/$50/$100) live. Required adding a `provider "google"` block with `user_project_override=true` + `billing_project=var.project_id` to fix a 403 quota-project routing error. | `APPLY-QUICKSTART.md` |
 
 ### Frontend — Done ✅
 

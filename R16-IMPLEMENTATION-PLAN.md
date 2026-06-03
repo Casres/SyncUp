@@ -285,7 +285,7 @@ Each step type-checks independently. Hold the AttendeesSheet update until QuickP
 
 5. **`onClose` ergonomics with two stacked sheets.** AttendeesSheet's existing `onClose` for QuickProfileSheet currently does `setQuickProfileTargetId(null)`. With stacking, dismissing the primary sheet should also clear the nested id. The cleanup is explicit in the §3a snippet — make sure both `setX(null)` calls happen.
 
-6. **R16-9 stub expiry clause** ("NEVER ship a 'Coming soon' toast for more than one major round"). Not enforced by code; track via a calendar reminder or a DESIGN-BACKLOG entry.
+6. **R16-9 stub expiry clause** ("NEVER ship a 'Coming soon' toast for more than one major round"). Not enforced by code; track via a calendar reminder or a DESIGN-BACKLOG entry. **RESOLVED 2026-06-02:** both DM and Report stubs intentionally KEPT this round (DM has no backend domain → separate scoped task; Report is a retained safety affordance). Clock consciously extended to the next major round. Recorded in CLAUDE.md R16 stub-decision note + PROJECT_TRACKER Step 5 + GAP-PROGRESS Friend Profile note.
 
 ---
 
