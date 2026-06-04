@@ -1,0 +1,295 @@
+# SyncUp — Design System Anchor Document · Round 17 Extension (Messaging)
+# Working copy. Merges into ANCHOR-DESIGN.txt under the HARD RULES section.
+# Updated: 2026-06-03
+# Round 17 specs the full SyncUp messaging system: 1:1 DM, group chat
+# (linked to FriendGroups), and event chat (linked to Events). All three
+# conversation types are designed together so the R18 data model can
+# accommodate every type from day one. DESIGN-ONLY round — no code.
+================================================================
+## HARD RULES — Round 17 additions (Messaging · DM / Group / Event chat)
+================================================================
+R17-1. MESSAGES IS THE THIRD SEGMENT OF THE FRIENDS TAB. The inbox
+       lives inside FriendsListScreen as the third option in the
+       existing SegmentedSwitcher (SCREENS.md → Friends List). The
+       switcher is now 3-way: Friends · Groups · Messages, in that
+       fixed left-to-right order. It is a carousel that wraps in BOTH
+       directions:
+         · Messages · swipe right → Friends.
+         · Friends · swipe left → Messages.
+       Selecting Messages renders the inbox list in place of the
+         friend-row body; the FlowHeader and floating "+" / Scan FAB
+         behavior are unchanged for the Friends/Groups segments.
+       The inbox is NOT a tab, NOT a route, NOT a standalone screen —
+         it is a segment view inside FriendsList (route: `FriendsList`).
+       NEVER add a fifth bottom-tab for messages. NEVER reorder the
+         SegmentedSwitcher (Friends · Groups · Messages is locked).
+         NEVER break the both-directions carousel wrap.
+
+R17-2. INBOX ROW ANATOMY IS FIXED. Each conversation row in the
+       Messages segment renders, left-to-right:
+         · Avatar (circular · type-specific per R17-3) · leading.
+         · Conversation name · bodyMed ink · top line · 1-line clamp
+           (R5-6).
+         · Last-message preview · caption ink2 · bottom line · 1-line
+           truncated (R5-6).
+         · Timestamp · caption ink3 · top-right.
+         · Unread badge · trailing, when the conversation has unread
+           messages.
+       Rows are sorted by last-message recency (lastMessageAt, newest
+         first; see R17-13 data model). Archived conversations are
+         excluded from the inbox entirely (R17-7).
+       Tap row → opens the thread for that conversation per the
+         routing in R17-11. Row-tap haptic is `light` (consistent
+         with FriendsList row tap · SCREENS.md).
+       NEVER render a non-circular avatar in the inbox. NEVER show
+         more than one line of preview text.
+
+R17-3. INBOX AND HEADER AVATARS ARE CIRCULAR AND TYPE-SPECIFIC. All
+       three conversation types render a circular avatar; the content
+       differs by type and is identical between the inbox row (R17-2)
+       and the thread header (R17-4):
+         · 1:1 DM → the friend's circular profile photo.
+         · Group chat → a CLUSTER of up to 5 overlapping circular
+           member avatars. The icon count matches the real member
+           count up to a cap of 5 (2 members → 2 avatars; 6+ members →
+           5 avatars). The cluster does NOT render a "+N" overflow
+           count — it caps silently at 5.
+         · Event chat → the event photo, circular crop.
+       NEVER render a square or rounded-rect avatar in messaging
+         surfaces. NEVER show a participant count anywhere on the
+         cluster (counts live on the group/event page per R17-4).
+
+R17-4. THREAD HEADER IS PER-TYPE AND OMITS PARTICIPANT COUNT. Each
+       thread is a routed screen whose header renders, by type:
+         · 1:1 DM → friend's name + circular profile photo.
+         · Group chat → group name + cluster avatar (same cluster as
+           the inbox row · R17-3).
+         · Event chat → event name + event photo (circular crop).
+       The header NEVER shows a participant/member count — that
+         information lives on the event page (EventDetail) or the
+         group page (GroupDetail), not in the thread. The header
+         carries a back affordance returning to the caller per the
+         nav graph (R17-12).
+       NEVER surface participant counts, member lists, or roster
+         management in the thread header in this round.
+
+R17-5. MESSAGE BUBBLES ARE SIDE-AND-COLOR CODED; SENDER LABELS ARE
+       GROUP/EVENT ONLY. Within a thread's message list:
+         · SENT messages (authored by the current user) → right-
+           aligned · accent color fill.
+         · RECEIVED messages → left-aligned · bgElevated fill.
+       Sender label rule:
+         · Group chat + event chat → the sender's NAME appears ABOVE
+           the bubble, left-aligned, next to their avatar, on
+           received messages.
+         · 1:1 DM → the sender label is OMITTED entirely (the header
+           already names the single counterpart).
+       Use design tokens for both fills (accent, bgElevated) — never
+         hardcode hex (Hard Rule · src/theme/colors.ts).
+       NEVER show a sender label on a 1:1 thread. NEVER show a sender
+         label on the current user's own sent bubbles.
+
+R17-6. TIMESTAMPS ARE GAP-GATED AND DATE-AWARE. A timestamp renders
+       in the message list:
+         · On the FIRST message of a conversation, and
+         · After any gap of 5 OR MORE minutes between consecutive
+           messages.
+       Format:
+         · Today → clock time only: "3:42 PM".
+         · Older than today → date + time: "Jun 1 · 3:42 PM".
+       Timestamps that do not meet the gap rule are NOT rendered —
+         consecutive messages within 5 minutes share the most recent
+         visible timestamp above them.
+       NEVER render a per-message timestamp on every bubble. NEVER use
+         the older-format ("Jun 1 · …") for messages sent today.
+
+R17-7. TYPING INDICATOR IS A RECEIVED-STYLE BUBBLE. While a remote
+       participant is typing (driven by `chat:typing:start` /
+       `chat:typing:stop` · R17-13), the thread renders three animated
+       dots styled as a RECEIVED bubble at the bottom of the message
+       list:
+         · Left-aligned · bgElevated fill (same as a received bubble
+           per R17-5).
+         · Sender label follows the received-bubble rule exactly —
+           name + avatar above the dots for group/event chats, omitted
+           for 1:1.
+       The indicator is loading-state-adjacent but is NOT a spinner —
+         it is the canonical three-dot typing animation and is the one
+         permitted exception to "spinner only" for this affordance.
+       NEVER show read receipts alongside the typing indicator in V1
+         (R17-14). NEVER render the typing bubble for the current
+         user's own typing.
+
+R17-8. INPUT BAR IS TEXT-ONLY WITH A HIDE-WHEN-EMPTY SEND ICON. The
+       thread input bar renders a single-line-growing text field plus
+       a paper-plane / arrow SEND icon:
+         · The send icon is HIDDEN COMPLETELY when the input is empty;
+           it appears only once the field contains text.
+         · Messages are text only. Native emoji via the device
+           keyboard are allowed. There is NO media attachment, NO file
+           picker, NO reactions affordance (R17-15).
+       NEVER render a disabled/greyed send icon on an empty field —
+         it is hidden, not disabled. NEVER add a media, camera, file,
+         or reaction button to the input bar in this round.
+
+R17-9. 1:1 DM CONVERSATIONS ARE CREATED ON FIRST MESSAGE SENT. A DM
+       conversation does NOT exist until the first message is actually
+       sent. Tapping a DM entry point opens the thread surface, but no
+       Conversation row is persisted (and none appears in the inbox)
+       until that first message lands. Entry points are exactly two:
+         · Friend Profile "DM" button (R16-5) — its R16-9 stub is now
+           SUPERSEDED by this round: the button opens a real DM thread
+           instead of firing the "coming soon" toast.
+         · Long-press a friend row in FriendsListScreen → context menu
+           with EXACTLY two options, in this order: "Message" +
+           "View Profile". "Message" opens the DM thread; "View
+           Profile" pushes FriendProfile (R16-2).
+       Get-or-create resolution routes through
+         `POST /conversations/direct/:friendId` (R17-13) so a second
+         entry to an existing DM reuses the same conversation.
+       NEVER create an empty DM conversation on DM-button tap or on
+         long-press "Message" tap. NEVER add a third option to the
+         friend-row long-press menu in this round.
+
+R17-10. GROUP CHATS ARE AUTO-CREATED WITH THE GROUP; EVENT CHATS ARE
+       HOST-ENABLED. The two non-DM conversation types differ in
+       lifecycle:
+         · GROUP CHAT → auto-created at the moment a FriendGroup is
+           created (`POST /groups/:groupId/chat`, auto-called on group
+           creation · R17-13). ALL group members are participants from
+           the start. When a new member joins the group later, they
+           are added to the chat automatically.
+         · EVENT CHAT → does NOT exist until the host manually enables
+           it from the event surface (`POST /events/:id/chat` ·
+           R17-13). Once enabled, participants = ALL invitees.
+       Event chat lifecycle:
+         · ONE-TIME event → the chat ARCHIVES 48 hours after the
+           event's end time (the "thank you / recap" window). Archived
+           conversations are excluded from the inbox (R17-2).
+         · RECURRING event → NEVER archives; stays active indefinitely.
+       NEVER auto-enable an event chat — it is always an explicit host
+         action. NEVER archive a recurring-event chat. NEVER archive a
+         group or DM conversation in this round (archiving is EVENT-only
+         · R17-13 data model).
+
+R17-11. NOTIFICATION CARDS FOR MESSAGES ROUTE STRAIGHT TO THE THREAD.
+       A new-message notification renders as a card in the NotifSheet
+       with type-specific anatomy:
+         · Avatar · type-specific per the inbox rules (R17-3).
+         · Conversation name.
+         · Message preview · 1-line.
+         · Timestamp.
+       Tap behavior follows the navigating-card convention (per R12-1):
+       the tapped card fires a `medium` haptic and routes DIRECTLY to
+       the thread while the NotifSheet executes its dismiss transition
+       CONCURRENT with the thread mounting (the sheet does not remain
+       open behind the thread; back from the thread returns to the
+       activated tab's top-of-stack, not to the sheet). Per-type
+       routing:
+         · DM card → Friends tab activates → Messages segment → DM
+           thread.
+         · Group chat card → Friends tab activates → Messages segment →
+           group thread.
+         · Event chat card → Home tab activates → event thread.
+       NEVER open the inbox segment as an intermediate stop before the
+         thread — the tap lands on the thread directly. NEVER leave the
+         NotifSheet open behind the thread (R12-1).
+
+R17-12. NAV GRAPH — MESSAGING THREADS LIVE IN TWO STACKS. Threads are
+       routed screens, placed to match each conversation type's home
+       surface and consistent with NAVIGATION.md:
+         · DM threads and GROUP threads live in the FriendsStack,
+           reached from the Messages segment of FriendsList (R17-1) and
+           from message notification cards (R17-11). Suggested route:
+           `MessageThread` with params
+           { conversationId: string; type: 'DIRECT' | 'GROUP' }.
+         · EVENT threads live in the HomeStack, reached from the event
+           surface (EventDetail) and from event-chat notification cards
+           (R17-11). Suggested route: `EventChat` with params
+           { conversationId: string; eventId: string }.
+       Transition is a step push (240ms easeStd) within the owning
+         stack; cross-stack arrivals from a notification card switch
+         the tab first, then push (per R12-1 / NAVIGATION.md cross-
+         stack pattern). Back from a thread returns to that stack's
+         prior top-of-stack (the Messages segment for DM/group; the
+         event surface for event chat) — NEVER back to the NotifSheet.
+       Exact route names and param shapes are NON-NORMATIVE here and
+         finalize in R18; the placement (FriendsStack for DM/group,
+         HomeStack for event) IS normative.
+       NEVER place an event thread in the FriendsStack. NEVER place a
+         DM or group thread in the HomeStack.
+
+R17-13. DATA MODEL AND TRANSPORT (NON-NORMATIVE · GUIDES R18 BUILD).
+       The following is NOT a UI hard rule. It records the conversation
+       schema, real-time transport, and REST surface so R18 agents
+       build against one shape. Treat names/shapes as a guide, not a
+       locked contract — finalize during R18.
+
+       Conversation
+         id
+         type: DIRECT | GROUP | EVENT
+         linkedGroupId?      (GROUP only)
+         linkedEventId?      (EVENT only)
+         createdAt
+         lastMessageAt       (inbox sort key · R17-2)
+         archivedAt?         (EVENT only — set 48h after event.endsAt
+                              for one-time events · R17-10)
+
+       Message
+         id
+         conversationId
+         senderId
+         content: string
+         sentAt
+
+       ConversationParticipant
+         conversationId
+         userId
+         joinedAt
+         lastReadMessageId?  (nullable — reserved for future read
+                              receipts · R17-14)
+
+       Socket.io events:
+         · chat:message:new
+         · chat:typing:start
+         · chat:typing:stop
+         · chat:conversation:new   (notify a participant when they are
+                                    added to a new conversation)
+
+       REST endpoints:
+         · GET  /conversations               inbox (sorted by
+                                              lastMessageAt; excludes
+                                              archived)
+         · GET  /conversations/:id/messages  paginated thread
+         · POST /conversations/direct/:friendId
+                                              get-or-create 1:1 (R17-9)
+         · POST /conversations/:id/messages  send a message
+         · POST /events/:id/chat             host enables event chat
+                                              (R17-10)
+         · POST /groups/:groupId/chat        auto-called on group
+                                              creation (R17-10)
+
+R17-14. READ RECEIPTS ARE EXPLICITLY DEFERRED TO V2. V1 messaging ships
+       with NO read-receipt UI. The schema reserves a hook for it
+       (`ConversationParticipant.lastReadMessageId`, nullable · R17-13)
+       but nothing renders a read/seen state in the inbox, thread, or
+       notification card in this round.
+       NEVER render a "Seen", "Read", or delivery-state indicator on
+         any messaging surface in V1.
+
+R17-15. R17 / V1 MESSAGING SCOPE BOUNDARIES. The following are
+       explicitly OUT OF SCOPE for this round and must not be designed,
+       stubbed, or built until a future round specs them:
+         · Read receipts (V2 · R17-14).
+         · Media messages, file sharing, and message reactions (input
+           bar is text + native emoji only · R17-8).
+         · Message editing and message deletion.
+         · Group chat admin controls beyond auto-creation (no add/
+           remove participant, no rename-from-thread, no leave flow in
+           this round · R17-10).
+         · Event chat host moderation controls (no mute, kick, delete-
+           message, or close-early in V1 — enabling the chat is the
+           only host control · R17-10).
+       NEVER introduce any of the above affordances on a messaging
+         surface in R17/V1. When one is promoted, it supersedes the
+         relevant clause here in a future round.
