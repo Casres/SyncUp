@@ -114,3 +114,51 @@ Relevant code:
 The mobile mocks tombstone (`social-calendar-mobile/src/mocks/index.ts`) is intentionally kept in place — 17 consumers still import from it. See `BUILD-CHECKLIST.md` for the consumer table and the priority unblock (ship `useFriendTypes()` + `useFriendLabels()` React Query hooks to kill 6 consumers in one PR).
 
 **`prisma-augment.d.ts` removed (2026-06-02).** The temporary type shim is gone. It had invented bespoke row-type names (`NotificationModel` / `BroadcastSettingsModel` / `UserAvailabilityModel`) that the repos imported from `@prisma/client`; those were refactored to the real generated names (`Notification` / `BroadcastSettings` / `UserAvailability`) in `notifications.repository.ts`, `availability.repository.ts`, and `notifications.service.ts`. Consequence: **the generated Prisma client is now the only source of these types — run `npm run prisma:generate` (in `social-calendar-api`) after a fresh checkout or schema change before `tsc`/`npm run build`.** The Dockerfile already runs `npx prisma generate` (L33). Without a generated client you'll see `TS2305: Module '@prisma/client' has no exported member 'AvailState'` (and similar) — that's a missing generate, not a code regression.
+
+## Session of 2026-06-04 (R18 messaging build) — branch `r18-messaging-build`
+
+The messaging system (1:1 DM · group chat · event chat) is built end-to-end —
+backend + mobile code complete, both workspaces `tsc` green, `social-calendar-api`
+`npm run build` green. Committed + pushed on branch `r18-messaging-build` (NOT
+merged to `main`). Full status + the three deferred items live in `R18-PLAN.md`
+"Build notes". Do not regress these:
+
+1. **All messaging WRITES route through the migration-owner `prisma` client**
+   (`conversations.repository.ts` `…Owner` methods), NOT `prismaApp`. They are
+   cross-user by nature; routing them through the owner client bypasses RLS so
+   the INSERT…RETURNING never re-evaluates a SELECT policy — the snapshot bug
+   from `5f30e3a` / `20260601000002` cannot recur on the write path. App-client
+   READS are gated by inline-EXISTS SELECT policies.
+2. **`ConversationParticipant` SELECT is own-rows-only** (`userId =
+   current_app_user_id()`). A co-participant-visibility policy would query
+   `ConversationParticipant` from within its own policy → "infinite recursion in
+   policy". Co-participants are hydrated via the gated owner-client
+   `listParticipantsForConversationsOwner` after a service membership check.
+3. **Group chat auto-creates via `friendGroups.service`** (create → seed owner;
+   addMember → add participant). NO public group-chat route (D4). **Event chat**
+   is the deliberate host action `POST /events/:id/chat` (organiser-only).
+4. **Message notifications dispatch as `NotifType.GROUP_ACTIVITY`** (no dedicated
+   MESSAGE type) with a `conversationId`/`conversationType`/`linkedEventId`
+   routing hint in the payload; the mobile NotifSheet `group_activity` case
+   routes to the thread when `conversationId` is present (M4).
+
+Relevant code:
+- `social-calendar-api/src/{repositories,services,controllers,routes}/conversations.*`
+- `social-calendar-api/src/sockets/chat.socket.ts`, `src/workers/eventChatArchival.worker.ts`
+- `social-calendar-api/prisma/migrations/20260603000001_messaging/`
+- `social-calendar-mobile/src/api/conversations.{ts,types.ts}`
+- `social-calendar-mobile/src/components/messaging/*`, `src/screens/{friends/Messages*,events/EventChat}*`
+- `scripts/messaging-roundtrip.sh` — run after any change touching these domains (needs docker + Clerk creds; not yet run).
+- `social-calendar-mobile/src/realtime/*` — the realtime socket client (see follow-up (a)).
+
+**Deferred (open follow-ups):** (a) realtime socket CLIENT on mobile — ✅ BUILT
+2026-06-04 in `social-calendar-mobile/src/realtime/` (`socket.io-client`, first on
+mobile): `RealtimeProvider` (in `App.tsx`) owns the Clerk-bound socket + global
+`chat:message:new`/`chat:conversation:new` → React Query; `useChatRoom` does
+per-thread join/leave + the `chat:typing` relay feeding `ChatThreadView`'s
+`TypingDots`. Pushes update the RQ cache only; typing is local state. `tsc` green;
+NOT yet run against a live socket server (gated on the docker stack). (b) R17-1
+Friends·Groups·Messages top-level carousel — inbox ships as a reachable `Messages`
+route (FriendsList header pill), Groups still a hidden stack. (c) migrate-deploy +
+`messaging-roundtrip.sh` run. (d) DM + Report R16-9 stub clock: DM is now PROMOTED
+(real); Report stays a stub.

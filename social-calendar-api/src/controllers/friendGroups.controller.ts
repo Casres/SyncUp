@@ -63,6 +63,7 @@ export const friendGroupsController = {
       request.prismaTransaction,
       request.user.id,
       body.data.name,
+      request.server.io,
     );
     return reply.code(201).send(group);
   },
@@ -138,6 +139,7 @@ export const friendGroupsController = {
         params.data.id,
         request.user.id,
         body.data.userId,
+        request.server.io,
       );
       return reply.code(201).send(member);
     } catch (err) {

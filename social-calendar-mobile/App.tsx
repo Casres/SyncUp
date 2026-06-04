@@ -35,6 +35,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { navigationRef } from './src/navigation/navigationRef';
 import { queryClient } from './src/api/queryClient';
 import { tokenCache } from './src/auth/tokenCache';
+import { RealtimeProvider } from './src/realtime';
 
 const CLERK_PUBLISHABLE_KEY = process.env['EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY'];
 
@@ -50,10 +51,12 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
-            <NavigationContainer ref={navigationRef}>
-              <RootNavigator />
-              <StatusBar style="auto" />
-            </NavigationContainer>
+            <RealtimeProvider>
+              <NavigationContainer ref={navigationRef}>
+                <RootNavigator />
+                <StatusBar style="auto" />
+              </NavigationContainer>
+            </RealtimeProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

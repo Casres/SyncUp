@@ -252,6 +252,39 @@ export function NotifSheet({
     });
   }
 
+  // R18 M4 / R17-11: a message notification routes straight to the thread,
+  // sheet dismissing concurrently. DM/group → Friends tab → MessageThread;
+  // event → Home tab → EventChat. Medium haptic on tap.
+  function navMessage(
+    conversationId: string,
+    conversationType: string | null,
+    linkedEventId: string | null,
+  ) {
+    fire('medium');
+    navigateAfterDismiss(() => {
+      if (conversationType === 'EVENT' && linkedEventId) {
+        navigationRef.navigate('Tabs', {
+          screen: 'HomeTab',
+          params: {
+            screen: 'EventChat',
+            params: { conversationId, eventId: linkedEventId },
+          },
+        });
+        return;
+      }
+      navigationRef.navigate('Tabs', {
+        screen: 'FriendsTab',
+        params: {
+          screen: 'MessageThread',
+          params: {
+            conversationId,
+            type: conversationType === 'GROUP' ? 'GROUP' : 'DIRECT',
+          },
+        },
+      });
+    });
+  }
+
   // ────────────────────────────────────────────────────────────────────────
   // Phase B drag gesture (R13-1).
   // Velocity-first @ ≥0.7 px/ms; displacement fallback otherwise.
@@ -435,6 +468,7 @@ export function NotifSheet({
                     onNavGroup: navGroupDetail,
                     onNavFriend: navFriendProfile,
                     onNavCreate: navCreateEvent,
+                    onNavMessage: navMessage,
                   }),
                 ),
               ])}
@@ -456,6 +490,11 @@ interface RenderCtx {
   onNavGroup: (groupId: string) => void;
   onNavFriend: (friendId: string) => void;
   onNavCreate: (friendId: string, friendName: string) => void;
+  onNavMessage: (
+    conversationId: string,
+    conversationType: string | null,
+    linkedEventId: string | null,
+  ) => void;
 }
 
 function renderCard(n: Notif, c: RenderCtx): React.ReactNode {
@@ -511,18 +550,35 @@ function renderCard(n: Notif, c: RenderCtx): React.ReactNode {
           onDismiss={onDismiss}
         />
       );
-    case 'group_activity':
+    case 'group_activity': {
+      // R18 M4: message notifications are dispatched as GROUP_ACTIVITY but
+      // carry a `conversationId` (+ type / linkedEventId) routing hint. When
+      // present, route to the thread instead of group detail.
+      const msg = n as unknown as {
+        conversationId?: string;
+        conversationType?: string | null;
+        linkedEventId?: string | null;
+      };
       return (
         <GroupActivityCard
           key={n.id}
           T={c.T}
           notif={n as GroupActivityNotif}
-          onNavigate={(groupId, _switchSegment) => c.onNavGroup(groupId)}
+          onNavigate={(groupId, _switchSegment) =>
+            msg.conversationId
+              ? c.onNavMessage(
+                  msg.conversationId,
+                  msg.conversationType ?? null,
+                  msg.linkedEventId ?? null,
+                )
+              : c.onNavGroup(groupId)
+          }
           onRead={onRead}
           onMute={onMute}
           onDismiss={onDismiss}
         />
       );
+    }
     case 'inbound_broadcast':
       return (
         <InboundBroadcastCard

@@ -12,6 +12,7 @@
  *   - Groups:       src/routes/GROUPS_HANDOFF.md   (GroupResponse / PollResponse / SuggestionResponse / member shape)
  */
 import type {
+  ConversationType,
   EventExceptionType,
   EventOrganiserRole,
   FriendshipStatus,
@@ -224,6 +225,39 @@ export type NotifPayload = {
   createdAt: string;
 } & Record<string, unknown>;
 
+// ─── Messaging (R17 / R18) ───────────────────────────────────────────────────
+
+/** A single chat message in wire form (ISO timestamps). */
+export type MessageWire = {
+  id: string;
+  conversationId: string;
+  content: string;
+  sentAt: string;
+  sender: PublicProfile;
+};
+
+/**
+ * Header / inbox-row shape shared by every conversation kind. `title` is
+ * resolved per-type server-side (DM → other party's name, GROUP → group name,
+ * EVENT → event title). `participants` carries every member's public profile
+ * so the mobile client can render the type-specific avatar (R17-3).
+ */
+export type ConversationSummaryWire = {
+  id: string;
+  type: ConversationType;
+  title: string;
+  linkedGroupId: string | null;
+  linkedEventId: string | null;
+  participants: PublicProfile[];
+};
+
+/** Inbox row: a summary plus preview, sort key, and the viewer's unread count. */
+export type InboxItemWire = ConversationSummaryWire & {
+  lastMessage: MessageWire | null;
+  lastMessageAt: string;
+  unreadCount: number;
+};
+
 // ─── Server → Client ─────────────────────────────────────────────────────────
 
 export interface ServerToClientEvents {
@@ -283,6 +317,23 @@ export interface ServerToClientEvents {
   // they're scoped to a single user).
   'notif:new': (data: { notification: NotifPayload }) => void;
   'notif:dismissed': (data: { notificationId: string }) => void;
+
+  // Messaging (R17 / R18)
+  // `chat:message:new` → the `conversation:{id}` room (joined participants).
+  // `chat:conversation:new` → each new participant's `user:{id}` room; the
+  //   client invalidates its inbox query on receipt (R18 M1).
+  // `chat:typing` → the `conversation:{id}` room minus the typer; ephemeral,
+  //   never persisted (R17-7).
+  'chat:message:new': (data: {
+    conversationId: string;
+    message: MessageWire;
+  }) => void;
+  'chat:conversation:new': (data: { conversationId: string }) => void;
+  'chat:typing': (data: {
+    conversationId: string;
+    userId: string;
+    isTyping: boolean;
+  }) => void;
 }
 
 // ─── Client → Server ─────────────────────────────────────────────────────────
@@ -292,6 +343,15 @@ export interface ClientToServerEvents {
   'presence:leave': (data: { userId: string }) => void;
   'group:join': (data: { groupId: string }) => void;
   'group:leave': (data: { groupId: string }) => void;
+
+  // Messaging room membership + typing relay (R17-7 / R18 B5). The server
+  // validates participation before honouring `chat:join` (silent no-op
+  // otherwise — mirrors `group:join`). Typing events are relayed to the room
+  // minus the sender and never persisted.
+  'chat:join': (data: { conversationId: string }) => void;
+  'chat:leave': (data: { conversationId: string }) => void;
+  'chat:typing:start': (data: { conversationId: string }) => void;
+  'chat:typing:stop': (data: { conversationId: string }) => void;
 }
 
 // ─── Inter-server (multi-instance) ──────────────────────────────────────────

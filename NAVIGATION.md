@@ -4,6 +4,16 @@
 > Tab IA + Groups/Messages placement reconciled to the locked anchor (TAB BAR IA + R17) on 2026-06-03: Explore is a tab; Groups and Messages are segments of the Friends tab, not separate tabs.
 > Convention: React Navigation route names are PascalCase.
 > Token references map to `TOKENS.ts`. Type references map to `TYPES.ts`.
+>
+> **R18 build status (2026-06-04):** the messaging routes below are BUILT and
+> their names finalized per D2 — `MessageThread { conversationId, type }` and
+> `Messages` in `FriendsStack`; `EventChat { conversationId, eventId }` in
+> `HomeStack`. **Caveat:** the Friends·Groups·Messages carousel below is still
+> the *target* IA — the shipped FriendsList switcher is still All/BFFs/Pending,
+> Groups is still a separate (hidden) `GroupsStack`, and the Messages inbox is
+> reached via a `Messages` route (FriendsList header "Messages" pill), not yet a
+> segment. Folding GroupsStack + the inbox under one switcher is the open R18
+> follow-up (see R18-PLAN.md "Build notes").
 
 ---
 
@@ -33,7 +43,7 @@
 |-------|---------|-------|
 | Home | yes | Today / Week / Month views (TabPills inside screen) |
 | EventDetail | — | Pushed from Home feed item (or Group Detail Events tab) |
-| EventChat | — | Event chat thread (host-enabled), pushed from EventDetail or an event-chat notif card (R17-12; route name non-normative, finalizes in R18) |
+| EventChat | — | Event chat thread (host-enabled), pushed from EventDetail or an event-chat notif card (R17-12 / D2; **BUILT R18** in `HomeStack`) |
 
 ### CreateEventStack (modal, full-screen)
 
@@ -60,7 +70,7 @@ Hosts the Friends tab's three segments (Friends · Groups · Messages, R17-1) pl
 | CreateGroup | — | Pushed from the Groups-segment "+"; NO invite flow here (Hard Rule 10) |
 | GroupDetail | — | Pushed from a Groups-segment card. TabPills: Members / Events / Polls / Ideas |
 | CoverPickerSheet | — | Modal sheet within the group flow |
-| MessageThread | — | DM/group thread, pushed from the Messages segment or a message notif card (R17-12; route name non-normative, finalizes in R18) |
+| MessageThread | — | DM/group thread, pushed from the Messages segment or a message notif card (R17-12 / D2; **BUILT R18** in `FriendsStack`) |
 
 > `GroupsStack` no longer exists — Groups is a segment of the Friends tab and its screens live in `FriendsStack` (locked TAB BAR IA + R17-1).
 
@@ -89,7 +99,7 @@ type RootTabParamList = {
 type HomeStackParamList = {
   Home: undefined;
   EventDetail: { eventId: string };
-  EventChat: { conversationId: string; eventId: string }; // R17-12 (route name non-normative)
+  EventChat: { conversationId: string; eventId: string }; // R17-12 / D2 — BUILT R18
 };
 
 type CreateEventStackParamList = {

@@ -36,6 +36,12 @@ const API_BASE =
   // Expo env vars must be prefixed with EXPO_PUBLIC_ to be bundled.
   (process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:3000').replace(/\/$/, '');
 
+/**
+ * Origin the realtime socket connects to (socket.io appends its own
+ * `/socket.io/` path). Same host as the REST API — see `src/realtime/`.
+ */
+export const apiOrigin = API_BASE;
+
 /** Dev-only token for exercising the real backend before Clerk is wired up. */
 const DEV_TOKEN = process.env['EXPO_PUBLIC_DEV_TOKEN'] ?? '';
 

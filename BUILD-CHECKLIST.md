@@ -1,6 +1,36 @@
 # SyncUp — Build Checklist (Pre-Testing)
 
-Last updated: 2026-06-02 (Wave 5: events.ts + notifications.ts live paths wired)
+Last updated: 2026-06-04 (R18: messaging build — branch `r18-messaging-build`)
+
+---
+
+## Recently completed (2026-06-04 — R18: messaging build)
+
+Messaging (DM · group · event chat) shipped end-to-end. Both workspaces `tsc`
+green; `social-calendar-api` `npm run build` green. Branch `r18-messaging-build`
+pushed to `origin`.
+
+- [x] **Backend domain** — `Conversation`/`Message`/`ConversationParticipant`
+  models + `ConversationType` enum; migration `20260603000001_messaging`.
+  Repo/service/routes/controller at `/conversations` + `POST /events/:id/chat`.
+  Group chat auto-created via `friendGroups.service` (D4); event chat host-enabled.
+- [x] **RLS** — writes route through the migration-owner `prisma` client (bypass
+  RLS → INSERT…RETURNING never re-evaluates a SELECT policy, sidestepping the
+  `5f30e3a`-class bug); reads use inline-EXISTS; `ConversationParticipant` SELECT
+  own-rows-only with co-participant hydration via gated owner-client methods.
+- [x] **Realtime (server)** — `chat.socket.ts` (join/leave + typing relay);
+  emits `chat:message:new` / `chat:conversation:new` / `chat:typing`.
+- [x] **Archival worker** — `eventChatArchival.worker.ts` sets `archivedAt =
+  endsAt+48h` for one-time event chats; inbox is a plain `archivedAt IS NULL` filter.
+- [x] **Round-trip script** — `scripts/messaging-roundtrip.sh` (all 3 types,
+  participant-gating 403, non-organiser 403, unread counts, archived exclusion).
+- [x] **Mobile** — `conversations.ts`/`.types.ts` hooks; `components/messaging/*`
+  + `EmptyMessages`; MessagesScreen/MessageThreadScreen/EventChatScreen + nav.
+  DM promoted from R16-9 stub → real (R17-9). NotifSheet M4 routing.
+- [ ] **PENDING — migrate-deploy + run `scripts/messaging-roundtrip.sh`** (needs
+  `docker compose up` + Clerk creds). `npx prisma generate` already run locally.
+- [ ] **PENDING — realtime socket client on mobile** (none exists for any domain).
+- [ ] **PENDING — R17-1 Friends·Groups·Messages carousel consolidation.**
 
 ---
 

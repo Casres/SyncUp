@@ -101,6 +101,15 @@ enum BroadcastAudienceMode {
   TYPES
 }
 
+// Messaging conversation kind (R17 / R18). DIRECT = 1:1 DM, GROUP =
+// linked to a FriendGroup, EVENT = linked to an Event (host-enabled).
+// Mirrors `ConversationType` on the mobile side.
+enum ConversationType {
+  DIRECT
+  GROUP
+  EVENT
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model User {
@@ -120,14 +129,14 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  friendshipsInitiated Friendship[]        @relation("FriendshipInitiator")
-  friendshipsReceived  Friendship[]        @relation("FriendshipReceiver")
+  friendshipsInitiated Friendship[]              @relation("FriendshipInitiator")
+  friendshipsReceived  Friendship[]              @relation("FriendshipReceiver")
   friendshipLabels     FriendshipLabel[]
-  availabilityBlocks   AvailabilityBlock[] @relation("AvailabilityBlocker")
-  blockedByUsers       AvailabilityBlock[] @relation("AvailabilityBlocked")
+  availabilityBlocks   AvailabilityBlock[]       @relation("AvailabilityBlocker")
+  blockedByUsers       AvailabilityBlock[]       @relation("AvailabilityBlocked")
   friendGroupsOwned    FriendGroup[]
   socialGroups         SocialGroupMember[]
-  socialGroupsCreated  SocialGroup[]       @relation("SocialGroupCreator")
+  socialGroupsCreated  SocialGroup[]             @relation("SocialGroupCreator")
   eventsCreated        Event[]
   eventOrganiserRoles  EventOrganiser[]
   eventInvites         EventInvite[]
@@ -138,6 +147,8 @@ model User {
   suggestionVotes      SuggestionVote[]
   notifications        Notification[]
   broadcastSettings    BroadcastSettings?
+  messagesSent         Message[]
+  conversationParts    ConversationParticipant[]
 }
 
 model Friendship {
@@ -196,9 +207,10 @@ model FriendGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner        User                @relation(fields: [ownerId], references: [id])
-  members      FriendGroupMember[]
-  eventInvites EventInvite[]
+  owner         User                @relation(fields: [ownerId], references: [id])
+  members       FriendGroupMember[]
+  eventInvites  EventInvite[]
+  conversations Conversation[]
 }
 
 model FriendGroupMember {
@@ -268,11 +280,12 @@ model Event {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  creator     User              @relation(fields: [creatorId], references: [id])
-  organisers  EventOrganiser[]
-  exceptions  EventException[]
-  invites     EventInvite[]
-  suggestions EventSuggestion[]
+  creator       User              @relation(fields: [creatorId], references: [id])
+  organisers    EventOrganiser[]
+  exceptions    EventException[]
+  invites       EventInvite[]
+  suggestions   EventSuggestion[]
+  conversations Conversation[]
 }
 
 model EventOrganiser {
@@ -505,4 +518,79 @@ model BroadcastSettings {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+// ─── Messaging (R17 / R18) ─────────────────────────────────────────────────
+//
+// A Conversation is the parent of a message thread. Three kinds, gated by
+// `type`:
+//   - DIRECT: a 1:1 DM. Created lazily on first send (R17-9). No link.
+//   - GROUP:  linked to a FriendGroup (linkedGroupId). Auto-created as a
+//             side effect of FriendGroup creation (R18 D4) — never via a
+//             public route.
+//   - EVENT:  linked to an Event (linkedEventId). Created only when the
+//             host enables chat (POST /events/:id/chat). Participants seed
+//             = all current invitees.
+//
+// `lastMessageAt` is the inbox sort key, bumped on every send. `archivedAt`
+// is EVENT-only: the archival worker sets it to endsAt+48h for one-time
+// events (recurring stays null). The inbox query is a simple
+// `archivedAt IS NULL` filter (R18 D3).
+model Conversation {
+  id            String           @id @default(cuid())
+  type          ConversationType
+  linkedGroupId String?
+  linkedEventId String?
+
+  createdAt     DateTime  @default(now())
+  lastMessageAt DateTime  @default(now())
+  archivedAt    DateTime?
+
+  linkedGroup  FriendGroup?              @relation(fields: [linkedGroupId], references: [id])
+  linkedEvent  Event?                    @relation(fields: [linkedEventId], references: [id])
+  messages     Message[]
+  participants ConversationParticipant[]
+
+  // Inbox sort.
+  @@index([lastMessageAt])
+  // Auto-create idempotency lookups ("does a chat for this group/event
+  // already exist?").
+  @@index([type, linkedGroupId])
+  @@index([type, linkedEventId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  sentAt         DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  // Thread pagination (cursor on sentAt within a conversation).
+  @@index([conversationId, sentAt])
+}
+
+// Membership + per-viewer read cursor.
+//
+// `lastReadMessageId` (D1, Director-approved 2026-06-03) is ACTIVE in V1:
+// it is the viewer's OWN private read marker, used by the inbox to compute
+// that viewer's unread count (messages sent after the marker). It is NEVER
+// surfaced to other participants as a "seen by" receipt — that cross-user
+// exposure is the only thing V2 (R17-14) adds.
+model ConversationParticipant {
+  id                String   @id @default(cuid())
+  conversationId    String
+  userId            String
+  joinedAt          DateTime @default(now())
+  lastReadMessageId String?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([conversationId, userId])
+  // Inbox: "every conversation I'm a participant of".
+  @@index([userId])
 }

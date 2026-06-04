@@ -749,3 +749,33 @@ All exported from `flow/polish-screens.jsx` per ANCHOR file map. Each uses `Empt
 | Hard Rule 15 (Quicksets are pure scoped fns) | QuicksetGrid + Quickset shape |
 | Hard Rule 16 (SettingsRow div when no onClick) | SettingsRow |
 | Hard Rule 17 (Step 3 wire-back banner) | Step3InviteWired (banded list) |
+
+---
+
+## 18. Messaging (R18 — built 2026-06-04, branch `r18-messaging-build`)
+
+Tokens-only, `useHaptic()`-only. Live at `src/components/messaging/` (+ one empty state). Wire types in `src/api/conversations.types.ts`.
+
+### MessageBubble
+**File:** `src/components/messaging/MessageBubble.tsx` — R17-5. Sent → right/accent/white ink; received → left/bgElevated/ink. Sender label above bubble for group/event only (`showSender`), omitted 1:1. Optional gap-gated timestamp below (R17-6).
+
+### TypingDots
+**File:** `src/components/messaging/TypingDots.tsx` — R17-7. Received-style 3-dot bubble, reanimated stagger. Driven by transient local state (socket `chat:typing` relay populates it once realtime lands); never persisted.
+
+### ConversationAvatar
+**File:** `src/components/messaging/ConversationAvatar.tsx` — R17-3. DIRECT → other party's RingAvatar; GROUP → ≤3 overlapping cluster; EVENT → accent-soft initial tile (schema has no event photo).
+
+### InboxRow
+**File:** `src/components/messaging/InboxRow.tsx` — R17-2. Avatar · name + 1-line preview · timestamp + unread badge (accent fill, "9+" cap, unread-row weight treatment).
+
+### MessageInput
+**File:** `src/components/messaging/MessageInput.tsx` — R17-8. Multiline text + native emoji; paper-plane send HIDDEN while empty; send fires `medium` haptic.
+
+### ThreadHeader
+**File:** `src/components/messaging/ThreadHeader.tsx` — R17-4. Back chevron · title · optional subtitle (group member count / "Event chat").
+
+### ChatThreadView
+**File:** `src/components/messaging/ChatThreadView.tsx` — shared thread surface (inverted FlatList, KeyboardAvoiding, read-cursor advance on newest message) behind both MessageThreadScreen and EventChatScreen.
+
+### EmptyMessages
+**File:** `src/components/emptyStates/EmptyMessages.tsx` — R17-2 NO-CTA empty state ("No messages yet").

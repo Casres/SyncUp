@@ -1,4 +1,5 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, ConversationType } from '@prisma/client';
+import { prisma } from '../config/prisma.js';
 import type { Db } from './_types.js';
 import { publicProfileSelect } from './_userSelects.js';
 
@@ -38,6 +39,44 @@ export const friendGroupsRepository = {
     return db.friendGroup.create({
       data: { ownerId, name },
       include: friendGroupWithMembersInclude,
+    });
+  },
+
+  /**
+   * Create a FriendGroup and its auto-seeded GROUP chat (R18 D4) atomically,
+   * on the migration-owner client.
+   *
+   * Why the owner client and not the per-request app client: the messaging
+   * tables have SELECT-only RLS policies (no INSERT policy), so the app client
+   * cannot write a Conversation / ConversationParticipant row at all — every
+   * messaging write routes through the owner client by design.
+   *
+   * Why one owner-client transaction and not "app-create group, then
+   * owner-create chat": the per-request app-client write commits only at
+   * `onResponse` (see AUTH_HANDOFF.md). If the chat insert runs on the separate
+   * owner connection while the group row is still uncommitted in the request
+   * transaction, the `Conversation.linkedGroupId` FK has no visible target and
+   * the insert fails (P2003). Creating both in the same owner transaction makes
+   * the FK target visible and rolls the pair back together on any failure.
+   *
+   * The owner is the sole initial participant; members added later join via
+   * `conversationsService.addGroupParticipant`.
+   */
+  createWithGroupChatOwner(ownerId: string, name: string) {
+    return prisma.$transaction(async (tx) => {
+      const group = await tx.friendGroup.create({
+        data: { ownerId, name },
+        include: friendGroupWithMembersInclude,
+      });
+      const conversation = await tx.conversation.create({
+        data: {
+          type: ConversationType.GROUP,
+          linkedGroupId: group.id,
+          participants: { create: [{ userId: ownerId }] },
+        },
+        select: { id: true },
+      });
+      return { group, conversationId: conversation.id };
     });
   },
 

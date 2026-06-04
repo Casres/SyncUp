@@ -67,6 +67,8 @@ export type AuthStackParamList = {
 export type HomeStackParamList = {
   Home: undefined;
   EventDetail: { eventId: string };
+  /** Event chat thread (R18 / D2). Reached from EventDetail or a notif. */
+  EventChat: { conversationId: string; eventId: string };
 };
 
 export type ExploreStackParamList = {
@@ -104,6 +106,13 @@ export type FriendsStackParamList = {
   AddFriend: { method?: AddFriendMethod } | undefined;
   FriendProfile: { friendId: string };
   FriendTypesManager: undefined;
+  /** Messages inbox — the Friends-tab Messages segment surface (R17-1 / R18). */
+  Messages: undefined;
+  /**
+   * DM + group chat thread (R18 / D2). EVENT chat lives in HomeStack
+   * (EventChat) because event surfaces hang off the Home tab.
+   */
+  MessageThread: { conversationId: string; type: 'DIRECT' | 'GROUP' };
 };
 
 export type GroupsStackParamList = {
@@ -225,6 +234,14 @@ export type EventDetailScreenProps = CompositeScreenProps<
   >
 >;
 
+export type EventChatScreenProps = CompositeScreenProps<
+  NativeStackScreenProps<HomeStackParamList, 'EventChat'>,
+  CompositeScreenProps<
+    BottomTabScreenProps<RootTabParamList, 'HomeTab'>,
+    NativeStackScreenProps<RootStackParamList>
+  >
+>;
+
 // --- Create Event (modal stack mounted at root) ---
 export type Step1ScreenProps = CompositeScreenProps<
   NativeStackScreenProps<CreateEventStackParamList, 'Step1'>,
@@ -273,6 +290,22 @@ export type FriendProfileScreenProps = CompositeScreenProps<
 
 export type FriendTypesManagerScreenProps = CompositeScreenProps<
   NativeStackScreenProps<FriendsStackParamList, 'FriendTypesManager'>,
+  CompositeScreenProps<
+    BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
+    NativeStackScreenProps<RootStackParamList>
+  >
+>;
+
+export type MessagesScreenProps = CompositeScreenProps<
+  NativeStackScreenProps<FriendsStackParamList, 'Messages'>,
+  CompositeScreenProps<
+    BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
+    NativeStackScreenProps<RootStackParamList>
+  >
+>;
+
+export type MessageThreadScreenProps = CompositeScreenProps<
+  NativeStackScreenProps<FriendsStackParamList, 'MessageThread'>,
   CompositeScreenProps<
     BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
     NativeStackScreenProps<RootStackParamList>

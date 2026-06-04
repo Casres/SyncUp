@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { initSocketServer } from './sockets/index.js';
+import { startEventChatArchivalWorker } from './workers/eventChatArchival.worker.js';
 import { startExplorePrewarmWorker } from './workers/explorePrewarm.worker.js';
 
 async function start() {
@@ -31,6 +32,11 @@ async function start() {
   if (env.NODE_ENV === 'production') {
     startExplorePrewarmWorker();
     app.log.info('explore pre-warm worker started');
+
+    // Event-chat archival sweep (R18 B6). Prod-only — dev/test invoke
+    // runEventChatArchivalSweep() directly when they need the behaviour.
+    startEventChatArchivalWorker();
+    app.log.info('event-chat archival worker started');
   }
 }
 

@@ -1,6 +1,11 @@
 # SyncUp — GAP Build Progress
 Last updated: 2026-05-11
 
+> Note (2026-06-04): this file tracks the original 10 GAPs only. Later rounds
+> (R15–R18) are tracked in `PROJECT_TRACKER.md` / `LEAD_MANAGER.md` /
+> `BUILD-CHECKLIST.md`. R18 = the messaging build (DM · group · event chat),
+> branch `r18-messaging-build` — see `R18-PLAN.md`.
+
 ## How to use this file
 Paste this file into a new conversation along with CLAUDE.md to resume
 without losing context. Always update this file after each GAP completes.

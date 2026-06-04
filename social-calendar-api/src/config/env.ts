@@ -43,6 +43,11 @@ const envSchema = z.object({
   // Must be ≤ EXPLORE_CACHE_TTL_SECONDS to keep the cache always warm.
   EXPLORE_PREWARM_CRON: z.string().default('0 */2 * * *'),
 
+  // ── Messaging — event-chat archival sweep (R18 B6) ───────────────────────
+  // Cron expression for the worker that sets `archivedAt` on one-time EVENT
+  // conversations 48h after the event ends. Default: hourly.
+  MESSAGING_ARCHIVE_CRON: z.string().default('0 * * * *'),
+
   // GCP project and billing account — optional in dev, required in production
   // for the Terraform billing-alert IaC to apply.
   GCP_PROJECT_ID: z.string().optional(),

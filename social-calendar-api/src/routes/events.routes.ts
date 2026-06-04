@@ -20,4 +20,8 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/:id/invites', eventsController.sendInvites);
   fastify.patch('/:id/invites/:inviteId', eventsController.respondToInvite);
   fastify.delete('/:id/invites/:inviteId', eventsController.rescindInvite);
+
+  // Event chat (R18). Organiser-only, deliberate host action — creates the
+  // EVENT Conversation and seeds participants = organisers + all invitees.
+  fastify.post('/:id/chat', eventsController.enableChat);
 };

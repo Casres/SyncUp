@@ -715,3 +715,31 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 - `flow-fade-up` replaced with simple opacity fade (200ms easeOut).
 - Stagger disabled (all-at-once).
 - Spinner rotation kept.
+
+---
+
+## Messaging (R18 — built 2026-06-04, branch `r18-messaging-build`)
+
+> Caveat: R17-1's Friends·Groups·Messages top-level carousel is NOT yet
+> consolidated. The inbox ships as a reachable `Messages` route (FriendsList
+> header "Messages" pill); folding GroupsList + the inbox under one
+> SegmentedSwitcher is the open R18 follow-up (R18-PLAN.md "Build notes").
+
+### Messages (inbox) — `MessagesScreen`
+**File:** `src/screens/friends/MessagesScreen.tsx` (FriendsStack route `Messages`). R17-1/R17-2.
+- Layout: FlowHeader "Messages" → list of `InboxRow` (newest first, archived excluded).
+- Loading: spinner only (R5-2). Empty: `EmptyMessages` (NO-CTA, R17-2). Error: `ErrorState kind="server"`.
+- Row tap: DM/group → `MessageThread`; event → HomeTab → `EventChat` (D2). Light haptic.
+
+### Message thread (DM / group) — `MessageThreadScreen`
+**File:** `src/screens/friends/MessageThreadScreen.tsx` (FriendsStack route `MessageThread { conversationId, type }`). R17-4…R17-8.
+- Thin wrapper over `ChatThreadView`; group subtitle = member count.
+
+### Event chat — `EventChatScreen`
+**File:** `src/screens/events/EventChatScreen.tsx` (HomeStack route `EventChat { conversationId, eventId }`). R17-4…R17-8 / D2.
+- Thin wrapper over `ChatThreadView`; subtitle = "Event chat". Reached from EventDetail (host-enabled) or a message notif card.
+
+### Entry points
+- **DM (R17-9):** `FriendProfileScreen` "DM" button → `useGetOrCreateDirect` → `MessageThread` (promoted from the R16-9 stub).
+- **Inbox:** FriendsList header "Messages" pill → `Messages`.
+- **Notif (M4):** message notif cards route straight to the thread, sheet dismissing concurrently, medium haptic (R17-11 / R12-1).
