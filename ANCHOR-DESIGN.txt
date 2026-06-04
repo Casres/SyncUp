@@ -32,10 +32,25 @@ R17-2. INBOX ROW ANATOMY IS FIXED. Each conversation row in the
            truncated (R5-6).
          · Timestamp · caption ink3 · top-right.
          · Unread badge · trailing, when the conversation has unread
-           messages.
+           messages. Count badge · accent fill · accentInk · 11/700 ·
+           radius 999 · min 18px · "9+" cap for counts above 9.
+       UNREAD ROW TREATMENT: while a row has unread messages, the
+         conversation name renders semibold and the preview steps from
+         ink2 → ink (one shade darker); read rows use the base weights
+         above. This is the ONLY emphasis change — NEVER tint the row
+         background and NEVER add a leading unread dot (the trailing
+         count badge is the sole unread signal).
        Rows are sorted by last-message recency (lastMessageAt, newest
          first; see R17-13 data model). Archived conversations are
-         excluded from the inbox entirely (R17-7).
+         excluded from the inbox entirely (R17-10).
+       LOADING: a 40px MD Spinner centered in the segment body while
+         the inbox fetches (spinner-only per R5-2 · NEVER a skeleton
+         list).
+       EMPTY: zero non-archived conversations renders EmptyMessages
+         inline (same empty-state family as EmptyHome / EmptyFriends /
+         EmptyNotifications). NO-CTA — conversations start from a
+         friend, group, or event surface (R17-9, R17-10), never from
+         the inbox itself.
        Tap row → opens the thread for that conversation per the
          routing in R17-11. Row-tap haptic is `light` (consistent
          with FriendsList row tap · SCREENS.md).
@@ -207,8 +222,8 @@ R17-12. NAV GRAPH — MESSAGING THREADS LIVE IN TWO STACKS. Threads are
            { conversationId: string; eventId: string }.
        Transition is a step push (240ms easeStd) within the owning
          stack; cross-stack arrivals from a notification card switch
-         the tab first, then push (per R12-1 / NAVIGATION.md cross-
-         stack pattern). Back from a thread returns to that stack's
+         the tab first, then push (per R12-1). Back from a thread
+         returns to that stack's
          prior top-of-stack (the Messages segment for DM/group; the
          event surface for event chat) — NEVER back to the NotifSheet.
        Exact route names and param shapes are NON-NORMATIVE here and
