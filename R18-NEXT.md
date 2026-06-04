@@ -1,6 +1,6 @@
 # R18 — What's Next (handoff)
 
-_Created 2026-06-04. Branch: `r18-messaging-build` (pushed, NOT merged to `main`)._
+_Created 2026-06-04. **MERGED to `main` via PR #1 (`a62668a`); `r18-messaging-build` deleted.** Steps 1–3 below are DONE; only device QA (step 4) + the live-socket smoke test remain._
 
 The messaging build (1:1 DM · group chat · event chat) is code-complete — backend
 + mobile, both workspaces `tsc` green, `social-calendar-api` `npm run build` green.
@@ -8,21 +8,24 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
 (R18)" block + memory `project_r18_messaging_built`.
 
 **Paste-ready first message for the new session:**
-> Continue R18. Step 2 (realtime socket client) is done — do step 1 (verify the
-> backend against a live docker stack + run `messaging-roundtrip.sh`), then
-> smoke-test realtime on device per step 4. See R18-PLAN.md "Build notes" and the
-> CLAUDE.md 2026-06-04 block.
+> Continue R18. Steps 1–3 are done (backend verified 31/31, socket client built,
+> carousel built) and R18 is merged to `main`. Remaining: device/sim QA (step 4)
+> incl. the realtime smoke test against a live socket server. See R18-PLAN.md
+> "Build notes" and the CLAUDE.md 2026-06-04 block.
 
 ---
 
 ## To finish R18
 
-### 1. Verify the backend against a live stack  ← do this first; it gates everything
+### 1. Verify the backend against a live stack  — ✅ DONE 2026-06-04 (31/31, 0 fail)
 - `cd social-calendar-api && npx prisma generate`
-- From repo root: `docker compose up -d --build` (applies migration `20260603000001_messaging`)
+- From repo root: `docker compose up -d --build`, then **`docker compose exec api npx
+  prisma migrate deploy`** — the migration is NOT auto-applied at boot (Dockerfile
+  `CMD` is just `node dist/server.js`).
 - Set `CLERK_SECRET_KEY`, `TEST_USER_A_CLERK_ID`, `TEST_USER_B_CLERK_ID`, then run
-  `./scripts/messaging-roundtrip.sh` — expect all-pass / 0 fail.
-- (This is the one thing the build session couldn't do — needs Docker + Clerk creds.)
+  `./scripts/messaging-roundtrip.sh` — **ran 31/31, re-runnable** (`MESSAGING_ROUNDTRIP_RESULTS.md`).
+- The run found+fixed a group-chat auto-create FK bug (`createWithGroupChatOwner`,
+  atomic owner-client tx) + 2 script assertions; CI Test job fixed (Cloudinary env).
 
 ### 2. Build the realtime socket client on mobile  — ✅ DONE 2026-06-04
 - Built `src/realtime/` (`socket.io-client@^4.8.3`, first socket client on mobile).
@@ -65,7 +68,7 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
 ## Pre-existing backlog (not R18, still open)
 - Onboarding R15-7..R15-13 tail.
 - AttendeesSheet R15-1..R15-6.
-- Merge `r18-messaging-build` → `main` once verification (step 1) passes — open the PR.
+- ~~Merge `r18-messaging-build` → `main`~~ — ✅ DONE 2026-06-04 (PR #1, `a62668a`; branch deleted).
 
 ---
 

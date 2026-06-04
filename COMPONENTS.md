@@ -752,7 +752,7 @@ All exported from `flow/polish-screens.jsx` per ANCHOR file map. Each uses `Empt
 
 ---
 
-## 18. Messaging (R18 — built 2026-06-04, branch `r18-messaging-build`)
+## 18. Messaging (R18 — built 2026-06-04, MERGED to `main` via PR #1 `a62668a`)
 
 Tokens-only, `useHaptic()`-only. Live at `src/components/messaging/` (+ one empty state). Wire types in `src/api/conversations.types.ts`.
 

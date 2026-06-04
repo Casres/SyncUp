@@ -718,7 +718,7 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 ---
 
-## Messaging (R18 — built 2026-06-04, branch `r18-messaging-build`)
+## Messaging (R18 — built 2026-06-04, MERGED to `main` via PR #1 `a62668a`)
 
 > R17-1's Friends·Groups·Messages top-level carousel is **BUILT** (2026-06-04):
 > `FriendsListScreen` hosts the 3-way `SegmentedSwitcher` + a swipe carousel

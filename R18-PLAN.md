@@ -4,9 +4,10 @@
 # Depends on: ANCHOR-DESIGN.txt v3.7 rules R17-1 … R17-15 (LOCKED 2026-06-03)
 # Spec source: R17-PLAN.md (decisions) + ANCHOR-DESIGN.txt R17 section (rules)
 # Locked: 2026-06-03
-# Status: BUILT 2026-06-04 — backend + mobile code complete, tsc/build green.
-#         Pending: docker migrate-deploy + messaging-roundtrip.sh run (needs
-#         Clerk creds), device QA, and the realtime socket client (see below).
+# Status: DONE + MERGED to `main` 2026-06-04 (PR #1, merge commit a62668a).
+#         Verified: migrate-deploy + messaging-roundtrip.sh = 31/31, 0 fail.
+#         Realtime socket client BUILT; R17-1 carousel BUILT (branch
+#         r17-friends-carousel). Remaining: device QA + live-socket smoke test.
 
 ---
 
@@ -278,8 +279,19 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
    CoverPickerSheet) moved into `FriendsStack`; `MessagesScreen`/`GroupsListScreen`
    deleted; Home search + NotifSheet `navGroupDetail` repoint to
    `FriendsTab → GroupDetail`. Mobile `tsc` green; device QA pending.
-3. **Migration not yet applied / round-trip not yet run** — needs `docker compose
-   up` + Clerk creds. `npx prisma generate` already run locally.
+3. **Migration applied + round-trip run — ✅ DONE 2026-06-04 (31/31, 0 fail, re-runnable).**
+   Note: the messaging migration is NOT auto-applied at boot (Dockerfile `CMD` is just
+   `node dist/server.js`) — run `docker compose exec api npx prisma migrate deploy` after
+   `docker compose up -d --build`. The run found+fixed a real group-chat auto-create FK
+   bug: the FriendGroup was written in the uncommitted per-request app-client tx while the
+   chat insert ran on a separate owner-client connection (FK `linkedGroupId` → no visible
+   target → P2003, swallowed by best-effort catch). Fix: `friendGroupsRepository.
+   createWithGroupChatOwner` creates group + GROUP conversation + owner participant in ONE
+   owner-client `$transaction` (atomic, FK visible). Two `messaging-roundtrip.sh` assertions
+   also fixed (friends-list shape `.friends[]?`; deterministic group-conversation selection
+   by `linkedGroupId`). CI Test job, pre-existing red on `main` (ci.yml omitted the
+   `CLOUDINARY_*` env `env.ts` requires), fixed via GitHub repo secrets wired into the Test
+   job. Results: `MESSAGING_ROUNDTRIP_RESULTS.md`.
 
 ## Out of scope (unchanged from R17)
 Read receipts (V2 · R17-14), media/files/reactions, message edit/delete,

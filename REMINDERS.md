@@ -6,9 +6,10 @@ A reference doc to share with a new chat so they can pick up where we left off. 
 > truth use `PROJECT_TRACKER.md`, `BUILD-CHECKLIST.md`, and `LEAD_MANAGER.md`.
 > The "frontend not yet built" line below is long obsolete — the mobile app,
 > all backend domains, and (as of **2026-06-04**) the **R18 messaging build**
-> (DM · group · event chat, branch `r18-messaging-build`) are done. See
-> `R18-PLAN.md` "Build notes" for the messaging status + pending items
-> (realtime socket client, Friends·Groups·Messages carousel, round-trip run).
+> (DM · group · event chat) are done and **MERGED to `main`** (PR #1, `a62668a`;
+> round-trip 31/31). The realtime socket client and Friends·Groups·Messages
+> carousel are also built (carousel on branch `r17-friends-carousel`); only
+> device QA remains. See `R18-PLAN.md` "Build notes".
 
 ## Project at a glance
 
