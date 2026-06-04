@@ -5,6 +5,7 @@ import type { JwtPayload } from '@clerk/types';
 import { env } from '../config/env.js';
 import { prisma } from '../config/prisma.js';
 import { registerAvailabilityHandlers } from './availability.socket.js';
+import { registerChatHandlers } from './chat.socket.js';
 import { registerEventsHandlers } from './events.socket.js';
 import { registerFriendsHandlers } from './friends.socket.js';
 import { registerGroupsHandlers } from './groups.socket.js';
@@ -100,6 +101,7 @@ export function initSocketServer(
     registerGroupsHandlers(io, socket);
     registerAvailabilityHandlers(io, socket);
     registerNotificationsHandlers(io, socket);
+    registerChatHandlers(io, socket);
 
     socket.on('disconnect', (reason) => {
       fastify.log.debug(

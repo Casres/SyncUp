@@ -47,6 +47,12 @@ export const queryKeys = {
     /** Activity feed (NotifSheet items). Distinct from profile.notifications which holds SETTINGS. */
     all: () => ['notifications'] as const,
   },
+  conversations: {
+    /** Inbox — the Messages segment list (R18). */
+    inbox: () => ['conversations'] as const,
+    /** One thread's paginated messages (infinite query). */
+    thread: (id: string) => ['conversations', id, 'messages'] as const,
+  },
   onboarding: {
     contactsMatches: (hashKey: string) => ['onboarding', 'contactsMatches', hashKey] as const,
   },

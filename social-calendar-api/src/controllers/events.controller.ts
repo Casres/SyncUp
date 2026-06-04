@@ -9,6 +9,11 @@ import {
   InviteNotFoundError,
   eventsService,
 } from '../services/events.service.js';
+import {
+  EventChatForbiddenError,
+  EventNotFoundError as ChatEventNotFoundError,
+  conversationsService,
+} from '../services/conversations.service.js';
 
 const createEventBodySchema = z
   .object({
@@ -295,6 +300,35 @@ export const eventsController = {
       }
       if (err instanceof InviteNotFoundError) {
         return reply.code(404).send({ error: 'Invite not found' });
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * POST /events/:id/chat — host enables event chat (R18). Organiser-only;
+   * idempotent (returns the existing conversation if already enabled).
+   */
+  async enableChat(request: FastifyRequest, reply: FastifyReply) {
+    const params = idParamsSchema.safeParse(request.params);
+    if (!params.success) return badRequest(reply, params.error);
+
+    try {
+      const conversation = await conversationsService.enableEventChat(
+        request.prismaTransaction,
+        request.server.io,
+        request.user.id,
+        params.data.id,
+      );
+      return reply.send({ conversation });
+    } catch (err) {
+      if (err instanceof ChatEventNotFoundError) {
+        return reply.code(404).send({ error: 'Event not found' });
+      }
+      if (err instanceof EventChatForbiddenError) {
+        return reply
+          .code(403)
+          .send({ error: 'Not an organiser of this event' });
       }
       throw err;
     }

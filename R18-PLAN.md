@@ -4,7 +4,9 @@
 # Depends on: ANCHOR-DESIGN.txt v3.7 rules R17-1 … R17-15 (LOCKED 2026-06-03)
 # Spec source: R17-PLAN.md (decisions) + ANCHOR-DESIGN.txt R17 section (rules)
 # Locked: 2026-06-03
-# Status: NOT STARTED
+# Status: BUILT 2026-06-04 — backend + mobile code complete, tsc/build green.
+#         Pending: docker migrate-deploy + messaging-roundtrip.sh run (needs
+#         Clerk creds), device QA, and the realtime socket client (see below).
 
 ---
 
@@ -215,6 +217,51 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
   `POST /events/:id/chat` route — that one IS a deliberate host action.)
 
 ---
+
+## Build notes (2026-06-04) — what shipped, deviations, follow-ups
+
+**Backend (complete, `tsc`+`build` green):**
+- Schema: `Conversation` / `Message` / `ConversationParticipant` + `ConversationType`
+  enum; migration `20260603000001_messaging` with RLS.
+- RLS design (important): ALL writes (message/conversation/participant) route
+  through the migration-owner `prisma` client (bypasses RLS), so the
+  INSERT...RETURNING snapshot-isolation bug cannot occur on the write path.
+  App-client reads are gated by inline-EXISTS SELECT policies. `ConversationParticipant`
+  SELECT is own-rows-only (a co-participant policy would self-recurse →
+  "infinite recursion in policy"); co-participants are hydrated via the gated
+  owner client (the `…Owner` repo methods), same trust model as notif dispatch.
+- Repo/service/routes/controller, auto-create hooks (group via friendGroups.service,
+  event via `POST /events/:id/chat`), `chat.socket.ts` (join/leave + typing relay),
+  `eventChatArchival.worker.ts`, and `scripts/messaging-roundtrip.sh`.
+- Message notifications dispatch as `GROUP_ACTIVITY` (no dedicated `MESSAGE`
+  NotifType — avoided a fragile `ALTER TYPE … ADD VALUE` migration). The payload
+  carries `conversationId`/`conversationType`/`linkedEventId` as an M4 routing hint.
+
+**Mobile (complete, `tsc` green):**
+- `src/api/conversations.ts` + `.types.ts` (useInbox / useThread infinite /
+  useSendMessage / useGetOrCreateDirect / useEnableEventChat / useMarkRead).
+- `src/components/messaging/` (MessageBubble, TypingDots, ConversationAvatar,
+  InboxRow, MessageInput, ThreadHeader, ChatThreadView) + `EmptyMessages`.
+- Screens: MessagesScreen (inbox), MessageThreadScreen (FriendsStack),
+  EventChatScreen (HomeStack); nav routes + types wired.
+- DM promoted from the R16-9 stub → real (FriendProfile "DM" button, R17-9).
+- NotifSheet M4 routing: message cards route to the thread (medium haptic).
+
+**Deviations / deferred (need a decision or a follow-up round):**
+1. **Realtime socket client — NOT built.** The mobile app has NO socket.io
+   client for ANY domain yet (presence/notifs/groups are all REST-only); adding
+   one is a cross-cutting infra task the backend handoff always scoped
+   separately. Messaging works over REST today (inbox refetch, send invalidates).
+   `chat:message:new` / `chat:conversation:new` / `chat:typing` are emitted by
+   the backend and ready; the mobile `ChatThreadView` has a `typingNames` state
+   slot the relay will populate. **Follow-up: build `src/realtime/` socket bridge.**
+2. **R17-1 Friends·Groups·Messages carousel — NOT consolidated.** The existing
+   FriendsList SegmentedSwitcher is All/BFFs/Pending (friend filters), and Groups
+   is still a separate hidden stack. Rather than risk that IA refactor blind, the
+   Messages inbox ships as a reachable route (FriendsList header "Messages" pill).
+   **Follow-up: fold GroupsList + the inbox under one top-level switcher.**
+3. **Migration not yet applied / round-trip not yet run** — needs `docker compose
+   up` + Clerk creds. `npx prisma generate` already run locally.
 
 ## Out of scope (unchanged from R17)
 Read receipts (V2 · R17-14), media/files/reactions, message edit/delete,

@@ -1,9 +1,24 @@
 import { Prisma } from '@prisma/client';
+import type { Server } from 'socket.io';
 import {
   friendGroupsRepository,
   type FriendGroupWithMembers,
 } from '../repositories/friendGroups.repository.js';
+import { conversationsService } from './conversations.service.js';
 import type { Db } from '../repositories/_types.js';
+import type {
+  ClientToServerEvents,
+  InterServerEvents,
+  ServerToClientEvents,
+  SocketData,
+} from '../types/socket.types.js';
+
+type IoServer = Server<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
 
 // ─── Domain errors ─────────────────────────────────────────────────────────
 
@@ -72,8 +87,22 @@ export const friendGroupsService = {
     db: Db,
     ownerId: string,
     name: string,
+    io?: IoServer,
   ): Promise<FriendGroupResponse> {
     const created = await friendGroupsRepository.create(db, ownerId, name);
+
+    // R18 D4: a GROUP chat is auto-created as a side effect of FriendGroup
+    // creation — never via a public route. The owner is the sole initial
+    // participant; members added later are joined via addGroupParticipant.
+    // Best-effort: a chat-creation failure must not fail group creation.
+    try {
+      await conversationsService.ensureGroupConversation(io, created.id, [
+        ownerId,
+      ]);
+    } catch {
+      /* swallow — group creation already committed */
+    }
+
     return shape(created);
   },
 
@@ -132,6 +161,7 @@ export const friendGroupsService = {
     friendGroupId: string,
     ownerId: string,
     userId: string,
+    io?: IoServer,
   ): Promise<{ membershipId: string; userId: string }> {
     const existing = await friendGroupsRepository.findById(db, friendGroupId);
     if (!existing) throw new FriendGroupNotFoundError(friendGroupId);
@@ -152,6 +182,19 @@ export const friendGroupsService = {
         friendGroupId,
         userId,
       );
+
+      // R18 D4: join the new member to the group's chat (idempotent; no-op if
+      // the chat doesn't exist). Best-effort — never fail the membership write.
+      try {
+        await conversationsService.addGroupParticipant(
+          io,
+          friendGroupId,
+          userId,
+        );
+      } catch {
+        /* swallow — membership already committed */
+      }
+
       return { membershipId: created.id, userId: created.userId };
     } catch (err) {
       if (

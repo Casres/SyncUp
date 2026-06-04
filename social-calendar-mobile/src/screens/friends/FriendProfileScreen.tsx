@@ -64,6 +64,7 @@ import {
   useFriendProfile,
   useFriends,
   useFriendTypes,
+  useGetOrCreateDirect,
   useRemoveFriend,
 } from '../../api';
 import type { FriendProfileScreenProps } from '../../navigation/types';
@@ -71,7 +72,9 @@ import type { AvailState, Event } from '../../../../TYPES';
 
 // R16-9 stub copy. Centralized so future rounds can promote either string
 // without grepping for it.
-const DM_STUB_COPY = 'Direct messaging is coming soon.';
+// R18: DM is live (promoted from the R16-9 stub). This copy is now only the
+// fallback toast shown if opening the thread fails (e.g. offline / blocked).
+const DM_STUB_COPY = "Couldn't open the chat. Try again.";
 const REPORT_CONFIRM_COPY = "Thanks — we'll review this report.";
 
 export default function FriendProfileScreen({
@@ -92,6 +95,7 @@ export default function FriendProfileScreen({
   // ── R16-7 / R16-8 mutations ────────────────────────────────────────────────
   const removeFriend = useRemoveFriend();
   const blockUser = useBlockUser();
+  const getOrCreateDirect = useGetOrCreateDirect();
 
   // ── Transient UI state (R16-6 overflow + R16-9 toasts + error toast) ──────
   const [overflowOpen, setOverflowOpen] = useState(false);
@@ -127,11 +131,22 @@ export default function FriendProfileScreen({
     });
   }, [fire, friendId, navigation]);
 
-  const handleDmStub = useCallback(() => {
-    // R16-9 — DM is intentionally a stub in this round. No network roundtrip.
+  const handleDm = useCallback(() => {
+    // R18: DM promoted from the R16-9 stub now the messaging backend exists
+    // (R17-9 — the DM button opens / lazily creates the 1:1 thread).
     fire('light');
-    setInfoToast(DM_STUB_COPY);
-  }, [fire]);
+    getOrCreateDirect.mutate(friendId, {
+      onSuccess: (conv) => {
+        navigation.navigate('MessageThread', {
+          conversationId: conv.id,
+          type: 'DIRECT',
+        });
+      },
+      onError: () => {
+        setInfoToast(DM_STUB_COPY);
+      },
+    });
+  }, [fire, friendId, getOrCreateDirect, navigation]);
 
   const handleOpenOverflow = useCallback(() => {
     fire('light');
@@ -348,7 +363,7 @@ export default function FriendProfileScreen({
               variant="primary"
               size="md"
               icon={<Ionicons name="chatbubble-outline" size={16} color={T.bgElevated} />}
-              onPress={handleDmStub}
+              onPress={handleDm}
             />
           </View>
         </View>

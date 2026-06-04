@@ -123,13 +123,25 @@ export default function FriendsListScreen({
         T={T}
         title={`Friends · ${friendsCount}`}
         right={
-          <PillBtn
-            T={T}
-            label="Types"
-            variant="ghost"
-            size="sm"
-            onPress={() => navigation.navigate('FriendTypesManager')}
-          />
+          <View style={styles.headerActions}>
+            {/* R18: entry to the Messages inbox (the Friends-tab Messages
+                surface; folds into the R17-1 Friends·Groups·Messages carousel
+                when that IA consolidation lands). */}
+            <PillBtn
+              T={T}
+              label="Messages"
+              variant="ghost"
+              size="sm"
+              onPress={() => navigation.navigate('Messages')}
+            />
+            <PillBtn
+              T={T}
+              label="Types"
+              variant="ghost"
+              size="sm"
+              onPress={() => navigation.navigate('FriendTypesManager')}
+            />
+          </View>
         }
       />
 
@@ -275,6 +287,7 @@ function filterFriends(
 const styles = StyleSheet.create({
   root: { flex: 1 },
   fill: { flex: 1 },
+  headerActions: { flexDirection: 'row', gap: spacing.xs },
   segRow: {
     paddingHorizontal: spacing.mdl,
     paddingVertical: spacing.sm,
