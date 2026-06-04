@@ -86,8 +86,8 @@ Add `conversations.repository.ts`, `conversations.service.ts`,
   socket + dispatches notification to other participants.
 - `POST /events/:id/chat` — host enables event chat (organiser-only;
   creates Conversation type=EVENT, seeds participants = all invitees).
-- `POST /groups/:groupId/chat` — auto-called on FriendGroup creation
-  (internal/service-level, not necessarily a public route — see B5).
+- Group chat — NO public route (D4): auto-created as an internal
+  `friendGroups.service` side effect of FriendGroup creation (see B4).
 
 ### B4. Auto-creation hooks (R17-10, R17-9)
 - **Group chat:** hook into `friendGroups.service` create path — when a
@@ -115,10 +115,10 @@ Add `src/sockets/chat.socket.ts`, register in `sockets/index.ts`:
 ### B6. Event-chat lifecycle / archival (R17-10)
 - One-time event: set `archivedAt` = event.endsAt + 48h. Recurring event:
   never archives (archivedAt stays null).
-- Mechanism (Open Decision D3): either a `workers/` job that sweeps and
-  sets archivedAt (consistent with `explorePrewarm.worker.ts`), OR compute
-  archived-state at read time in the inbox query. Recommend the worker so
-  the inbox `GET /conversations` stays a simple `archivedAt IS NULL` filter.
+- Mechanism (D3-resolved): a `workers/` sweep job sets archivedAt
+  (consistent with `explorePrewarm.worker.ts`) — NOT computed at read time —
+  so the inbox `GET /conversations` stays a simple `archivedAt IS NULL`
+  filter.
 
 ### B7. Round-trip test
 Add `scripts/messaging-roundtrip.sh` mirroring
@@ -183,7 +183,7 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
 
 ---
 
-## Build decisions (D1 resolved; D2–D4 open — resolve early)
+## Build decisions (all resolved · D1–D4 · 2026-06-03)
 
 - **D1 — Unread count derivation. ✅ RESOLVED (Director-approved 2026-06-03).**
   R17-2 requires an unread *count* badge, but R17-14 defers read *receipts*
@@ -197,14 +197,21 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
   (and while the thread stays foregrounded). This supersedes R17-13's
   "reserved" wording: the field is live in V1 for the badge, dormant only
   as a read receipt.
-- **D2 — Thread route names/params.** Non-normative in R17-12. Suggested:
-  `MessageThread { conversationId, type }`, `EventChat { conversationId,
-  eventId }`. Finalize here.
-- **D3 — Archival mechanism** (B6): worker vs compute-at-read. Recommend
-  worker.
-- **D4 — `POST /groups/:groupId/chat`**: public route vs internal service
-  call only. Recommend internal (auto-create is a side effect of group
-  creation, not a client action).
+- **D2 — Thread route names/params. ✅ RESOLVED (2026-06-03).** Locked:
+  `MessageThread { conversationId, type: 'DIRECT' | 'GROUP' }` in
+  FriendsStack; `EventChat { conversationId, eventId }` in HomeStack. This
+  finalizes the names R17-12 left non-normative — NAVIGATION.md already
+  carries them.
+- **D3 — Archival mechanism. ✅ RESOLVED (2026-06-03).** Locked: a `workers/`
+  sweep job sets `archivedAt = event.endsAt + 48h` for one-time EVENT
+  conversations (recurring stays null), mirroring `explorePrewarm.worker.ts`.
+  The inbox query stays a simple `archivedAt IS NULL` filter — archival is
+  NOT computed at read time.
+- **D4 — Group-chat creation trigger. ✅ RESOLVED (2026-06-03).** Locked:
+  internal service call only — NO public `POST /groups/:groupId/chat` route.
+  Group-chat auto-create is a side effect of FriendGroup creation inside
+  `friendGroups.service`, not a client action. (Event chat keeps its public
+  `POST /events/:id/chat` route — that one IS a deliberate host action.)
 
 ---
 
