@@ -50,13 +50,20 @@ export async function getFriends(
   const path = label
     ? `/friends?label=${encodeURIComponent(label)}`
     : '/friends';
-  return authedFetch<Friend[]>(path);
+  // Backend wraps the list: GET /friends → { friends: [...] }. Normalize
+  // defensively so a bare-array response (e.g. mocks) also works.
+  const res = await authedFetch<{ friends: Friend[] } | Friend[]>(path);
+  return Array.isArray(res) ? res : (res?.friends ?? []);
 }
 
 export async function getFriendRequests(
   authedFetch: AuthedFetch,
 ): Promise<Friend[]> {
-  return authedFetch<Friend[]>('/friends/requests');
+  // Backend wraps: GET /friends/requests → { requests: [...] }.
+  const res = await authedFetch<{ requests: Friend[] } | Friend[]>(
+    '/friends/requests',
+  );
+  return Array.isArray(res) ? res : (res?.requests ?? []);
 }
 
 export async function sendFriendRequest(
