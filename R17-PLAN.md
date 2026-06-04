@@ -3,6 +3,39 @@
 # Output: ANCHOR-DESIGN.txt rules R17-1 through R17-N
 # Build round: R18
 # Locked: 2026-06-03
+# Status: ✅ COMPLETE — 2026-06-03
+
+---
+
+## Status: COMPLETE (2026-06-03)
+
+R17 shipped to `main`. Deliverables:
+
+- **15 HARD RULES (R17-1 … R17-15)** written into `ANCHOR-DESIGN.txt`
+  under a new "Round 17 — Messaging" section, anchor bumped to **v3.7**
+  (Updated 2026-06-03). Standalone mirror in
+  `ANCHOR-DESIGN-R17-EXTENSION.txt`. Every Director-locked decision
+  below is encoded; surface order followed (Nav/Inbox → Thread →
+  1:1 → Group → Event → Notif → Nav graph → Data model → scope).
+- **Adversarial review pass** completed. Fixes applied: corrected a
+  broken cross-ref (R17-2 archived-inbox cite R17-7 → R17-10), dropped
+  a dangling NAVIGATION.md cite in R17-12, and filled the inbox spec
+  hole (unread count badge, unread-row treatment, spinner-only loading,
+  `EmptyMessages` empty state). Medium notif-tap haptic (R17-11) and the
+  Friends·Groups·Messages switcher premise (R17-1) confirmed correct.
+- **IA reconciliation** (surfaced by review): `NAVIGATION.md` and
+  `SCREENS.md` updated to the locked TAB BAR IA — tab bar is
+  Home · Explore · Create(+) · Friends · Profile; Groups + Messages are
+  segments of the Friends tab (former GroupsStack folded into
+  FriendsStack), not separate tabs.
+
+Commits: `cfd35a5` (plan), `749990b` (R17 rules), `8591a6f` (review
+fixes), `06704c2` (IA reconciliation).
+
+**Known follow-ups for R18 (deferred, not gaps in R17):**
+- Explore tab slot is locked but has no specced screens (forward placeholder).
+- Thread route names / param shapes are non-normative (finalize in R18).
+- DM and Report remain stubs per the R16-9 clock.
 
 ---
 
