@@ -1,6 +1,6 @@
 # SyncUp — Project Tracker
 
-_Last updated: 2026-06-04 (R18 messaging — MERGED to `main` via PR #1 `a62668a`; roundtrip 31/31)_
+_Last updated: 2026-06-04 (R18 merged to `main` via PR #1 `a62668a`, roundtrip 31/31; R17-1 carousel built on `r17-friends-carousel` (PR #2) + first sim run found/fixed the API list-envelope shape bug, commit `6c3b22b`)_
 
 A cross-platform social calendar app (iOS & Android). High-level summary of build state. **For the agent-by-agent ground truth see `LEAD_MANAGER.md`.**
 
@@ -101,7 +101,8 @@ A cross-platform social calendar app (iOS & Android). High-level summary of buil
 | Onboarding R15-7..R15-13 | PENDING — post-Step-6 tail (PushPermissionGate · FriendFind Decision/Matches/NoWorries · YoureIn), R15-11 ContactsDeniedAffordance, R15-13 first-run empty-state copy gating; needs `expo-notifications` + `expo-contacts` | `agent-prompts/ONBOARDING_AGENT_PROMPT.md` |
 | AttendeesSheet R15-1..R15-6 | PENDING — R15-1 row-tap → QuickProfileSheet, R15-2 friend variant, R15-3 RSVP grouping w/ HOSTS pinned, R15-4 magnifier reveal, R15-5 sticky chip filter bar, R15-6 offline state mirroring NotifSheet; wires SearchOverlay PEOPLE row tap | `agent-prompts/ATTENDEES_SHEET_AGENT_PROMPT.md` |
 | Realtime socket client (R18 follow-up) | ✅ BUILT 2026-06-04 (`src/realtime/`, first socket.io-client on mobile) — `RealtimeProvider` (in `App.tsx`) owns the Clerk-bound socket + global `chat:message:new`/`chat:conversation:new` → React Query cache; `useChatRoom` does per-thread join/leave + `chat:typing` → local state (CLAUDE.md state rule). `tsc` green. **Remaining:** not yet run against a live socket server (gated on docker). | see R18-PLAN.md "Build notes" |
-| Friends·Groups·Messages carousel (R17-1) | ✅ BUILT 2026-06-04 on branch `r17-friends-carousel` — `FriendsListScreen` hosts a 3-way `SegmentedSwitcher` + `SegmentCarousel` (swipe, wraps both ways); Groups=`GroupsPane`, Messages=`InboxPane`, both segments not routes. `GroupsTab`/`GroupsStack` retired, group screens moved into `FriendsStack`. `tsc` green. **Remaining:** device QA. | see R18-PLAN.md "Build notes" |
+| Friends·Groups·Messages carousel (R17-1) | ✅ BUILT 2026-06-04 on branch `r17-friends-carousel` (PR #2, draft → `main`) — `FriendsListScreen` hosts a 3-way `SegmentedSwitcher` + `SegmentCarousel` (swipe, wraps both ways); Groups=`GroupsPane`, Messages=`InboxPane`, both segments not routes. `GroupsTab`/`GroupsStack` retired, group screens moved into `FriendsStack`. `tsc` green. First iPhone-17-sim run (2026-06-04) verified native build + launch + sign-in + Home render; **found+fixed the API shape bug below.** **Remaining:** full carousel swipe QA + messaging device QA. | see R18-PLAN.md "Build notes" |
+| API list-envelope shape mismatch | ✅ FIXED 2026-06-04 (commit `6c3b22b`, branch `r17-friends-carousel`) — surfaced by the first live mobile run. Backend wraps list responses (`{ friends }`/`{ requests }`/`{ groups }`/`{ polls }`/`{ suggestions }`) but 5 mobile fetchers cast to bare arrays → `x.filter is not a function` (was masked on mocks). Fixed `getFriends`/`getFriendRequests` (`api/friends.ts`) + `getGroups`/`getGroupPolls`/`getGroupSuggestions` (`api/groups.ts`) to unwrap defensively. After such a fix a **full reload** is required (React Query caches the bad shape across fast-refresh). | see R18-NEXT.md step 4 |
 
 ### DevOps — Done ✅
 

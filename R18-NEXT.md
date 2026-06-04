@@ -46,9 +46,20 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
   CoverPickerSheet) moved into `FriendsStack`; Home search + NotifSheet repoint to
   `FriendsTab → GroupDetail`. Mobile `tsc` green. Device QA still pending (step 4).
 
-### 4. Device / sim QA
-- Run the app (`/run` or `/verify`); send messages across two accounts; check inbox
-  unread badges, group/event chat, and notif-tap routing.
+### 4. Device / sim QA  — ⏳ IN PROGRESS (started 2026-06-04 on iPhone 17 sim)
+- **First live run (iPhone 17 sim, prod API):** native build + launch + JS bundle all
+  green; app signs in and renders Home. **Found + fixed a real pre-existing bug** — see
+  below. Full carousel swipe QA + messaging QA still pending (handed to device driver).
+- **🐞 API list-envelope shape mismatch (FIXED, commit `6c3b22b`).** Backend wraps list
+  responses (`{ friends }`, `{ requests }`, `{ groups }`, `{ polls }`, `{ suggestions }`)
+  but five mobile fetchers cast to bare arrays → runtime `friends.filter is not a
+  function` on first live render (FriendsListScreen, onboarding Step2Screen). NOT a
+  carousel regression — first time the app ran against the real API. Fixed all five to
+  unwrap defensively. NOTE: after the fix, a **full app reload** is needed (not just fast
+  refresh) because React Query had cached the bad shape.
+- Still TODO: drive the Friends·Groups·Messages swipe (wrap both ways, vertical-scroll
+  coexistence, BFF chip, pending-banner expand); send messages across two accounts; inbox
+  unread badges; group/event chat; notif-tap routing.
 - Realtime smoke test (step 2 is built but unexercised): with the thread open on two
   devices, confirm a sent message appears live on the other (no manual refresh) and the
   `TypingDots` indicator shows while the other party types.

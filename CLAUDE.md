@@ -164,7 +164,21 @@ Friends·Groups·Messages top-level carousel — ✅ BUILT 2026-06-04: `FriendsL
 hosts a 3-way `SegmentedSwitcher` + `SegmentCarousel` (swipe, wraps both ways);
 Groups=`GroupsPane`, Messages=`InboxPane`, both segments (not routes). `GroupsTab`/
 `GroupsStack` retired, group screens moved into `FriendsStack`; Friends pane keeps a
-pinned BFF chip + inline-expand pending banner. `tsc` green; device QA pending.
+pinned BFF chip + inline-expand pending banner. On branch `r17-friends-carousel`
+(PR #2, draft into `main`); `tsc` green; device QA in progress (first iPhone-17-sim
+run 2026-06-04 found+fixed the API shape bug in (e), full swipe QA still pending).
+(e) **API list-envelope shape mismatch — ✅ FIXED 2026-06-04 (commit `6c3b22b`, branch
+`r17-friends-carousel`).** The first live mobile run surfaced a pre-existing bug: the
+backend wraps list responses (`{ friends }`, `{ requests }`, `{ groups }`, `{ polls }`,
+`{ suggestions }`) but five mobile fetchers (`getFriends`/`getFriendRequests` in
+`api/friends.ts`, `getGroups`/`getGroupPolls`/`getGroupSuggestions` in `api/groups.ts`)
+cast to bare arrays → runtime `x.filter is not a function` on first render against the
+real API (was masked before because the app had only run on mocks). Fixed all five to
+unwrap defensively (`Array.isArray(res) ? res : res?.key ?? []`). `getFriendTypes`,
+`useInbox`, `events`, `notifications` already unwrapped; no `blocks`/`members` list
+fetchers exist. NB after such a fix a **full reload** is needed — React Query caches the
+bad shape across fast-refresh. When adding a new list endpoint, mirror the backend
+envelope in the fetcher.
 (c) migrate-deploy ✅ + `messaging-roundtrip.sh` ✅ 31/31 (2026-06-04). The run found
 + fixed a real bug: group-chat auto-create silently failed because the FriendGroup
 was written in the uncommitted per-request app-client tx while the chat insert ran on
