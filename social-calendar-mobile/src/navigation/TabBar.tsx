@@ -6,9 +6,9 @@
  *
  * The center "Create" slot is NOT a tab screen — pressing it intercepts the
  * `tabPress` event and opens the `CreateEventModal` modal stack at the root.
- * See `RootNavigator.tsx`. `GroupsTab` is registered in RootNavigator for
- * cross-tab navigation but is intentionally NOT rendered in this bar — groups
- * are reached via the Friends tab's SegmentedSwitcher.
+ * See `RootNavigator.tsx`. Groups and Messages are SEGMENTS of the Friends
+ * tab (R17-1), not tabs — they are reached via the FriendsList carousel, so
+ * there is no Groups entry in this bar.
  *
  * Visual spec (ANCHOR / NAVIGATION.md):
  *   - Background:        colors.bgElevated
@@ -171,10 +171,8 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
 /**
  * Force the visual order to: Home, Explore, Create, Friends, Profile.
  *
- * Non-canonical routes are intentionally NOT rendered. `GroupsTab` is
- * registered in RootNavigator so cross-tab navigation can target it, but
- * is hidden from this TabBar by design — see the comment on the GroupsTab
- * line in RootNavigator.tsx.
+ * Non-canonical routes are intentionally NOT rendered. There is no Groups
+ * tab — groups (and messages) are segments of the Friends tab (R17-1).
  */
 function orderRoutes(names: string[]): string[] {
   const canonical = ['HomeTab', 'ExploreTab', 'CreateTab', 'FriendsTab', 'ProfileTab'];

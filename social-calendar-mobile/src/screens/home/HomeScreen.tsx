@@ -313,7 +313,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps): React.JSX.E
         }}
         onNavigateToGroupDetail={(groupId) => {
           closeSearch();
-          navigation.navigate('GroupsTab', {
+          navigation.navigate('FriendsTab', {
             screen: 'GroupDetail',
             params: { groupId },
           });

@@ -169,6 +169,12 @@ export type {
   SegmentedOption,
 } from './social/SegmentedSwitcher';
 
+export { SegmentCarousel } from './social/SegmentCarousel';
+export type { SegmentCarouselProps } from './social/SegmentCarousel';
+
+export { GroupsPane } from './social/GroupsPane';
+export type { GroupsPaneProps } from './social/GroupsPane';
+
 export { SuggestionRow } from './social/SuggestionRow';
 export type { SuggestionRowProps } from './social/SuggestionRow';
 

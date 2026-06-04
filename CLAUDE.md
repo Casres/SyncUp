@@ -158,7 +158,10 @@ mobile): `RealtimeProvider` (in `App.tsx`) owns the Clerk-bound socket + global
 per-thread join/leave + the `chat:typing` relay feeding `ChatThreadView`'s
 `TypingDots`. Pushes update the RQ cache only; typing is local state. `tsc` green;
 NOT yet run against a live socket server (gated on the docker stack). (b) R17-1
-Friends·Groups·Messages top-level carousel — inbox ships as a reachable `Messages`
-route (FriendsList header pill), Groups still a hidden stack. (c) migrate-deploy +
-`messaging-roundtrip.sh` run. (d) DM + Report R16-9 stub clock: DM is now PROMOTED
-(real); Report stays a stub.
+Friends·Groups·Messages top-level carousel — ✅ BUILT 2026-06-04: `FriendsListScreen`
+hosts a 3-way `SegmentedSwitcher` + `SegmentCarousel` (swipe, wraps both ways);
+Groups=`GroupsPane`, Messages=`InboxPane`, both segments (not routes). `GroupsTab`/
+`GroupsStack` retired, group screens moved into `FriendsStack`; Friends pane keeps a
+pinned BFF chip + inline-expand pending banner. `tsc` green; device QA pending.
+(c) migrate-deploy ✅ + `messaging-roundtrip.sh` ✅ 31/31 (2026-06-04). (d) DM + Report
+R16-9 stub clock: DM is now PROMOTED (real); Report stays a stub.

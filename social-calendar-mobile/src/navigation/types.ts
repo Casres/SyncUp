@@ -106,17 +106,15 @@ export type FriendsStackParamList = {
   AddFriend: { method?: AddFriendMethod } | undefined;
   FriendProfile: { friendId: string };
   FriendTypesManager: undefined;
-  /** Messages inbox — the Friends-tab Messages segment surface (R17-1 / R18). */
-  Messages: undefined;
   /**
    * DM + group chat thread (R18 / D2). EVENT chat lives in HomeStack
    * (EventChat) because event surfaces hang off the Home tab.
    */
   MessageThread: { conversationId: string; type: 'DIRECT' | 'GROUP' };
-};
-
-export type GroupsStackParamList = {
-  GroupsList: undefined;
+  // Group routes (R17-1): Groups is a segment of the Friends tab, so group
+  // creation / detail / cover-picker push WITHIN FriendsStack from the Groups
+  // pane — there is no separate Groups tab. The Messages inbox is likewise a
+  // SEGMENT (rendered inside FriendsList), NOT a route.
   CreateGroup: undefined;
   GroupDetail: { groupId: string; tab?: GroupDetailTab };
   CoverPickerSheet: { selectedCoverId?: string };
@@ -156,16 +154,15 @@ export type ProfileStackParamList = {
  * Tab bar order (locked — see TabBar.tsx canonical array):
  *   Home | Explore | [Create +] | Friends | Profile
  *
- * GroupsTab is intentionally kept in this type (and in the Tab.Navigator)
- * so GroupDetailScreen retains cross-tab navigation access. It is hidden
- * from the tab bar because it is absent from TabBar.tsx's canonical array.
+ * There is NO GroupsTab (R17-1): groups and messages are SEGMENTS of the
+ * Friends tab, and the group routes live in FriendsStack. Cross-tab callers
+ * (Home search, NotifSheet) reach group detail via `FriendsTab → GroupDetail`.
  */
 export type RootTabParamList = {
   HomeTab:    NavigatorScreenParams<HomeStackParamList>;
   ExploreTab: NavigatorScreenParams<ExploreStackParamList>;
   CreateTab:  undefined;
   FriendsTab: NavigatorScreenParams<FriendsStackParamList>;
-  GroupsTab:  NavigatorScreenParams<GroupsStackParamList>; // hidden from TabBar
   ProfileTab: NavigatorScreenParams<ProfileStackParamList>;
 };
 
@@ -296,14 +293,6 @@ export type FriendTypesManagerScreenProps = CompositeScreenProps<
   >
 >;
 
-export type MessagesScreenProps = CompositeScreenProps<
-  NativeStackScreenProps<FriendsStackParamList, 'Messages'>,
-  CompositeScreenProps<
-    BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
-    NativeStackScreenProps<RootStackParamList>
-  >
->;
-
 export type MessageThreadScreenProps = CompositeScreenProps<
   NativeStackScreenProps<FriendsStackParamList, 'MessageThread'>,
   CompositeScreenProps<
@@ -312,32 +301,25 @@ export type MessageThreadScreenProps = CompositeScreenProps<
   >
 >;
 
-// --- Groups (hidden from TabBar but still in navigator for cross-tab nav) ---
-export type GroupsListScreenProps = CompositeScreenProps<
-  NativeStackScreenProps<GroupsStackParamList, 'GroupsList'>,
-  CompositeScreenProps<
-    BottomTabScreenProps<RootTabParamList, 'GroupsTab'>,
-    NativeStackScreenProps<RootStackParamList>
-  >
->;
+// --- Groups (segment of the Friends tab; routes live in FriendsStack, R17-1) ---
 export type CreateGroupScreenProps = CompositeScreenProps<
-  NativeStackScreenProps<GroupsStackParamList, 'CreateGroup'>,
+  NativeStackScreenProps<FriendsStackParamList, 'CreateGroup'>,
   CompositeScreenProps<
-    BottomTabScreenProps<RootTabParamList, 'GroupsTab'>,
+    BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
     NativeStackScreenProps<RootStackParamList>
   >
 >;
 export type GroupDetailScreenProps = CompositeScreenProps<
-  NativeStackScreenProps<GroupsStackParamList, 'GroupDetail'>,
+  NativeStackScreenProps<FriendsStackParamList, 'GroupDetail'>,
   CompositeScreenProps<
-    BottomTabScreenProps<RootTabParamList, 'GroupsTab'>,
+    BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
     NativeStackScreenProps<RootStackParamList>
   >
 >;
 export type CoverPickerSheetScreenProps = CompositeScreenProps<
-  NativeStackScreenProps<GroupsStackParamList, 'CoverPickerSheet'>,
+  NativeStackScreenProps<FriendsStackParamList, 'CoverPickerSheet'>,
   CompositeScreenProps<
-    BottomTabScreenProps<RootTabParamList, 'GroupsTab'>,
+    BottomTabScreenProps<RootTabParamList, 'FriendsTab'>,
     NativeStackScreenProps<RootStackParamList>
   >
 >;

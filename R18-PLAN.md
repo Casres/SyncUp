@@ -266,11 +266,18 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
    backend emits to `conversation:{id}` only; cross-thread awareness rides the
    GROUP_ACTIVITY notif. Not yet exercised against a live socket server (gated on step 1
    docker stack).
-2. **R17-1 Friends·Groups·Messages carousel — NOT consolidated.** The existing
-   FriendsList SegmentedSwitcher is All/BFFs/Pending (friend filters), and Groups
-   is still a separate hidden stack. Rather than risk that IA refactor blind, the
-   Messages inbox ships as a reachable route (FriendsList header "Messages" pill).
-   **Follow-up: fold GroupsList + the inbox under one top-level switcher.**
+2. **R17-1 Friends·Groups·Messages carousel — ✅ CONSOLIDATED 2026-06-04 (follow-up
+   session).** `FriendsListScreen` now hosts a 3-way `SegmentedSwitcher`
+   (Friends·Groups·Messages) + `SegmentCarousel` — a reanimated/gesture-handler
+   swipe pager that wraps both directions (clamped live drag; wrap on release via
+   threshold/velocity). Groups → new `GroupsPane`, Messages → new `InboxPane`; both
+   are SEGMENTS, not routes. The Friends pane keeps a pinned "BFFs" filter chip
+   (union multi-select with the FriendType chips) and an inline-expand
+   pending-requests banner (Director decisions 2026-06-04). IA cleanup: `GroupsTab`
+   + `GroupsStack` retired; the group screens (GroupDetail/CreateGroup/
+   CoverPickerSheet) moved into `FriendsStack`; `MessagesScreen`/`GroupsListScreen`
+   deleted; Home search + NotifSheet `navGroupDetail` repoint to
+   `FriendsTab → GroupDetail`. Mobile `tsc` green; device QA pending.
 3. **Migration not yet applied / round-trip not yet run** — needs `docker compose
    up` + Clerk creds. `npx prisma generate` already run locally.
 

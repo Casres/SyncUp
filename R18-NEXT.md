@@ -34,11 +34,14 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
 - Mobile `tsc` green. NOT yet exercised against a live socket server — needs step 1's
   docker stack, then the device smoke test in step 4.
 
-### 3. Consolidate the Friends·Groups·Messages carousel (R17-1)
-- Today: FriendsList switcher is still All/BFFs/Pending, Groups is a separate hidden
-  stack, and the inbox is reached via a "Messages" header pill.
-- Fold `GroupsListScreen` + the Messages inbox under one top-level `SegmentedSwitcher`
-  on the Friends tab (carousel wraps both directions).
+### 3. Consolidate the Friends·Groups·Messages carousel (R17-1) — ✅ DONE 2026-06-04
+- `FriendsListScreen` now hosts a 3-way `SegmentedSwitcher` (Friends·Groups·Messages)
+  + `SegmentCarousel` (reanimated/gesture-handler swipe, wraps both directions).
+- Groups → `GroupsPane`, Messages → `InboxPane` — both SEGMENTS, not routes. Friends
+  pane keeps a pinned "BFFs" filter chip + an inline-expand pending-requests banner.
+- `GroupsTab`/`GroupsStack` retired; group screens (GroupDetail/CreateGroup/
+  CoverPickerSheet) moved into `FriendsStack`; Home search + NotifSheet repoint to
+  `FriendsTab → GroupDetail`. Mobile `tsc` green. Device QA still pending (step 4).
 
 ### 4. Device / sim QA
 - Run the app (`/run` or `/verify`); send messages across two accounts; check inbox
