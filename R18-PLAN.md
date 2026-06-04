@@ -43,8 +43,8 @@ Add to `prisma/schema.prisma`:
   (inbox sort key), archivedAt? (EVENT-only).
 - `Message` — id, conversationId, senderId, content (String), sentAt.
 - `ConversationParticipant` — conversationId, userId, joinedAt,
-  lastReadMessageId? (see Open Decision D1 — used for the unread badge,
-  NOT exposed as a read receipt).
+  lastReadMessageId? (D1-resolved: the viewer's private read cursor —
+  powers the V1 unread badge; NEVER surfaced to others as a read receipt).
 - New enum `ConversationType`.
 - Relations + indexes: `Conversation.lastMessageAt` (inbox sort),
   `Message.conversationId + sentAt` (thread pagination),
@@ -183,16 +183,20 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
 
 ---
 
-## Open build decisions (resolve early — flag to Director if needed)
+## Build decisions (D1 resolved; D2–D4 open — resolve early)
 
-- **D1 — Unread count derivation.** R17-2 requires an unread *count* badge,
-  but R17-14 defers read *receipts* to V2 and R17-13 calls
-  `lastReadMessageId` "reserved for future read receipts." Resolution:
-  `lastReadMessageId` (or a `lastReadAt`) IS used in V1 to compute the
-  VIEWER'S OWN unread count (messages after their marker). It is NOT
-  surfaced to other users as "seen" — that exposure is what V2 adds. Write
-  the marker when the viewer opens/leaves a thread. **This is a clarification
-  of R17-13's framing the build must make; confirm with Director.**
+- **D1 — Unread count derivation. ✅ RESOLVED (Director-approved 2026-06-03).**
+  R17-2 requires an unread *count* badge, but R17-14 defers read *receipts*
+  to V2 and R17-13 calls `lastReadMessageId` "reserved for future read
+  receipts." **Resolution (locked):** `ConversationParticipant.lastReadMessageId`
+  is ACTIVE in V1 — it is the viewer's own private read cursor, used by the
+  inbox to compute that viewer's unread count (messages sent after the
+  marker). It is NEVER surfaced to other participants as a "seen by"
+  receipt; that cross-user exposure is the sole thing V2 adds. The client
+  advances the marker to the latest message when the viewer opens a thread
+  (and while the thread stays foregrounded). This supersedes R17-13's
+  "reserved" wording: the field is live in V1 for the badge, dormant only
+  as a read receipt.
 - **D2 — Thread route names/params.** Non-normative in R17-12. Suggested:
   `MessageThread { conversationId, type }`, `EventChat { conversationId,
   eventId }`. Finalize here.
