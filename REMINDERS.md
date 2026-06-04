@@ -2,6 +2,14 @@
 
 A reference doc to share with a new chat so they can pick up where we left off. Paste the relevant sections (or the whole thing) into any new conversation.
 
+> ⚠️ **This doc is legacy (early auth-middleware era).** For current ground
+> truth use `PROJECT_TRACKER.md`, `BUILD-CHECKLIST.md`, and `LEAD_MANAGER.md`.
+> The "frontend not yet built" line below is long obsolete — the mobile app,
+> all backend domains, and (as of **2026-06-04**) the **R18 messaging build**
+> (DM · group · event chat, branch `r18-messaging-build`) are done. See
+> `R18-PLAN.md` "Build notes" for the messaging status + pending items
+> (realtime socket client, Friends·Groups·Messages carousel, round-trip run).
+
 ## Project at a glance
 
 SyncUp is a social calendar app. The backend lives in `social-calendar-api/` and is built with Fastify + TypeScript + Prisma + Postgres. Authentication is handled by Clerk. A frontend exists in plan but is not yet built.
