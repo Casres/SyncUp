@@ -94,6 +94,9 @@ jobs:
       REDIS_URL: redis://localhost:6379
       CLERK_SECRET_KEY: sk_test_placeholder
       CLERK_WEBHOOK_SECRET: whsec_placeholder
+      CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+      CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+      CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
       PORT: 3000
       NODE_ENV: test
 
