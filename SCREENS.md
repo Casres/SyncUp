@@ -1,6 +1,7 @@
 # SyncUp — Screen Implementation Guide
 
 > Source: ANCHOR.pdf v2.5 (2026-04-27).
+> Tab IA + Groups/Messages placement reconciled to the locked anchor (TAB BAR IA + R17) on 2026-06-03: Explore is a tab; Groups and Messages are segments of the Friends tab, not separate tabs.
 > Component references map to `COMPONENTS.md`. Token references map to `TOKENS.ts`. Type references map to `TYPES.ts`.
 > Hard rules referenced inline (full text in `ANCHOR.md`).
 
@@ -250,8 +251,8 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 **Layout (top → bottom):**
 1. **FlowHeader** — title "Friends. {N}" (h1 = 28/800/-1.0).
-2. **SegmentedSwitcher** — All / BFFs / Pending (or similar segments).
-3. **FilterChipRowMulti** — filter by FriendType.
+2. **SegmentedSwitcher** — **Friends · Groups · Messages** (3-way, carousel-wraps both directions per R17-1). Items 3–5 below describe the **Friends** segment; the **Groups** segment renders the group list (see Groups section) and the **Messages** segment renders the inbox (R17-2).
+3. **FilterChipRowMulti** — filter by FriendType (Friends segment).
 4. **Body** — `StaggerList`-wrapped list of friend rows: RingAvatar + name (1-line ellipsis R5-6) + handle (mono 1-line ellipsis R5-6) + CategoryBadge + trailing chevron.
 5. **Floating "+" / Scan FAB** — opens AddFriend.
 
@@ -377,11 +378,13 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 ## Groups section
 
+> **Placement (locked):** these screens live in the **Friends tab** (`FriendsStack`), surfaced via the **Groups segment** of the FriendsList SegmentedSwitcher (TAB BAR IA + R17-1). Groups is NOT a separate bottom tab. The group-list view (below) renders as the Groups-segment body.
+
 ### Groups List
 
 **Round introduced:** R3
 **Route name:** `GroupsList`
-**Tab:** Groups
+**Tab:** Friends (Groups segment)
 
 **Layout (top → bottom):**
 1. **FlowHeader** — title "Groups. {N}".
@@ -414,7 +417,7 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 **Round introduced:** R3
 **Route name:** `CreateGroup`
-**Tab:** Groups
+**Tab:** Friends (FriendsStack · pushed from the Groups segment)
 
 **Layout (top → bottom):**
 1. **FlowHeader** — back; title "New group".
@@ -447,7 +450,7 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 **Round introduced:** R3
 **Route name:** `GroupDetail`
-**Tab:** Groups
+**Tab:** Friends (FriendsStack · pushed from the Groups segment)
 
 **Layout (top → bottom):**
 1. **AdminBar** (sticky top) — visible when `userRole === 'admin'` (Hard Rule 9). Hosts invite flow + group settings (Hard Rule 10).
@@ -488,7 +491,7 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 - Members row → push FriendProfile (if non-self).
 - Events row → push EventDetail.
 - Tap "Invite" in AdminBar → opens invite picker (uses AdminInviteRow).
-- Back → GroupsList.
+- Back → FriendsList (Groups segment).
 
 **Hard rules:** Hard Rules 8, 9, 10, 11 (PrivateBadge sparingly), R5-6.
 **Open question:** Group Detail AdminBar collapsing on scroll — deferred. Implement non-collapsing for now.
@@ -499,7 +502,7 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 **Round introduced:** R3
 **Route name:** `CoverPickerSheet`
-**Tab:** Groups (modal sheet)
+**Tab:** Friends (FriendsStack · modal sheet in the group flow)
 
 **Layout (top → bottom):**
 1. **38×4 grab handle** + sheet header "Choose cover" (h3).

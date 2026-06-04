@@ -1,6 +1,7 @@
 # SyncUp — Navigation Structure
 
 > Source: ANCHOR.pdf v2.5 (2026-04-27).
+> Tab IA + Groups/Messages placement reconciled to the locked anchor (TAB BAR IA + R17) on 2026-06-03: Explore is a tab; Groups and Messages are segments of the Friends tab, not separate tabs.
 > Convention: React Navigation route names are PascalCase.
 > Token references map to `TOKENS.ts`. Type references map to `TYPES.ts`.
 
@@ -8,17 +9,18 @@
 
 ## Tab Navigator (Root)
 
-5 tabs: **Home** | **Create** (modal trigger) | **Friends** | **Groups** | **Profile**
+5 slots (LEFT → RIGHT, locked TAB BAR IA): **Home** | **Explore** | **Create** (center, modal trigger) | **Friends** | **Profile**
 
-- The "Create" tab does NOT push a tab screen — it opens the Create Event modal stack (`CreateEventStack`) full-screen.
+- The "Create" slot does NOT push a tab screen — it opens the Create Event modal stack (`CreateEventStack`) full-screen.
+- **Groups and Messages are NOT tabs** — they are the 2nd and 3rd segments of the Friends-tab SegmentedSwitcher (Friends · Groups · Messages, R17-1).
 - Tab bar sits above the safe area bottom inset; `BroadcastToast` docks above it (`bottom: 24` from screen bottom).
 
 | Tab | Screen / Behaviour |
 |-----|--------------------|
 | Home | `HomeStack` (initial: `Home`) |
-| Create | Opens `CreateEventStack` modal — does not change selected tab visually |
-| Friends | `FriendsStack` (initial: `FriendsList`) |
-| Groups | `GroupsStack` (initial: `GroupsList`) |
+| Explore | `ExploreStack` — internal screens not yet specced (forward placeholder; the tab slot is locked, routes finalize in a later round) |
+| Create | Opens `CreateEventStack` modal — does not change selected tab visually (center slot) |
+| Friends | `FriendsStack` (initial: `FriendsList`). FriendsList hosts a 3-way SegmentedSwitcher — **Friends · Groups · Messages** (R17-1); Groups and Messages live here, not as separate tabs. |
 | Profile | `ProfileStack` (initial: `ProfileSettings`) |
 
 ---
@@ -31,6 +33,7 @@
 |-------|---------|-------|
 | Home | yes | Today / Week / Month views (TabPills inside screen) |
 | EventDetail | — | Pushed from Home feed item (or Group Detail Events tab) |
+| EventChat | — | Event chat thread (host-enabled), pushed from EventDetail or an event-chat notif card (R17-12; route name non-normative, finalizes in R18) |
 
 ### CreateEventStack (modal, full-screen)
 
@@ -45,21 +48,21 @@ Presented modally above the active tab; swipe-down to dismiss.
 
 ### FriendsStack
 
+Hosts the Friends tab's three segments (Friends · Groups · Messages, R17-1) plus every screen pushed from them. The former `GroupsStack` is folded in here.
+
 | Route | Initial | Notes |
 |-------|---------|-------|
-| FriendsList | yes | |
+| FriendsList | yes | Segmented host: **Friends** segment (friend list), **Groups** segment (group list — formerly the standalone `GroupsList` screen), **Messages** segment (inbox, R17-2) |
 | AddFriend | — | QR / Link / Username (SegmentedSwitcher inside) |
-| FriendProfile | — | Pushed from FriendsList row |
+| FriendProfile | — | Pushed from the Friends-segment row |
 | FriendTypesManager | — | Reachable from Profile or Friend Profile |
+| GroupsList | — | Now rendered as the **Groups segment** body of FriendsList; retained as a route name for the group-list view |
+| CreateGroup | — | Pushed from the Groups-segment "+"; NO invite flow here (Hard Rule 10) |
+| GroupDetail | — | Pushed from a Groups-segment card. TabPills: Members / Events / Polls / Ideas |
+| CoverPickerSheet | — | Modal sheet within the group flow |
+| MessageThread | — | DM/group thread, pushed from the Messages segment or a message notif card (R17-12; route name non-normative, finalizes in R18) |
 
-### GroupsStack
-
-| Route | Initial | Notes |
-|-------|---------|-------|
-| GroupsList | yes | |
-| CreateGroup | — | NO invite flow here (Hard Rule 10) |
-| GroupDetail | — | TabPills: Members / Events / Polls / Ideas |
-| CoverPickerSheet | — | Modal sheet within Groups |
+> `GroupsStack` no longer exists — Groups is a segment of the Friends tab and its screens live in `FriendsStack` (locked TAB BAR IA + R17-1).
 
 ### ProfileStack
 
@@ -77,15 +80,16 @@ Presented modally above the active tab; swipe-down to dismiss.
 ```ts
 type RootTabParamList = {
   HomeTab: undefined;
+  ExploreTab: undefined; // internal screens not yet specced — forward placeholder
   CreateTab: undefined; // opens modal — never receives focus as a tab
   FriendsTab: undefined;
-  GroupsTab: undefined;
   ProfileTab: undefined;
 };
 
 type HomeStackParamList = {
   Home: undefined;
   EventDetail: { eventId: string };
+  EventChat: { conversationId: string; eventId: string }; // R17-12 (route name non-normative)
 };
 
 type CreateEventStackParamList = {
@@ -96,18 +100,20 @@ type CreateEventStackParamList = {
 };
 
 type FriendsStackParamList = {
-  FriendsList: undefined;
+  FriendsList: undefined; // hosts Friends · Groups · Messages segments (R17-1)
   AddFriend: { method?: AddFriendMethod } | undefined;
   FriendProfile: { friendId: string };
   FriendTypesManager: undefined;
-};
-
-type GroupsStackParamList = {
+  // Group screens — folded in from the former GroupsStack (Groups is a Friends-tab segment):
   GroupsList: undefined;
   CreateGroup: undefined;
   GroupDetail: { groupId: string; tab?: GroupDetailTab };
   CoverPickerSheet: { selectedCoverId?: string };
+  // Messaging thread (R17-12; route name non-normative, finalizes in R18):
+  MessageThread: { conversationId: string; type: 'DIRECT' | 'GROUP' };
 };
+
+// GroupsStackParamList removed — Groups is a segment of the Friends tab; its screens are in FriendsStackParamList above.
 
 type ProfileStackParamList = {
   ProfileSettings: undefined;
@@ -148,12 +154,14 @@ Cross-screen events from the ANCHOR navigation graph (Round 4 + earlier rounds).
 | Profile entry "Friend types" | FriendTypesManager | step push |
 | FriendProfile "Plan together" | CreateEventStack > Step1 (prefilled) | modal up |
 
-### Groups
+### Groups (Friends tab · Groups segment)
+
+> All Groups screens live in `FriendsStack`, reached via the **Groups segment** of FriendsList (locked TAB BAR IA + R17-1). Pushes below are within-stack pushes from that segment.
 
 | Trigger | Destination | Animation |
 |---------|-------------|-----------|
-| GroupsList card tap | GroupDetail | step push |
-| GroupsList "+" tap | CreateGroup | step push |
+| Groups-segment card tap | GroupDetail | step push |
+| Groups-segment "+" tap | CreateGroup | step push |
 | CreateGroup CoverArt picker | CoverPickerSheet | sheet up (280ms spring) |
 | CreateGroup "Create" success | GroupDetail (replace) | step push |
 | GroupDetail Members row (other user) | FriendProfile (cross-stack via root) | step push |
@@ -231,7 +239,7 @@ Not specified in ANCHOR. Deferred to a later round.
 When implemented, suggested mapping:
 - `syncup://event/:eventId` → EventDetail (HomeStack)
 - `syncup://friend/:friendId` → FriendProfile (FriendsStack)
-- `syncup://group/:groupId` → GroupDetail (GroupsStack)
+- `syncup://group/:groupId` → GroupDetail (FriendsStack · Groups segment)
 - `syncup://invite/:inviteCode` → AddFriend with `method='link'` prefilled
 
 These are placeholders — confirm with Director before implementation.
@@ -240,7 +248,7 @@ These are placeholders — confirm with Director before implementation.
 
 ## Tab Bar Behaviour
 
-- **Always visible** on top-level routes (Home, FriendsList, GroupsList, ProfileSettings).
+- **Always visible** on top-level routes (Home, FriendsList, ProfileSettings; Explore once specced). The group list is no longer a top-level route — it is the Groups segment of FriendsList.
 - **Hidden** during the Create Event modal stack (full-screen modal).
 - **Optionally hidden** during deep-stack screens (e.g. EventDetail, FriendProfile) — implementation choice; ANCHOR doesn't mandate. Default: keep visible to preserve quick tab switching.
 - **BroadcastToast docks above tab bar** (`bottom: 24` from screen bottom) regardless of which tab is active.
