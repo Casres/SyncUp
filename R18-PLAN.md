@@ -148,8 +148,9 @@ FORBIDDEN), assert archived exclusion, assert unread counts. Expect N/0.
 - `EmptyMessages` (NO-CTA) + spinner-only loading (R17-2, R5-2).
 
 ### M3. Thread screens (R17-4 … R17-8, R17-12)
-- `MessageThread` in FriendsStack (DM + group); `EventChat` in HomeStack.
-  Finalize route names (Open Decision D2).
+- `MessageThread { conversationId, type }` in FriendsStack (DM + group);
+  `EventChat { conversationId, eventId }` in HomeStack (route names locked
+  per D2).
 - Header per type (R17-4). Bubbles: sent right/accent, received
   left/bgElevated (R17-5). Sender label above bubble for group/event only,
   omitted 1:1 (R17-5). Timestamps gap-gated/date-aware (R17-6). Typing
