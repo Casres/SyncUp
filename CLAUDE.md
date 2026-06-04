@@ -149,10 +149,16 @@ Relevant code:
 - `social-calendar-mobile/src/api/conversations.{ts,types.ts}`
 - `social-calendar-mobile/src/components/messaging/*`, `src/screens/{friends/Messages*,events/EventChat}*`
 - `scripts/messaging-roundtrip.sh` — run after any change touching these domains (needs docker + Clerk creds; not yet run).
+- `social-calendar-mobile/src/realtime/*` — the realtime socket client (see follow-up (a)).
 
-**Deferred (open follow-ups):** (a) realtime socket CLIENT on mobile — none
-exists for any domain; messaging runs REST-only today (backend emits are ready,
-`ChatThreadView` has a `typingNames` slot). (b) R17-1 Friends·Groups·Messages
-top-level carousel — inbox ships as a reachable `Messages` route (FriendsList
-header pill), Groups still a hidden stack. (c) migrate-deploy + `messaging-roundtrip.sh`
-run. (d) DM + Report R16-9 stub clock: DM is now PROMOTED (real); Report stays a stub.
+**Deferred (open follow-ups):** (a) realtime socket CLIENT on mobile — ✅ BUILT
+2026-06-04 in `social-calendar-mobile/src/realtime/` (`socket.io-client`, first on
+mobile): `RealtimeProvider` (in `App.tsx`) owns the Clerk-bound socket + global
+`chat:message:new`/`chat:conversation:new` → React Query; `useChatRoom` does
+per-thread join/leave + the `chat:typing` relay feeding `ChatThreadView`'s
+`TypingDots`. Pushes update the RQ cache only; typing is local state. `tsc` green;
+NOT yet run against a live socket server (gated on the docker stack). (b) R17-1
+Friends·Groups·Messages top-level carousel — inbox ships as a reachable `Messages`
+route (FriendsList header pill), Groups still a hidden stack. (c) migrate-deploy +
+`messaging-roundtrip.sh` run. (d) DM + Report R16-9 stub clock: DM is now PROMOTED
+(real); Report stays a stub.

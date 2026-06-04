@@ -38,6 +38,7 @@ import {
   useThread,
 } from '../../api/conversations';
 import { useMyProfile } from '../../api/profile';
+import { useChatRoom } from '../../realtime';
 import { colors, spacing } from '../../theme';
 import type { ConversationSummary, Message } from '../../api/conversations.types';
 
@@ -63,12 +64,18 @@ export function ChatThreadView({
   const markRead = useMarkRead(conversationId);
 
   const [draft, setDraft] = useState('');
-  // Populated by the socket `chat:typing` relay once realtime is wired.
-  const [typingNames] = useState<string[]>([]);
+  // Realtime room: join/leave + the `chat:typing` relay (R17-7). `typingUserIds`
+  // is local state owned by the hook — never a global store (CLAUDE.md rule).
+  const { typingUserIds, markTyping, stopTyping } = useChatRoom(conversationId);
 
   const messages = flattenThread(thread.data);
   const conv = threadConversation(thread.data);
   const newestId = messages[0]?.id;
+
+  // Resolve typing user ids → display names via the conversation participants.
+  const typingNames = typingUserIds
+    .map((id) => conv?.participants.find((p) => p.id === id)?.displayName)
+    .filter((name): name is string => Boolean(name));
 
   // Advance the read cursor to the newest message (D1).
   const lastMarked = useRef<string | undefined>(undefined);
@@ -135,11 +142,15 @@ export function ChatThreadView({
         <MessageInput
           T={T}
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={(text) => {
+            setDraft(text);
+            markTyping();
+          }}
           sending={send.isPending}
           onSend={(content) => {
             send.mutate(content);
             setDraft('');
+            stopTyping();
           }}
         />
       </KeyboardAvoidingView>

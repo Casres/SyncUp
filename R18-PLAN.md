@@ -248,13 +248,24 @@ once the API contract (endpoints + socket events) is frozen after phase 2.
 - NotifSheet M4 routing: message cards route to the thread (medium haptic).
 
 **Deviations / deferred (need a decision or a follow-up round):**
-1. **Realtime socket client — NOT built.** The mobile app has NO socket.io
-   client for ANY domain yet (presence/notifs/groups are all REST-only); adding
-   one is a cross-cutting infra task the backend handoff always scoped
-   separately. Messaging works over REST today (inbox refetch, send invalidates).
-   `chat:message:new` / `chat:conversation:new` / `chat:typing` are emitted by
-   the backend and ready; the mobile `ChatThreadView` has a `typingNames` state
-   slot the relay will populate. **Follow-up: build `src/realtime/` socket bridge.**
+1. **Realtime socket client — ✅ BUILT 2026-06-04 (follow-up session).** `src/realtime/`
+   is the first socket.io client on mobile (`socket.io-client@^4.8.3`, hoisted to the
+   workspace-root `node_modules`). `RealtimeProvider` (mounted in `App.tsx` inside
+   QueryClientProvider) owns the socket lifecycle tied to the Clerk session — `auth`
+   is supplied as a FUNCTION so a fresh Clerk JWT is fetched before every (re)connect —
+   and registers the GLOBAL chat subscriptions: `chat:message:new` prepends into the
+   thread query cache (dedupe by id) + invalidates the inbox; `chat:conversation:new`
+   invalidates the inbox. `useChatRoom(conversationId)` handles per-thread `chat:join`/
+   `chat:leave` and the bidirectional typing relay (`chat:typing` inbound → local state
+   with per-user expiry; `markTyping()`/`stopTyping()` outbound, debounced). `ChatThreadView`
+   now wires `useChatRoom` → maps typing user ids to participant names → drives the
+   existing `TypingDots` slot; the composer calls `markTyping()` on keystroke and
+   `stopTyping()` on send. Pushes update the React Query cache ONLY (no global store);
+   typing is local component state — both per CLAUDE.md state rules. Mobile `tsc` green.
+   NOTE: `chat:message:new` only arrives while a thread is open (room-scoped join) — the
+   backend emits to `conversation:{id}` only; cross-thread awareness rides the
+   GROUP_ACTIVITY notif. Not yet exercised against a live socket server (gated on step 1
+   docker stack).
 2. **R17-1 Friends·Groups·Messages carousel — NOT consolidated.** The existing
    FriendsList SegmentedSwitcher is All/BFFs/Pending (friend filters), and Groups
    is still a separate hidden stack. Rather than risk that IA refactor blind, the

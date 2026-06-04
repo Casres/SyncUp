@@ -8,10 +8,10 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
 (R18)" block + memory `project_r18_messaging_built`.
 
 **Paste-ready first message for the new session:**
-> Continue R18. Start with step 2 — build the mobile realtime socket client
-> (`src/realtime/`) for `chat:message:new` / `chat:conversation:new` /
-> `chat:typing`, wiring pushes into React Query and typing into `ChatThreadView`'s
-> `typingNames`. See R18-PLAN.md "Build notes" and the CLAUDE.md 2026-06-04 block.
+> Continue R18. Step 2 (realtime socket client) is done — do step 1 (verify the
+> backend against a live docker stack + run `messaging-roundtrip.sh`), then
+> smoke-test realtime on device per step 4. See R18-PLAN.md "Build notes" and the
+> CLAUDE.md 2026-06-04 block.
 
 ---
 
@@ -24,17 +24,15 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
   `./scripts/messaging-roundtrip.sh` — expect all-pass / 0 fail.
 - (This is the one thing the build session couldn't do — needs Docker + Clerk creds.)
 
-### 2. Build the realtime socket client on mobile  ← biggest remaining piece
-- No `socket.io-client` exists on mobile for ANY domain yet — net-new infra
-  (`npm i socket.io-client`).
-- Create `src/realtime/`: connect with the Clerk JWT; subscribe to
-  - `chat:message:new` → push into the thread query cache / invalidate inbox,
-  - `chat:conversation:new` → invalidate inbox,
-  - `chat:typing` → local state (feed `ChatThreadView`'s `typingNames` slot — it's
-    already wired to render `TypingDots`).
-- Emit `chat:join`/`chat:leave` on thread mount/unmount; `chat:typing:start/stop`
-  while typing.
-- Backend emits are already live — this is purely client-side.
+### 2. Build the realtime socket client on mobile  — ✅ DONE 2026-06-04
+- Built `src/realtime/` (`socket.io-client@^4.8.3`, first socket client on mobile).
+  `RealtimeProvider` (in `App.tsx`) owns the Clerk-session-bound socket + global
+  subscriptions: `chat:message:new` → thread cache + inbox invalidation;
+  `chat:conversation:new` → inbox invalidation. `useChatRoom(conversationId)` does
+  `chat:join`/`chat:leave` + the typing relay; `ChatThreadView` feeds the resolved
+  names into `TypingDots` and emits `markTyping()`/`stopTyping()`.
+- Mobile `tsc` green. NOT yet exercised against a live socket server — needs step 1's
+  docker stack, then the device smoke test in step 4.
 
 ### 3. Consolidate the Friends·Groups·Messages carousel (R17-1)
 - Today: FriendsList switcher is still All/BFFs/Pending, Groups is a separate hidden
@@ -45,6 +43,9 @@ Full context: `R18-PLAN.md` "Build notes" + the `CLAUDE.md` "Session of 2026-06-
 ### 4. Device / sim QA
 - Run the app (`/run` or `/verify`); send messages across two accounts; check inbox
   unread badges, group/event chat, and notif-tap routing.
+- Realtime smoke test (step 2 is built but unexercised): with the thread open on two
+  devices, confirm a sent message appears live on the other (no manual refresh) and the
+  `TypingDots` indicator shows while the other party types.
 
 ---
 
