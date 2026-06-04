@@ -140,8 +140,10 @@ else
   fail "POST /friends/requests → unexpected $FR_CODE (${FR_BODY:0:120})"
 fi
 # Real gate: B must appear in A's friends list.
+# GET /friends returns { friends: [ { friend: {...}, ... } ] } — iterate the
+# `friends` array, not the top-level object.
 RESP=$(hit_auth "$JWT_A" GET "/friends"); BODY="${RESP#*|}"
-if echo "$BODY" | jq -e --arg b "$B_APP_ID" 'any(.[]?; (.friend.id // .id) == $b)' >/dev/null 2>&1; then
+if echo "$BODY" | jq -e --arg b "$B_APP_ID" 'any(.friends[]?; (.friend.id // .id) == $b)' >/dev/null 2>&1; then
   pass "A and B are accepted friends"
 else
   fail "A and B are not friends after setup — DM tests will 403"
@@ -200,9 +202,12 @@ FG_CODE="${RESP%%|*}"; FG_BODY="${RESP#*|}"
 expect_code "POST /friend-groups (auto-creates GROUP chat)" "201" "$FG_CODE" "$FG_BODY"
 FG_ID=$(echo "$FG_BODY" | jq -r '.id // empty')
 
-# A's inbox now has a GROUP conversation; grab the newest one.
+# A's inbox now has a GROUP conversation. Select it deterministically by the
+# friend group we just created (linkedGroupId) — NOT "the newest GROUP
+# conversation", which is non-deterministic and breaks re-runs once prior runs
+# have left other group chats (with B already a participant) in the inbox.
 RESP=$(hit_auth "$JWT_A" GET "/conversations"); INBOX_A="${RESP#*|}"
-GROUP_CONV_ID=$(echo "$INBOX_A" | jq -r '[.conversations[]? | select(.type=="GROUP")] | last | .id // empty')
+GROUP_CONV_ID=$(echo "$INBOX_A" | jq -r --arg g "$FG_ID" 'first(.conversations[]? | select(.type=="GROUP" and .linkedGroupId==$g) | .id) // empty')
 [ -n "$GROUP_CONV_ID" ] && pass "GROUP conversation auto-created ($GROUP_CONV_ID)" \
   || fail "no GROUP conversation in A's inbox after FriendGroup create"
 

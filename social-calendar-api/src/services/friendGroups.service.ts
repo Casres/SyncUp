@@ -89,21 +89,25 @@ export const friendGroupsService = {
     name: string,
     io?: IoServer,
   ): Promise<FriendGroupResponse> {
-    const created = await friendGroupsRepository.create(db, ownerId, name);
-
     // R18 D4: a GROUP chat is auto-created as a side effect of FriendGroup
     // creation — never via a public route. The owner is the sole initial
     // participant; members added later are joined via addGroupParticipant.
-    // Best-effort: a chat-creation failure must not fail group creation.
-    try {
-      await conversationsService.ensureGroupConversation(io, created.id, [
-        ownerId,
-      ]);
-    } catch {
-      /* swallow — group creation already committed */
+    //
+    // The group row and its chat are created together in a single owner-client
+    // transaction (see createWithGroupChatOwner): the messaging tables have no
+    // INSERT RLS policy so the chat must be written by the owner client, and the
+    // group must be committed on the same connection first or the
+    // Conversation.linkedGroupId FK has no visible target (P2003).
+    const { group, conversationId } =
+      await friendGroupsRepository.createWithGroupChatOwner(ownerId, name);
+
+    if (io) {
+      io.to(`user:${ownerId}`).emit('chat:conversation:new', {
+        conversationId,
+      });
     }
 
-    return shape(created);
+    return shape(group);
   },
 
   async rename(
