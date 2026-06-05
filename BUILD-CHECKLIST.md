@@ -139,7 +139,7 @@ Both `tsc --noEmit` (mobile + API) clean after all changes.
 
 - [x] **Delete seed file** — DONE 2026-05-28. `prisma/seed.ts` deleted + `prisma:seed` script + `prisma.seed` config block removed from `package.json`.
 - [x] **`publicProfileSelect` consolidation** — DONE 2026-06-02. See "Recently completed" above.
-- [~] **Delete mocks tombstone** — **12 consumers still import from `../mocks`** (7 api stubs, 5 screens/components) as of 2026-06-02 Wave 4. Tombstone stays in place; deletion deferred until each consumer is rewired to a live endpoint. See "Mocks tombstone — remaining consumers" below.
+- [x] **Delete mocks tombstone** — **DONE (verified 2026-06-04).** `src/mocks/` is gone (untracked/deleted) and **zero** files import from it; `friends.ts` is fully live-wired. The tables below are kept as a historical record of the rewiring effort but no longer track open work. Only remnant: `SearchOverlay.tsx` holds a *local* hardcoded `MOCK_PEOPLE` array — wiring it needs a `GET /users/search` endpoint that does not yet exist (a scoped feature + contract decision, not a tombstone consumer). A few stale `src/mocks/...` references survive in code comments/docstrings only.
 
 ### Mocks tombstone — remaining consumers (updated 2026-06-02 after Wave 5)
 
@@ -164,7 +164,7 @@ Screens / components reading mocks directly (should consume the React Query hook
 | `src/screens/groups/GroupDetailScreen.tsx` | `MOCK_USERS_BY_ID` |
 | `src/screens/events/EventDetailScreen.tsx` | `MOCK_USERS_BY_ID` |
 
-**Next priority:** Wire `src/api/friends.ts` → live `GET /friends` — clears `MOCK_FRIENDS` which unblocks all 4 screen consumers above and reduces the tombstone to explore/availability/profile/groups only.
+**~~Next priority: Wire `src/api/friends.ts` → live `GET /friends`~~ — DONE.** `friends.ts` (and the screen consumers above) no longer import mocks; the directory is deleted. This line is left struck-through for history only.
 | `src/components/social/SearchOverlay.tsx` | `MOCK_EVENTS`, `MOCK_FRIENDS`, `MOCK_SOCIAL_GROUPS` |
 
 Observation: The `MOCK_FRIEND_TYPES` / `MOCK_FRIEND_LABELS` long pole is cleared (Wave 4). **The new long pole is `MOCK_FRIENDS`** — it blocks BroadcastSettingsScreen, AvailabilityEditorScreen, and SearchOverlay. Wiring `src/api/friends.ts` → live `GET /friends` endpoint kills 3 screen consumers and unblocks `src/api/friends.ts` itself (which still holds `MOCK_FRIENDS`, `MOCK_PENDING_REQUESTS`, `MOCK_USERS_BY_ID`). After that, `events.ts` → `notifications.ts` → remaining stubs.
