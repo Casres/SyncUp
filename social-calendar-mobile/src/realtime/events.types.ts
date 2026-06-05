@@ -28,6 +28,24 @@ export interface ServerToClientEvents {
     userId: string;
     isTyping: boolean;
   }) => void;
+  /**
+   * A new in-app notification for this user — emitted to the recipient's own
+   * `user:{id}` room by `notificationsService.dispatch` (covers message
+   * notifications, which dispatch as GROUP_ACTIVITY). `notification` is the
+   * backend `toPayload()` wire shape: the discriminator fields plus the
+   * type-specific payload hoisted to the top level.
+   */
+  'notif:new': (data: {
+    notification: {
+      id: string;
+      type: string;
+      read: boolean;
+      createdAt: string;
+      [key: string]: unknown;
+    };
+  }) => void;
+  /** A notification was dismissed (multi-device sync). */
+  'notif:dismissed': (data: { notificationId: string }) => void;
 }
 
 /** Events this client emits to the server. */

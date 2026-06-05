@@ -53,6 +53,15 @@ function toPayload(row: Notification): NotifPayload {
   };
 }
 
+/** Read the running collapse `count` off a stored payload; defaults to 1. */
+function readCount(payload: unknown): number {
+  if (payload && typeof payload === 'object' && 'count' in payload) {
+    const c = (payload as { count?: unknown }).count;
+    if (typeof c === 'number' && c > 0) return c;
+  }
+  return 1;
+}
+
 export const notificationsService = {
   /**
    * List for the current user. Newest first. Defaults limit=50.
@@ -110,7 +119,32 @@ export const notificationsService = {
     io: IoServer | undefined,
     data: CreateNotificationData,
   ): Promise<NotifPayload> {
-    const row = await notificationsRepository.create(db, data);
+    // Collapse path (opt-in via `data.collapse`): if an active notification
+    // already exists for this (userId, groupKey), refresh it in place instead
+    // of inserting a new row — many messages in one conversation become one
+    // self-updating card. The payload carries a running `count` for callers
+    // that want to show "N new". Falls back to insert when nothing to collapse.
+    let row;
+    if (data.collapse && data.groupKey) {
+      const existing = await notificationsRepository.findActiveByGroupKeyOwner(
+        data.userId,
+        data.groupKey,
+      );
+      if (existing) {
+        row = await notificationsRepository.refreshOwner(existing.id, {
+          ...data.payload,
+          count: readCount(existing.payload) + 1,
+        });
+      } else {
+        row = await notificationsRepository.create(db, {
+          ...data,
+          payload: { ...data.payload, count: 1 },
+        });
+      }
+    } else {
+      row = await notificationsRepository.create(db, data);
+    }
+
     const payload = toPayload(row);
     if (io) {
       io.to(`user:${data.userId}`).emit('notif:new', {
