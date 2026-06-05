@@ -1,15 +1,15 @@
 # MESSAGING_ROUNDTRIP_RESULTS
 
-**Date:** 2026-06-04  
-**Commit:** `9ec2519`  
+**Date:** 2026-06-05  
+**Commit:** `bd4b2ff`  
 **API base:** http://localhost:3000
 
 ---
 
 ## Summary
 
-- Total checks: 31
-- Passed: 31
+- Total checks: 36
+- Passed: 36
 - Failed: 0
 
 ## Coverage
