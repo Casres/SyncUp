@@ -86,7 +86,9 @@ If you're picking up where this round left off, the relevant code lives in:
 
 DM and Report ship as stubs (toast-only) per R16-9.
 
-**Stub decision — 2026-06-02:** both stubs are intentionally KEPT this round, not promoted and not cut.
+> **STATUS UPDATE (2026-06-04, R18):** **DM is now PROMOTED to a real flow** — `FriendProfileScreen` navigates to the live `MessageThread` (messaging shipped in R18, merged via PR #1). The former `DM_STUB_COPY` string is now only an error-toast fallback ("Couldn't open the chat. Try again."), not "coming soon" copy. **Report remains a stub** (no report pipeline yet). The R16-2026-06-02 decision below is preserved as the historical record; the DM half is superseded.
+
+**Stub decision — 2026-06-02 (historical; DM half superseded — see status update above):** both stubs are intentionally KEPT this round, not promoted and not cut.
 - **DM** stays a stub. No DM backend domain exists; building a real DM flow is a separate scoped task, deferred to a future round.
 - **Report** stays a stub. It's a safety/flag affordance — cutting it would remove the only path to report someone from a profile with nothing replacing it, so the stub is retained until a real report pipeline is built.
 
