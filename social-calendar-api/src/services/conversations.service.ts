@@ -404,6 +404,9 @@ export const conversationsService = {
             preview,
           },
           groupKey: `conversation:${conversationId}`,
+          // Collapse repeats: many messages in one conversation become a
+          // single self-updating card instead of one card per message.
+          collapse: true,
         });
       } catch {
         // Dispatch is best-effort — never fail the send on a notif error.

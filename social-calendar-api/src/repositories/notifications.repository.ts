@@ -47,7 +47,13 @@ type NotificationDelegate = {
   }): Promise<Notification[]>;
 
   findFirst(args: {
-    where: { id: string; userId?: string; dismissedAt?: null };
+    where: {
+      id?: string;
+      userId?: string;
+      groupKey?: string;
+      dismissedAt?: null;
+    };
+    orderBy?: { createdAt?: 'asc' | 'desc' };
   }): Promise<Notification | null>;
 
   count(args?: { where?: NotifWhere }): Promise<number>;
@@ -59,6 +65,15 @@ type NotificationDelegate = {
       payload: Prisma.InputJsonValue;
       groupKey?: string | null;
       read?: boolean;
+    };
+  }): Promise<Notification>;
+
+  update(args: {
+    where: { id: string };
+    data: {
+      payload?: Prisma.InputJsonValue;
+      read?: boolean;
+      createdAt?: Date;
     };
   }): Promise<Notification>;
 
@@ -103,6 +118,13 @@ export type CreateNotificationData = {
   type: NotifType;
   payload: Record<string, unknown>;
   groupKey?: string | null;
+  /**
+   * When true (and `groupKey` is set), the service collapses repeats into the
+   * existing active notification for that key instead of inserting a new row —
+   * e.g. many messages in one conversation become one self-updating card. Read
+   * by `notificationsService.dispatch`; the `create` insert ignores it.
+   */
+  collapse?: boolean;
 };
 
 export const notificationsRepository = {
@@ -168,6 +190,35 @@ export const notificationsRepository = {
         type: data.type,
         payload: data.payload as Prisma.InputJsonValue,
         groupKey: data.groupKey ?? null,
+      },
+    });
+  },
+
+  /**
+   * Find the most recent active (undismissed) notification for a
+   * (userId, groupKey) pair — the collapse target for message-style notifs.
+   * Owner client: same cross-user side-effect path as `create` (the row's
+   * userId is the recipient, not the acting sender).
+   */
+  findActiveByGroupKeyOwner(userId: string, groupKey: string) {
+    return notif(prisma).findFirst({
+      where: { userId, groupKey, dismissedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+  },
+
+  /**
+   * Collapse a repeat into an existing notification: swap in the latest
+   * payload, mark it unread again, and bump `createdAt` so the list (ordered
+   * by createdAt desc) floats it back to the top. Owner client.
+   */
+  refreshOwner(id: string, payload: Record<string, unknown>) {
+    return notif(prisma).update({
+      where: { id },
+      data: {
+        payload: payload as Prisma.InputJsonValue,
+        read: false,
+        createdAt: new Date(),
       },
     });
   },

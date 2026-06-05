@@ -10,6 +10,11 @@
  *   - `chat:message:new`      → push into the thread query cache + invalidate
  *                               the inbox (preview + unread badge re-sync).
  *   - `chat:conversation:new` → invalidate the inbox.
+ *   - `notif:new`             → invalidate the notifications query so the Home
+ *                               bell's unread dot + the NotifSheet update live
+ *                               (message notifs dispatch as GROUP_ACTIVITY).
+ *   - `notif:dismissed`       → drop the row from the notifications cache
+ *                               (multi-device dismiss sync).
  *
  * HARD RULE (CLAUDE.md): socket pushes update the React Query cache ONLY —
  * never a global store. Typing events are local component state (useChatRoom).
@@ -29,6 +34,7 @@ import { queryKeys } from '../api/queryKeys';
 import { createChatSocket } from './socket';
 import type { ChatSocket } from './events.types';
 import type { Message, ThreadResponse } from '../api/conversations.types';
+import type { Notif } from '../../../TYPES';
 
 const RealtimeContext = createContext<ChatSocket | null>(null);
 
@@ -94,14 +100,39 @@ export function RealtimeProvider({
       void qc.invalidateQueries({ queryKey: queryKeys.conversations.inbox() });
     };
 
+    // A new in-app notification → re-sync the notifications query so the Home
+    // bell's unread dot + the NotifSheet update live. The Home tab stays
+    // mounted, so invalidate refetches immediately rather than waiting out the
+    // 60s staleTime. Invalidate (not a manual prepend) keeps the backend→mobile
+    // shape mapping in one place (getNotifications / toMobileNotif).
+    const handleNotifNew = () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.notifications.all() });
+    };
+
+    // A dismissal elsewhere → optimistically drop the row (multi-device sync).
+    const handleNotifDismissed = ({
+      notificationId,
+    }: {
+      notificationId: string;
+    }) => {
+      qc.setQueryData<Notif[]>(
+        queryKeys.notifications.all(),
+        (prev) => prev?.filter((n) => n.id !== notificationId) ?? prev,
+      );
+    };
+
     s.on('chat:message:new', handleMessage);
     s.on('chat:conversation:new', handleConversationNew);
+    s.on('notif:new', handleNotifNew);
+    s.on('notif:dismissed', handleNotifDismissed);
     s.connect();
     setSocket(s);
 
     return () => {
       s.off('chat:message:new', handleMessage);
       s.off('chat:conversation:new', handleConversationNew);
+      s.off('notif:new', handleNotifNew);
+      s.off('notif:dismissed', handleNotifDismissed);
       s.disconnect();
       setSocket(null);
     };

@@ -8,6 +8,8 @@
 #
 # Covers:
 #   - DIRECT (1:1) get-or-create, send, receive, unread count, mark-read
+#   - Notification collapse (PR #3): N messages in one conversation → ONE
+#     recipient notif row, count bumps by N, re-surfaces unread
 #   - GROUP chat auto-created by FriendGroup creation (R18 D4), member join
 #   - EVENT chat host-enable (organiser-only), idempotency, non-organiser 403
 #   - Participant gating: a non-participant GET → 403 FORBIDDEN
@@ -194,6 +196,52 @@ if [ -n "$DM_MSG_ID" ]; then
   [ "${UNREAD_B2:-x}" = "0" ] && pass "B inbox unreadCount reset to 0 after read" \
     || fail "B inbox unreadCount expected 0 after read, got '${UNREAD_B2}'"
 fi
+
+# ── Notification collapse (per-conversation, PR #3) ──────────────────────────
+# Many messages in one conversation must collapse into ONE self-updating
+# notification row for the recipient (refreshed in place, re-surfaced unread,
+# running `count` in the payload) — NOT one card per message.
+#
+# Collapse keys on the recipient's ACTIVE (undismissed) row for
+# groupKey=conversation:<id>, and `count` accumulates until that row is
+# dismissed. So across re-runs the absolute count drifts — we assert the DELTA
+# (send N more → exactly one row, count up by N, read=false) rather than an
+# absolute value. The "hello from A" send above already created B's first row.
+section "Notification collapse (per-conversation, PR #3)"
+
+# jq helpers over GET /notifications → { notifications: [...] }; each row spreads
+# its payload, so conversationId/count/read are top-level on the row.
+notif_rows()  { echo "$1" | jq -r --arg c "$DM_CONV_ID" '[.notifications[]? | select(.conversationId==$c)] | length'; }
+notif_count() { echo "$1" | jq -r --arg c "$DM_CONV_ID" 'first(.notifications[]? | select(.conversationId==$c)) | .count // 0'; }
+notif_read()  { echo "$1" | jq -r --arg c "$DM_CONV_ID" 'first(.notifications[]? | select(.conversationId==$c)) | .read'; }
+
+# Baseline (after "hello from A"): expect exactly one row, count ≥ 1.
+RESP=$(hit_auth "$JWT_B" GET "/notifications"); NOTIF_B0="${RESP#*|}"
+BASE_ROWS=$(notif_rows "$NOTIF_B0"); BASE_COUNT=$(notif_count "$NOTIF_B0")
+[ "${BASE_ROWS:-0}" = "1" ] && pass "B has exactly 1 notif row for the DM (baseline)" \
+  || fail "B baseline DM notif rows expected 1, got '${BASE_ROWS}' (collapse may be off)"
+[ "${BASE_COUNT:-0}" -ge 1 ] 2>/dev/null && info "baseline count=${BASE_COUNT}" \
+  || fail "B baseline DM notif count expected ≥1, got '${BASE_COUNT}'"
+
+# A sends two more messages → these must collapse into the SAME row.
+hit_auth "$JWT_A" POST "/conversations/$DM_CONV_ID/messages" '{"content":"second"}' >/dev/null
+hit_auth "$JWT_A" POST "/conversations/$DM_CONV_ID/messages" '{"content":"third"}'  >/dev/null
+
+RESP=$(hit_auth "$JWT_B" GET "/notifications"); NOTIF_B1="${RESP#*|}"
+NEW_ROWS=$(notif_rows "$NOTIF_B1"); NEW_COUNT=$(notif_count "$NOTIF_B1"); NEW_READ=$(notif_read "$NOTIF_B1")
+
+# Headline: still exactly ONE row after 2 more messages (no per-message flurry).
+[ "${NEW_ROWS:-0}" = "1" ] && pass "2 more messages collapse into ONE notif row (got 1 row)" \
+  || fail "collapse failed — expected 1 DM notif row, got '${NEW_ROWS}' (flurry?)"
+
+# count bumped by exactly 2 (delta, not absolute — robust to re-runs).
+EXPECT_COUNT=$((BASE_COUNT + 2))
+[ "${NEW_COUNT:-0}" = "$EXPECT_COUNT" ] && pass "collapse count bumped by 2 (${BASE_COUNT}→${NEW_COUNT})" \
+  || fail "collapse count expected ${EXPECT_COUNT} (${BASE_COUNT}+2), got '${NEW_COUNT}'"
+
+# Re-surfaced as unread (refreshOwner marks read=false).
+[ "${NEW_READ}" = "false" ] && pass "collapsed notif re-surfaced as unread (read=false)" \
+  || fail "collapsed notif expected read=false, got '${NEW_READ}'"
 
 # ── GROUP chat (auto-created by FriendGroup creation, R18 D4) ─────────────────
 section "Group chat (auto-created via FriendGroup)"
