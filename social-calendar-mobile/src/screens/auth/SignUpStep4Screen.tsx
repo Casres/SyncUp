@@ -22,6 +22,7 @@ import { PillBtn } from '../../components/foundation/PillBtn';
 import { ProgressDots } from '../../components/foundation/ProgressDots';
 import { colors, spacing, typography, useHaptic } from '../../theme';
 import type { SignUpStep4ScreenProps } from '../../navigation/types';
+import { setSignupSessionId } from './signupSessionStore';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -47,7 +48,15 @@ export default function SignUpStep4Screen({
     setSubmitting(true);
     setError(null);
     try {
-      await signUp.update({ password });
+      // Setting the password completes the Clerk sign-up; Clerk mints the
+      // session here. setActive() only runs ~5 screens later on YoureIn, by
+      // which point `signUp.createdSessionId` has been dropped from the client
+      // resource — so capture it now and stash it for YoureIn (issue #4). Use
+      // the resolved resource from update(), not the possibly-stale closure.
+      const completed = await signUp.update({ password });
+      if (completed.status === 'complete' && completed.createdSessionId) {
+        setSignupSessionId(completed.createdSessionId);
+      }
       fire('success');
       navigation.navigate('SignUpStep5', {
         credential,
