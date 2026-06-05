@@ -57,7 +57,10 @@ export function pollIsClosed(poll: Poll, now: Date = new Date()): boolean {
 // ---------------------------------------------------------------------------
 
 export async function getGroups(authedFetch: AuthedFetch): Promise<SocialGroup[]> {
-  return authedFetch<SocialGroup[]>('/groups');
+  // Backend wraps the list: GET /groups → { groups: [...] }. Normalize
+  // defensively so a bare-array response (e.g. mocks) also works.
+  const res = await authedFetch<{ groups: SocialGroup[] } | SocialGroup[]>('/groups');
+  return Array.isArray(res) ? res : (res?.groups ?? []);
 }
 
 export async function getGroupDetail(
@@ -71,16 +74,22 @@ export async function getGroupPolls(
   authedFetch: AuthedFetch,
   groupId: string,
 ): Promise<Poll[]> {
-  return authedFetch<Poll[]>(`/groups/${encodeURIComponent(groupId)}/polls`);
+  // Backend wraps: GET /groups/:id/polls → { polls: [...] }.
+  const res = await authedFetch<{ polls: Poll[] } | Poll[]>(
+    `/groups/${encodeURIComponent(groupId)}/polls`,
+  );
+  return Array.isArray(res) ? res : (res?.polls ?? []);
 }
 
 export async function getGroupSuggestions(
   authedFetch: AuthedFetch,
   groupId: string,
 ): Promise<Suggestion[]> {
-  return authedFetch<Suggestion[]>(
+  // Backend wraps: GET /groups/:id/suggestions → { suggestions: [...] }.
+  const res = await authedFetch<{ suggestions: Suggestion[] } | Suggestion[]>(
     `/groups/${encodeURIComponent(groupId)}/suggestions`,
   );
+  return Array.isArray(res) ? res : (res?.suggestions ?? []);
 }
 
 export async function createGroup(

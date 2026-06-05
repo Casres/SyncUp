@@ -5,9 +5,9 @@
  *   RootStack (native-stack, root)
  *     ├── "Tabs"               — BottomTabNavigator (5 tabs)
  *     │     ├── HomeTab    → HomeStack
- *     │     ├── FriendsTab → FriendsStack
+ *     │     ├── ExploreTab → ExploreStack
  *     │     ├── CreateTab  → empty placeholder; press intercepted by TabBar
- *     │     ├── GroupsTab  → GroupsStack
+ *     │     ├── FriendsTab → FriendsStack (hosts Groups + Messages segments)
  *     │     └── ProfileTab → ProfileStack
  *     │
  *     └── "CreateEventModal"   — CreateEventStack (fullScreenModal)
@@ -34,7 +34,6 @@ import type { RootStackParamList, RootTabParamList } from './types';
 import HomeStack        from './HomeStack';
 import ExploreStack     from './ExploreStack';
 import FriendsStack     from './FriendsStack';
-import GroupsStack      from './GroupsStack';
 import ProfileStack     from './ProfileStack';
 import CreateEventStack from './CreateEventStack';
 import AuthNavigator   from './AuthNavigator';
@@ -49,9 +48,9 @@ import { SearchProvider } from '../components/social/SearchContext';
 // TAB BAR IA (LOCKED 2026-05-25): Home · Explore · Create(+) · Friends ·
 // Profile. ANCHOR R6-6 + Hard Rule 23 updated to match. NotifSheet is a
 // root-level overlay (mounted below) opened from the Home FlowHeader bell
-// — it is intentionally NOT a tab. GroupsTab is registered for cross-tab
-// navigation but hidden from the bar; groups are reached via the Friends
-// tab's SegmentedSwitcher.
+// — it is intentionally NOT a tab. There is no GroupsTab: groups and
+// messages are SEGMENTS of the Friends tab (R17-1), and the group routes
+// live in FriendsStack.
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -87,8 +86,6 @@ function TabNavigator() {
         })}
       />
       <Tab.Screen name="FriendsTab" component={FriendsStack} />
-      {/* GroupsTab: present in navigator for cross-tab navigation, hidden from TabBar */}
-      <Tab.Screen name="GroupsTab"  component={GroupsStack} />
       <Tab.Screen name="ProfileTab" component={ProfileStack} />
     </Tab.Navigator>
   );

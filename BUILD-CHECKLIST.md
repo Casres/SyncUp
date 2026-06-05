@@ -1,14 +1,14 @@
 # SyncUp — Build Checklist (Pre-Testing)
 
-Last updated: 2026-06-04 (R18: messaging build — branch `r18-messaging-build`)
+Last updated: 2026-06-04 (R18: messaging — MERGED to `main` via PR #1 `a62668a`; roundtrip 31/31)
 
 ---
 
 ## Recently completed (2026-06-04 — R18: messaging build)
 
 Messaging (DM · group · event chat) shipped end-to-end. Both workspaces `tsc`
-green; `social-calendar-api` `npm run build` green. Branch `r18-messaging-build`
-pushed to `origin`.
+green; `social-calendar-api` `npm run build` green. **MERGED to `main` 2026-06-04
+via PR #1 (merge commit `a62668a`); `r18-messaging-build` branch deleted.**
 
 - [x] **Backend domain** — `Conversation`/`Message`/`ConversationParticipant`
   models + `ConversationType` enum; migration `20260603000001_messaging`.
@@ -27,10 +27,26 @@ pushed to `origin`.
 - [x] **Mobile** — `conversations.ts`/`.types.ts` hooks; `components/messaging/*`
   + `EmptyMessages`; MessagesScreen/MessageThreadScreen/EventChatScreen + nav.
   DM promoted from R16-9 stub → real (R17-9). NotifSheet M4 routing.
-- [ ] **PENDING — migrate-deploy + run `scripts/messaging-roundtrip.sh`** (needs
-  `docker compose up` + Clerk creds). `npx prisma generate` already run locally.
-- [ ] **PENDING — realtime socket client on mobile** (none exists for any domain).
-- [ ] **PENDING — R17-1 Friends·Groups·Messages carousel consolidation.**
+- [x] **migrate-deploy + `scripts/messaging-roundtrip.sh`** — DONE 2026-06-04,
+  **31/31, 0 fail, re-runnable** (`MESSAGING_ROUNDTRIP_RESULTS.md`). Note: the
+  messaging migration is NOT auto-applied at boot (Dockerfile `CMD` is just
+  `node dist/server.js`) — run `docker compose exec api npx prisma migrate deploy`
+  after `docker compose up -d --build`. Run found+fixed a group-chat auto-create FK
+  bug (`createWithGroupChatOwner`, atomic owner-client tx) + 2 script assertions.
+- [x] **Realtime socket client on mobile** — DONE 2026-06-04 (`src/realtime/`, first
+  socket.io-client on mobile). **Remaining:** not yet run against a live socket server.
+- [x] **R17-1 Friends·Groups·Messages carousel consolidation** — DONE 2026-06-04 on
+  branch `r17-friends-carousel` (PR #2; Groups + inbox are now segments, not routes).
+  **Remaining:** full carousel swipe QA + messaging device QA.
+- [x] **API list-envelope shape mismatch** — FIXED 2026-06-04 (commit `6c3b22b`),
+  surfaced by the first live iPhone-17-sim run. Backend wraps list responses
+  (`{ friends }`/`{ requests }`/`{ groups }`/`{ polls }`/`{ suggestions }`) but 5 mobile
+  fetchers cast to bare arrays → `x.filter is not a function` (masked while on mocks).
+  Fixed all 5 to unwrap defensively. **Lesson:** any new list endpoint must mirror the
+  backend envelope in its fetcher; after such a fix, full-reload (RQ caches the bad shape).
+- [x] **CI Test job fixed** — was pre-existing red on `main` (`ci.yml` omitted the
+  `CLOUDINARY_*` vars `env.ts` requires at import → `process.exit(1)` before any test);
+  fixed by adding them as GitHub repo secrets wired into the Test job env. CI now green.
 
 ---
 

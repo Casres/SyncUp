@@ -1,50 +1,51 @@
 /**
- * GroupsListScreen — All social groups for 'me'.
+ * GroupsPane — the Groups segment body of the Friends-tab carousel (R17-1).
  *
- * SCREENS.md Groups List layout:
- *  1. FlowHeader title "Groups · {N}"
- *  2. SegmentedSwitcher — All / Mine / Joined
- *  3. StaggerList of group cards: CoverArt + name + member count + PrivateBadge
- *  4. Floating "+" FAB → opens CreateGroup
+ * Extracted from the former GroupsListScreen so the group list renders inside
+ * the FriendsList SegmentedSwitcher (Groups is a Friends-tab segment, not a
+ * tab). Self-contained data (useGroups) + its own inner All / Mine / Joined
+ * switcher; the host owns the FlowHeader and the "+ New" FAB.
  *
- * Hard rules: Hard Rule 11 (PrivateBadge sparingly — list rows where the
- * privacy isn't already screen-stated), R5-6 (2-line clamp on group name).
- *
- * Edge cases: long group name → 2-line clamp; group of 1 still appears.
- *
- * Haptics: tab change → light; card tap → light.
+ * SCREENS.md Groups List rules preserved: PrivateBadge sparingly (Hard Rule
+ * 11), 2-line clamp on group name (R5-6), light haptic on card tap.
  */
+
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
-import {
-  CoverArt,
-  EmptyGroups,
-  ErrorState,
-  FlowHeader,
-  LoadingOverlay,
-  PillBtn,
-  PrivateBadge,
-  SegmentedSwitcher,
-  StaggerList,
-} from '../../components';
+// Direct imports (not the barrel) — this component is itself re-exported by
+// the barrel, so importing siblings from it would be a circular dependency.
+import { CoverArt } from './CoverArt';
+import { PrivateBadge } from './PrivateBadge';
+import { SegmentedSwitcher } from './SegmentedSwitcher';
+import { EmptyGroups } from '../emptyStates/EmptyGroups';
+import { ErrorState } from '../polish/ErrorState';
+import { LoadingOverlay } from '../polish/LoadingOverlay';
+import { StaggerList } from '../polish/StaggerList';
 import { colors, radii, spacing, typography, useHaptic } from '../../theme';
 import { useGroups } from '../../api';
-import { useIsFirstRun } from '../auth/onboarding/useIsFirstRun';
-import type { GroupsListScreenProps } from '../../navigation/types';
+import { useIsFirstRun } from '../../screens/auth/onboarding/useIsFirstRun';
 import type { SocialGroup } from '../../../../TYPES';
 
+type Theme = typeof colors.light;
+
 const SEGMENTS = [
-  { id: 'all',    label: 'All' },
-  { id: 'mine',   label: 'Mine' },
+  { id: 'all', label: 'All' },
+  { id: 'mine', label: 'Mine' },
   { id: 'joined', label: 'Joined' },
 ];
 
-export default function GroupsListScreen({
-  navigation,
-}: GroupsListScreenProps): React.JSX.Element {
-  const T = colors.light;
+export interface GroupsPaneProps {
+  T?: Theme;
+  onOpenGroup: (groupId: string) => void;
+  onCreateGroup: () => void;
+}
+
+export function GroupsPane({
+  T = colors.light,
+  onOpenGroup,
+  onCreateGroup,
+}: GroupsPaneProps): React.JSX.Element {
   const fire = useHaptic();
   const firstRun = useIsFirstRun();
   const [segment, setSegment] = useState<string>('all');
@@ -53,43 +54,29 @@ export default function GroupsListScreen({
 
   const visibleGroups = useMemo(
     () => filterGroups(groups ?? [], segment),
-    [groups, segment]
+    [groups, segment],
   );
 
   if (isLoading) {
-    return (
-      <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
-        <FlowHeader T={T} title="Groups" />
-        <LoadingOverlay T={T} caption="LOADING ·" />
-      </SafeAreaView>
-    );
+    return <LoadingOverlay T={T} caption="LOADING ·" />;
   }
   if (error) {
     return (
-      <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
-        <FlowHeader T={T} title="Groups" />
-        <View style={styles.fill}>
-          <ErrorState T={T} kind="network" onPrimary={() => refetch()} />
-        </View>
-      </SafeAreaView>
+      <View style={styles.fill}>
+        <ErrorState T={T} kind="network" onPrimary={() => refetch()} />
+      </View>
     );
   }
 
-  const count = groups?.length ?? 0;
-
-  // TODO (GAP 2): wire SearchOverlay entry via FlowHeader search icon.
-
   return (
-    <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: T.bg }]}>
-      <FlowHeader T={T} title={`Groups · ${count}`} />
-
+    <View style={styles.fill}>
       <View style={styles.segRow}>
         <SegmentedSwitcher T={T} options={SEGMENTS} value={segment} onChange={setSegment} />
       </View>
 
       {visibleGroups.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyContent}>
-          <EmptyGroups T={T} firstRun={firstRun} onCreate={() => navigation.navigate('CreateGroup')} />
+          <EmptyGroups T={T} firstRun={firstRun} onCreate={onCreateGroup} />
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>
@@ -101,7 +88,7 @@ export default function GroupsListScreen({
                 accessibilityLabel={g.name}
                 onPress={() => {
                   fire('light');
-                  navigation.navigate('GroupDetail', { groupId: g.id });
+                  onOpenGroup(g.id);
                 }}
                 style={({ pressed }) => [
                   styles.card,
@@ -131,17 +118,7 @@ export default function GroupsListScreen({
           </StaggerList>
         </ScrollView>
       )}
-
-      <View style={styles.fab}>
-        <PillBtn
-          T={T}
-          label="+ New"
-          variant="primary"
-          size="md"
-          onPress={() => navigation.navigate('CreateGroup')}
-        />
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -152,7 +129,6 @@ function filterGroups(groups: SocialGroup[], segment: string): SocialGroup[] {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
   fill: { flex: 1 },
   segRow: {
     paddingHorizontal: spacing.mdl,
@@ -182,10 +158,5 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: spacing.xs,
-  },
-  fab: {
-    position: 'absolute',
-    right: spacing.mdl,
-    bottom: spacing.lg,
   },
 });

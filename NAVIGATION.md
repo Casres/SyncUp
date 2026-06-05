@@ -6,14 +6,15 @@
 > Token references map to `TOKENS.ts`. Type references map to `TYPES.ts`.
 >
 > **R18 build status (2026-06-04):** the messaging routes below are BUILT and
-> their names finalized per D2 — `MessageThread { conversationId, type }` and
-> `Messages` in `FriendsStack`; `EventChat { conversationId, eventId }` in
-> `HomeStack`. **Caveat:** the Friends·Groups·Messages carousel below is still
-> the *target* IA — the shipped FriendsList switcher is still All/BFFs/Pending,
-> Groups is still a separate (hidden) `GroupsStack`, and the Messages inbox is
-> reached via a `Messages` route (FriendsList header "Messages" pill), not yet a
-> segment. Folding GroupsStack + the inbox under one switcher is the open R18
-> follow-up (see R18-PLAN.md "Build notes").
+> their names finalized per D2 — `MessageThread { conversationId, type }` in
+> `FriendsStack`; `EventChat { conversationId, eventId }` in `HomeStack`.
+> The **Friends·Groups·Messages carousel is now BUILT** (R17-1): `FriendsList`
+> hosts a 3-way `SegmentedSwitcher` + a swipe carousel (`SegmentCarousel`,
+> wraps both directions). Groups and Messages are SEGMENTS, not routes —
+> `GroupsStack`/`GroupsTab` are retired and the group screens (GroupDetail,
+> CreateGroup, CoverPickerSheet) now live in `FriendsStack`; the inbox renders
+> via `InboxPane` (no `Messages` route). Cross-tab callers (Home search,
+> NotifSheet) route to group detail via `FriendsTab → GroupDetail`.
 
 ---
 
@@ -62,11 +63,10 @@ Hosts the Friends tab's three segments (Friends · Groups · Messages, R17-1) pl
 
 | Route | Initial | Notes |
 |-------|---------|-------|
-| FriendsList | yes | Segmented host: **Friends** segment (friend list), **Groups** segment (group list — formerly the standalone `GroupsList` screen), **Messages** segment (inbox, R17-2) |
+| FriendsList | yes | Segmented host: **Friends** segment (friend list), **Groups** segment (`GroupsPane`), **Messages** segment (`InboxPane`, R17-2). Bodies swipe via `SegmentCarousel` |
 | AddFriend | — | QR / Link / Username (SegmentedSwitcher inside) |
 | FriendProfile | — | Pushed from the Friends-segment row |
 | FriendTypesManager | — | Reachable from Profile or Friend Profile |
-| GroupsList | — | Now rendered as the **Groups segment** body of FriendsList; retained as a route name for the group-list view |
 | CreateGroup | — | Pushed from the Groups-segment "+"; NO invite flow here (Hard Rule 10) |
 | GroupDetail | — | Pushed from a Groups-segment card. TabPills: Members / Events / Polls / Ideas |
 | CoverPickerSheet | — | Modal sheet within the group flow |
@@ -114,13 +114,14 @@ type FriendsStackParamList = {
   AddFriend: { method?: AddFriendMethod } | undefined;
   FriendProfile: { friendId: string };
   FriendTypesManager: undefined;
-  // Group screens — folded in from the former GroupsStack (Groups is a Friends-tab segment):
-  GroupsList: undefined;
+  // Messaging thread (R17-12 / D2 — BUILT R18). The inbox is the Messages
+  // SEGMENT (InboxPane), not a route.
+  MessageThread: { conversationId: string; type: 'DIRECT' | 'GROUP' };
+  // Group screens — folded in from the former GroupsStack (Groups is a
+  // Friends-tab segment, R17-1). The group LIST is GroupsPane (no route).
   CreateGroup: undefined;
   GroupDetail: { groupId: string; tab?: GroupDetailTab };
   CoverPickerSheet: { selectedCoverId?: string };
-  // Messaging thread (R17-12; route name non-normative, finalizes in R18):
-  MessageThread: { conversationId: string; type: 'DIRECT' | 'GROUP' };
 };
 
 // GroupsStackParamList removed — Groups is a segment of the Friends tab; its screens are in FriendsStackParamList above.

@@ -718,18 +718,20 @@ Same FlowHeader / ProgressBar / banded list / FilterChipRowMulti as Standard, PL
 
 ---
 
-## Messaging (R18 — built 2026-06-04, branch `r18-messaging-build`)
+## Messaging (R18 — built 2026-06-04, MERGED to `main` via PR #1 `a62668a`)
 
-> Caveat: R17-1's Friends·Groups·Messages top-level carousel is NOT yet
-> consolidated. The inbox ships as a reachable `Messages` route (FriendsList
-> header "Messages" pill); folding GroupsList + the inbox under one
-> SegmentedSwitcher is the open R18 follow-up (R18-PLAN.md "Build notes").
+> R17-1's Friends·Groups·Messages top-level carousel is **BUILT** (2026-06-04):
+> `FriendsListScreen` hosts the 3-way `SegmentedSwitcher` + a swipe carousel
+> (`SegmentCarousel`, wraps both directions). Groups is `GroupsPane`, Messages
+> is `InboxPane` — both SEGMENTS, not routes. The Friends pane keeps a pinned
+> "BFFs" filter chip and an inline-expand pending-requests banner. `GroupsTab`/
+> `GroupsStack` are retired; group screens live in `FriendsStack`.
 
-### Messages (inbox) — `MessagesScreen`
-**File:** `src/screens/friends/MessagesScreen.tsx` (FriendsStack route `Messages`). R17-1/R17-2.
-- Layout: FlowHeader "Messages" → list of `InboxRow` (newest first, archived excluded).
+### Messages (inbox) — `InboxPane`
+**File:** `src/components/messaging/InboxPane.tsx` — the **Messages segment** body of FriendsList (NOT a route, R17-1). R17-2.
+- Layout: list of `InboxRow` (newest first, archived excluded); host owns the FlowHeader.
 - Loading: spinner only (R5-2). Empty: `EmptyMessages` (NO-CTA, R17-2). Error: `ErrorState kind="server"`.
-- Row tap: DM/group → `MessageThread`; event → HomeTab → `EventChat` (D2). Light haptic.
+- Row tap (host-routed): DM/group → `MessageThread`; event → HomeTab → `EventChat` (D2). Light haptic.
 
 ### Message thread (DM / group) — `MessageThreadScreen`
 **File:** `src/screens/friends/MessageThreadScreen.tsx` (FriendsStack route `MessageThread { conversationId, type }`). R17-4…R17-8.

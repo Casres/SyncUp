@@ -117,12 +117,14 @@ The mobile mocks tombstone (`social-calendar-mobile/src/mocks/index.ts`) is inte
 
 **`prisma-augment.d.ts` removed (2026-06-02).** The temporary type shim is gone. It had invented bespoke row-type names (`NotificationModel` / `BroadcastSettingsModel` / `UserAvailabilityModel`) that the repos imported from `@prisma/client`; those were refactored to the real generated names (`Notification` / `BroadcastSettings` / `UserAvailability`) in `notifications.repository.ts`, `availability.repository.ts`, and `notifications.service.ts`. Consequence: **the generated Prisma client is now the only source of these types — run `npm run prisma:generate` (in `social-calendar-api`) after a fresh checkout or schema change before `tsc`/`npm run build`.** The Dockerfile already runs `npx prisma generate` (L33). Without a generated client you'll see `TS2305: Module '@prisma/client' has no exported member 'AvailState'` (and similar) — that's a missing generate, not a code regression.
 
-## Session of 2026-06-04 (R18 messaging build) — branch `r18-messaging-build`
+## Session of 2026-06-04 (R18 messaging build) — MERGED to `main`
 
 The messaging system (1:1 DM · group chat · event chat) is built end-to-end —
 backend + mobile code complete, both workspaces `tsc` green, `social-calendar-api`
-`npm run build` green. Committed + pushed on branch `r18-messaging-build` (NOT
-merged to `main`). Full status + the three deferred items live in `R18-PLAN.md`
+`npm run build` green. **MERGED to `main` 2026-06-04 via PR #1 (merge commit
+`a62668a`); the `r18-messaging-build` branch has been deleted.** Verified live:
+migrate-deploy applied + `scripts/messaging-roundtrip.sh` runs **31/31, 0 fail,
+re-runnable** against the docker stack. Full status lives in `R18-PLAN.md`
 "Build notes". Do not regress these:
 
 1. **All messaging WRITES route through the migration-owner `prisma` client**
@@ -150,7 +152,7 @@ Relevant code:
 - `social-calendar-api/prisma/migrations/20260603000001_messaging/`
 - `social-calendar-mobile/src/api/conversations.{ts,types.ts}`
 - `social-calendar-mobile/src/components/messaging/*`, `src/screens/{friends/Messages*,events/EventChat}*`
-- `scripts/messaging-roundtrip.sh` — run after any change touching these domains (needs docker + Clerk creds; not yet run).
+- `scripts/messaging-roundtrip.sh` — re-run after any change touching these domains (needs docker + Clerk creds); expect 31/31. The messaging migration is NOT auto-applied at boot — run `docker compose exec api npx prisma migrate deploy` after `docker compose up -d --build`.
 - `social-calendar-mobile/src/realtime/*` — the realtime socket client (see follow-up (a)).
 
 **Deferred (open follow-ups):** (a) realtime socket CLIENT on mobile — ✅ BUILT
@@ -160,7 +162,34 @@ mobile): `RealtimeProvider` (in `App.tsx`) owns the Clerk-bound socket + global
 per-thread join/leave + the `chat:typing` relay feeding `ChatThreadView`'s
 `TypingDots`. Pushes update the RQ cache only; typing is local state. `tsc` green;
 NOT yet run against a live socket server (gated on the docker stack). (b) R17-1
-Friends·Groups·Messages top-level carousel — inbox ships as a reachable `Messages`
-route (FriendsList header pill), Groups still a hidden stack. (c) migrate-deploy +
-`messaging-roundtrip.sh` run. (d) DM + Report R16-9 stub clock: DM is now PROMOTED
+Friends·Groups·Messages top-level carousel — ✅ BUILT 2026-06-04: `FriendsListScreen`
+hosts a 3-way `SegmentedSwitcher` + `SegmentCarousel` (swipe, wraps both ways);
+Groups=`GroupsPane`, Messages=`InboxPane`, both segments (not routes). `GroupsTab`/
+`GroupsStack` retired, group screens moved into `FriendsStack`; Friends pane keeps a
+pinned BFF chip + inline-expand pending banner. On branch `r17-friends-carousel`
+(PR #2, draft into `main`); `tsc` green; device QA in progress (first iPhone-17-sim
+run 2026-06-04 found+fixed the API shape bug in (e), full swipe QA still pending).
+(e) **API list-envelope shape mismatch — ✅ FIXED 2026-06-04 (commit `6c3b22b`, branch
+`r17-friends-carousel`).** The first live mobile run surfaced a pre-existing bug: the
+backend wraps list responses (`{ friends }`, `{ requests }`, `{ groups }`, `{ polls }`,
+`{ suggestions }`) but five mobile fetchers (`getFriends`/`getFriendRequests` in
+`api/friends.ts`, `getGroups`/`getGroupPolls`/`getGroupSuggestions` in `api/groups.ts`)
+cast to bare arrays → runtime `x.filter is not a function` on first render against the
+real API (was masked before because the app had only run on mocks). Fixed all five to
+unwrap defensively (`Array.isArray(res) ? res : res?.key ?? []`). `getFriendTypes`,
+`useInbox`, `events`, `notifications` already unwrapped; no `blocks`/`members` list
+fetchers exist. NB after such a fix a **full reload** is needed — React Query caches the
+bad shape across fast-refresh. When adding a new list endpoint, mirror the backend
+envelope in the fetcher.
+(c) migrate-deploy ✅ + `messaging-roundtrip.sh` ✅ 31/31 (2026-06-04). The run found
++ fixed a real bug: group-chat auto-create silently failed because the FriendGroup
+was written in the uncommitted per-request app-client tx while the chat insert ran on
+a separate owner-client connection (FK `linkedGroupId` had no visible target → P2003,
+swallowed). Fix: `friendGroupsRepository.createWithGroupChatOwner` creates group + GROUP
+conversation + owner participant in ONE owner-client `$transaction`. Two
+`messaging-roundtrip.sh` assertions also fixed (friends-list shape; deterministic
+group-conversation selection by `linkedGroupId`). CI: the Test job was pre-existing red
+on `main` because `ci.yml` omitted the `CLOUDINARY_*` vars `env.ts` requires at import
+(`process.exit(1)` before any test); fixed by adding them as GitHub repo secrets and
+wiring them into the Test job env. (d) DM + Report R16-9 stub clock: DM is now PROMOTED
 (real); Report stays a stub.

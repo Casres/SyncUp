@@ -220,14 +220,12 @@ export function NotifSheet({
   }
 
   function navGroupDetail(groupId: string) {
-    // SPEC-R12-NotifRouting: Friends tab activates and the SegmentedSwitcher
-    // flips to Groups. Current navigator hides GroupsTab from TabBar but it
-    // remains a real tab — navigate directly to it. Once the Friends/Groups
-    // SegmentedSwitcher is unified into a single FriendsTab segment, swap
-    // this to navigate('FriendsTab', { … }) with a `segment: 'groups'` param.
+    // SPEC-R12-NotifRouting: Friends tab activates and GroupDetail pushes.
+    // Groups is now a SEGMENT of the Friends tab (R17-1) and GroupDetail lives
+    // in FriendsStack, so route via FriendsTab → GroupDetail.
     navigateAfterDismiss(() => {
       navigationRef.navigate('Tabs', {
-        screen: 'GroupsTab',
+        screen: 'FriendsTab',
         params: { screen: 'GroupDetail', params: { groupId } },
       });
     });
