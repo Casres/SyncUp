@@ -34,6 +34,10 @@ import {
   clearSignupAvatarUri,
   getSignupAvatarUri,
 } from './signupAvatarStore';
+import {
+  clearSignupSessionId,
+  getSignupSessionId,
+} from './signupSessionStore';
 
 const TRANSLATE_START = 20;
 const BADGE_SIZE = 24;
@@ -95,12 +99,20 @@ export default function YoureInScreen({
     // RootNavigator, which unmounts AuthNavigator and mounts the main
     // shell. It must run BEFORE the avatar upload — getToken() needs an
     // active session to mint a valid JWT for the API.
-    if (!isLoaded || !signUp?.createdSessionId) return;
+    //
+    // The session was minted back on Step4 (when the password completed the
+    // sign-up) and stashed; `signUp.createdSessionId` is usually null this far
+    // down the flow because Clerk drops it from the client resource after
+    // completion (issue #4). Prefer the live value, fall back to the stash.
+    if (!isLoaded) return;
+    const sessionId = signUp?.createdSessionId ?? getSignupSessionId();
+    if (!sessionId) return;
     try {
-      await setActive({ session: signUp.createdSessionId });
+      await setActive({ session: sessionId });
+      clearSignupSessionId();
     } catch {
-      // Activation failed — leave the avatar queued so the user can retry
-      // by tapping Go again rather than losing their photo selection.
+      // Activation failed — leave the avatar + session queued so the user can
+      // retry by tapping Go again rather than losing their photo selection.
       return;
     }
 
